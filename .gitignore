@@ -1,0 +1,6 @@
+package-lock.json
+node_modules
+dist
+.cache
+*.png
+package 

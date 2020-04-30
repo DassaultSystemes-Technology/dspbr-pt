@@ -1,0 +1,59 @@
+{
+  "name": "dspbr-pt",
+  "version": "1.0.0",
+  "description": "A WebGL2 Enterprise PBR sample renderer",
+  "main": "src/electron/main.js",
+  "browser": "src/app.js",
+  "dependencies": {
+    "argparse": "^1.0.10",
+    "core-js": "^3.6.5",
+    "dat.gui": "^0.7.7",
+    "three": "^0.115.0",
+    "open": "^7.0.3",
+    "shx": "^0.3.2",
+    "parcel": "^1.12.4",
+    "parcel-plugin-static-files-copy": "^2.3.1"
+  },
+  "devDependencies": {
+    "concurrently": "^5.2.0",
+    "electron-serve": "^1.0.0",
+    "cssnano": "^4.1.10",
+    "electron": "^8.2.3",
+    "electron-packager": "^14.2.1"
+  },
+  "scripts": {
+    "start": "electron .",
+    "render": "electron src/electron/offscreen.js --enable-logging",
+    "clean": "shx rm -rf dist/*",
+    "build": "npm run clean && parcel build src/index.html --public-url ./",
+    "build-all": "npm run clean && parcel build src/index.html --public-url ./ && parcel build src/electron/headless.html --public-url ./",
+    "dev": "parcel src/index.html --port 3000 --open",
+    "build-headless": "npm run clean && parcel build src/electron/headless.html --public-url ./",
+    "dev:electron": "concurrently \"parcel watch src/index.html\" \"npm start\"",
+    "package:mac": "electron-packager . --overwrite --platform=darwin --arch=x64 --out=package",
+    "package:windows": "electron-packager . dspbr-viewer --overwrite --asar --platform=win32 --arch=ia32 --out=package --version-string.CompanyName=CE --version-string.FileDescription=CE --version-string.ProductName=\"Enterprise PBR Viewer\""
+  },
+  "staticFiles": {
+    "staticPath": [
+      {
+        "staticPath": "assets",
+        "staticOutDir": "assets"
+      },
+      {
+        "staticPath": "lib/shader",
+        "staticOutDir": "shader"
+      }
+    ],
+    "watcherGlob": "**"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DassaultSystemes-Technology/dspbr-pt"
+  },
+  "author": "Bastian Sdorra <bastian.SDORRA@3ds.com>",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/DassaultSystemes-Technology/dspbr-pt/issues"
+  },
+  "homepage": "https://github.com/DassaultSystemes-Technology/dspbr-pt#readme"
+}
