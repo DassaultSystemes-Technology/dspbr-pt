@@ -197,7 +197,10 @@ int sampleBSDFBounce(inout RenderState rs, inout vec3 pathWeight) {
     //return -1;
     float sample_pdf = 0.0;
     vec3 sample_weight = vec3(0);
-    rs.wo = dspbr_sample(rs.closure, y_to_z_up * rs.wi, vec2(rng_NextFloat(), rng_NextFloat()), sample_weight, sample_pdf);
+
+    vec3 wi = y_to_z_up * rs.wi;
+    vec3 wo = dspbr_sample(rs.closure, wi, vec3(rng_NextFloat(), rng_NextFloat(), rng_NextFloat()), sample_weight, sample_pdf);
+    rs.wo = transpose(y_to_z_up) * wo;
 
     if(sample_pdf > 0.0) {
         pathWeight *= sample_weight;
