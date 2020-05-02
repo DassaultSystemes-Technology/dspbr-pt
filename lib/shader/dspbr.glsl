@@ -13,58 +13,124 @@
  * limitations under the License.
  */
 
-vec3 fresnel_schlick(vec3 f0, vec3 f90, float theta) {
+vec3 fresnel_schlick(vec3 f0, vec3 f90, float theta)
+{
     return f0 + (f90-f0)*pow(abs(1.0-theta), 5.0);
 }
 
-float fresnel_schlick(float f0, float f90, float theta) {
+float fresnel_schlick(float f0, float f90, float theta)
+{
     return f0 + (f90-f0)*pow(abs(1.0-theta), 5.0);
 }
 
-// Smith-masking for anisotropic GGX
-float smith_lambda(in vec3 wi, in vec2 alpha)
+float sqr(float x)
 {
-    float ax = alpha.x * wi.x;
-    float ay = alpha.y * wi.y;
-
-    float inv_a_2 = (ax * ax + ay * ay) / (wi.z* wi.z);
-
-    return 2.0 / (1.0 + sqrt(1.0 + inv_a_2));
+    return x * x;
 }
 
-float ggx_g1(in vec2 alpha, in vec3 w, in vec3 wh)
+/////////////////////////////////////////////////
+// GGX Distribution
+
+// Eric Heitz. Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs.
+// Journal of Computer Graphics TechniquesVol. 3, No. 2, 2014
+// http://jcgt.org/published/0003/02/03/paper.pdf
+
+// eq. 80
+float projected_roughness(in vec2 alpha, in vec3 w)
 {
-    if (dot(w, wh) <= 0.0 || w.z == 0.0) {
+    float sin_theta_2 = 1.0 - w.z * w.z;
+    float inv_sin_theta_2 = 1.0 / sin_theta_2;
+    float cos_phi_2 = sqr(w.x) * inv_sin_theta_2;
+    float sin_phi_2 = sqr(w.y) * inv_sin_theta_2;
+
+    return sqrt(cos_phi_2 * sqr(alpha.x) + sin_phi_2 * sqr(alpha.y));    
+}
+
+// eq. 86
+float ggx_smith_lambda(in vec2 alpha, in vec3 w)
+{
+    float sin_theta_2 = 1.0 - w.z * w.z;
+
+    if (sin_theta_2 < 0.0001) {
         return 0.0;
-    } else {
-        vec3 alphauv1 = vec3(alpha.x, alpha.y, 1.0);
-        float abs_cos_w = abs(w.z);
-        return 2.0 * abs_cos_w / (length(alphauv1 * w) + abs_cos_w);
     }
+
+    float alpha_w = projected_roughness(alpha, w);
+
+    float tan_theta = sqrt(sin_theta_2) / abs(w.z);
+    float a = 1.0 / (alpha_w * tan_theta);
+
+    return 0.5 * (-1.0 + sqrt(1.0 + 1.0 / sqr(a)));
 }
 
-// Height-Correlated Masking and Shadowing
-// equation 21 in 'Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs'
-float ggx_g(in vec2 alpha, in vec3 wi, in vec3 wo, in vec3 wh)
+// eq. 43
+float ggx_smith_g1(in vec2 alpha, in vec3 w, in vec3 wh)
 {
-    bool has_no_contribution = dot(wi, wh) <= 0.0 || dot(wo, wh) <= 0.0;
-    if(has_no_contribution || (wi.z == 0.0 && wo.z == 0.0))
+    if (dot(w, wh) < 0.0) {
         return 0.0;
-    else {
-        float abs_cos_wi = abs(wi.z);
-        float abs_cos_wo = abs(wo.z);
-
-        vec3 alphauv1 = vec3(alpha.x, alpha.y, 1.0);
-        return 2.0 * abs_cos_wi * abs_cos_wo / (length(alphauv1 * wi) * abs_cos_wo + length(alphauv1 * wo) * abs_cos_wi);
     }
-    // float G1 = smith_lambda(wi, alpha);
-    // float G2 = smith_lambda(wo, alpha);
-    // return G1 * G2;
+
+    return 1.0 / (1.0 + ggx_smith_lambda(alpha, w));
 }
 
-// Heitz 2017, A Simpler and Exact Sampling Routine for the GGX Distribution of Visible Normals
+// eq. 99
+float ggx_smith_g2(in vec2 alpha, in vec3 wi, in vec3 wo, in vec3 wh)
+{
+    if (dot(wo, wh) * dot(wi, wh) < 0.0) {
+        return 0.0;
+    }
+
+    float lambda_wi = ggx_smith_lambda(alpha, wi);
+    float lambda_wo = ggx_smith_lambda(alpha, wo);
+
+    return 1.0 / (1.0 + lambda_wi + lambda_wo);
+}
+
+// GGX distribution, eq. 85
+float ggx_eval(vec2 alpha, vec3 wh)
+{
+    if (wh.z < 0.0) {
+        return 0.0;
+    }
+
+    // // simplified alternative
+    // float hx = sqr(wh.x) / sqr(alpha.x);
+    // float hy = sqr(wh.y) / sqr(alpha.y);
+    // float hn = sqr(wh.z);
+    // float norm = 1.0 / (PI * alpha.x * alpha.y);
+    // return norm * (1.0 / sqr(hx + hy + hn));
+
+    float cos_theta_2 = sqr(wh.z);
+    float cos_theta_4 = sqr(cos_theta_2);
+    float sin_theta_2 = 1.0 - cos_theta_2;
+    float tan_theta_2 = sqr(sqrt(sin_theta_2) / wh.z);
+
+    if (sin_theta_2 < 0.0001) {
+        return 0.0;
+    }
+
+    float inv_sin_theta_2 = 1.0 / sin_theta_2;
+    float cos_phi_2 = sqr(wh.x) * inv_sin_theta_2;
+    float sin_phi_2 = sqr(wh.y) * inv_sin_theta_2;
+
+    return 1.0 / (PI * alpha.x * alpha.y * cos_theta_4 * sqr(1.0 + tan_theta_2 * (cos_phi_2 / sqr(alpha.x) + sin_phi_2 / sqr(alpha.y))));
+}
+
+// GGX distribution of visible normals, eq. 16
+float ggx_eval_vndf(vec2 alpha, vec3 wi, vec3 wh)
+{
+    float d = ggx_eval(alpha, wh);
+    float g1 = ggx_smith_g1(alpha, wi, wh);
+    return g1 * abs(dot(wi, wh)) * d / abs(wi.z);
+}
+
+// Sample GGX distribution of visible normals
 vec3 ggx_sample_vndf(vec2 alpha, vec3 wi_, vec2 uv)
 {
+    // Eric Heitz. A Simpler and Exact Sampling Routine for the GGX Distribution of Visible Normals.
+    // [Research Report] Unity Technologies. 2017. hal-01509746
+    // https://hal.archives-ouvertes.fr/hal-01509746/document
+
     // stretch view
     vec3 wi = normalize(vec3(alpha.x * wi_.x, alpha.y * wi_.y, wi_.z));
     // orthonormal basis
@@ -85,39 +151,12 @@ vec3 ggx_sample_vndf(vec2 alpha, vec3 wi_, vec2 uv)
     return normalize(wh);
 }
 
-float ggx_pdf(vec2 alpha, in vec3 wi, in vec3 wh) {
-    vec3 alphauv1 = vec3(alpha.x, alpha.y, 1.0);
-    float dot_wi_wh = dot(wi, wh);
-    if (dot_wi_wh <= 0.0 || wi.z <= 0.0) {
-        return 0.0;
-    } else {
-        vec3 wh_inv_scaled = wh / alphauv1;
-        float dot_wh_wh_inv_scaled = dot(wh_inv_scaled, wh_inv_scaled);
-        vec3 wi_scaled = alphauv1 * wi;
-        float dot_wi_wi_scaled = dot(wi_scaled, wi_scaled);
-        return dot_wi_wh / ((0.5*PI)*alpha.x*alpha.y* dot_wh_wh_inv_scaled * dot_wh_wh_inv_scaled * (wi.z+ sqrt(dot_wi_wi_scaled)));
-    }
-}
-
-float ggx_eval(in vec2 alpha, in vec3 wh) {
-    float alphauv = alpha.x * alpha.y;
-    vec3 wh_scaled = vec3(alpha.y, alpha.x, alphauv) * wh;
-    float b = dot(wh_scaled, wh_scaled);
-    return (alphauv*alphauv*alphauv) / (PI*b*b);
-}
-
-vec3 ggx_sample(vec2 alpha, in vec3 wi, in vec2 uv, out float pdf)
-{
-    vec3 wh = ggx_sample_vndf(alpha, wi, uv);
-    pdf = ggx_pdf(alpha, wi, wh);
-    return wh;
-}
+/////////////////////////////////////////////////
 
 vec3 ggx_importance(vec3 f0, float cos_theta)
 {
     return fresnel_schlick(f0, vec3(1.0), cos_theta);
 }
-
 
 float directional_albedo_ggx(float alpha, float cosTheta)
 {
@@ -146,13 +185,16 @@ vec3 microfacet_ggx_smith_eval_ms(vec3 f0, vec3 f90, vec2 alpha_anisotropic, flo
     return ms * f;
 }
 
-
 vec3 microfacet_ggx_smith_eval(vec3 f0, vec3 f90, vec2 alpha, vec3 wi, vec3 wo, vec3 wh)
 {
-    vec3 f = fresnel_schlick(f0, f90, dot(wi, wh));
-    float d = ggx_eval(alpha, wh);
-    float g = ggx_g(alpha, wi, wo, wh);
+    if (abs(wi.z) < 0.0001 || abs(wo.z) < 0.0001) {
+        return vec3(0.0);
+    }
 
+    vec3 f = fresnel_schlick(f0, f90, dot(wi, wh));
+    
+    float d = ggx_eval(alpha, wh);
+    float g = ggx_smith_g2(alpha, wi, wo, wh);
     return (f * g * d) / abs(4.0 * wi.z * wo.z);
 }
 
@@ -166,33 +208,14 @@ vec3 sample_hemisphere_cos(vec2 uv, out float pdf) {
 
 vec3 microfacet_ggx_smith_sample(in vec2 alpha, in vec3 wi, in vec2 uv, out float pdf)
 {
-    vec3 wo;
-    //if(c.specularity > 0.5) {
-    vec3 wh = ggx_sample(alpha, wi, uv, pdf);
-    pdf *= 1.0 / (4.0 * abs(dot(wi, wh)));
-    wo = reflect(-wi, wh);
-    //} else {
-   //     wo = sample_hemisphere_cos(uv, pdf);
-        //pdf = wi.z * ONE_OVER_PI;
-    //}
+    vec3 wh = ggx_sample_vndf(alpha, wi, uv);
+    vec3 wo = reflect(-wi, wh);
+
+    float dwh_dwo = 1.0 / (4.0 * abs(dot(wo, wh)));
+    pdf = ggx_eval_vndf(alpha, wi, wh) * dwh_dwo;
+
     return wo;
 }
-
-// float microfacet_ggx_smith_pdf(in vec2 alpha, vec3 wi, vec3 wo)
-// {
-//         vec3 wh = normalize(wi+wo);
-//     //if(c.specularity > 0.5) {
-//         return ggx_pdf(alpha, wi, wh);
-//     //} else {
-//     //    return wi.y / ONE_OVER_PI;
-//     //}
-// }
-
-// vec3 microfacet_ggx_smith_importance(const in MaterialClosure c, vec3 wi)
-// {
-//     return ggx_importance(c, wi);
-// }
-
 
 float directional_albedo_ggx_ms(float theta, vec2 alpha, float e0) {
     return mix(e0 + (1.0-e0)*pow(abs(1.0-theta), 5.0), 0.04762+0.95238*e0,
@@ -306,19 +329,18 @@ float luminance(vec3 rgb) {
     return 0.2126*rgb.x + 0.7152*rgb.y + 0.0722*rgb.z;
 }
 
-vec3 dspbr_sample(const in MaterialClosure c, vec3 wi, in vec2 uv, out vec3 weight, out float pdf) {
-    vec3 wi_ =  c.to_local * wi;
+vec3 dspbr_sample(const in MaterialClosure c, vec3 wi, in vec3 uvw, out vec3 weight, out float pdf) {
+    vec3 wi_ = c.to_local * wi;
     float dot_wi_n = wi_.z;
 
     vec3 diffuse_color = c.albedo * (1.0-c.metallic);
     float bsdf_importance[2];
     bsdf_importance[0] = luminance(diffuse_bsdf_importance(diffuse_color));
     bsdf_importance[1] = luminance(ggx_importance(c.specular_f0, dot_wi_n));
-    // bsdf_importance[1] = luminance(microfacet_ggx_smith_importance(c, wi_));
 
     float bsdf_cdf[2];
-		bsdf_cdf[0] = bsdf_importance[0];
-		bsdf_cdf[1] = bsdf_cdf[0] + bsdf_importance[1];
+    bsdf_cdf[0] = bsdf_importance[0];
+    bsdf_cdf[1] = bsdf_cdf[0] + bsdf_importance[1];
 
     if (bsdf_cdf[1] != 0.0) {
         bsdf_cdf[0] *= 1.0 / bsdf_cdf[1];
@@ -327,30 +349,18 @@ vec3 dspbr_sample(const in MaterialClosure c, vec3 wi, in vec2 uv, out vec3 weig
         bsdf_cdf[0] = 1.0;
     }
 
-    //bsdf_cdf[0] = 1.0;
-    //bsdf_cdf[1] = 1.0;
-
-    float rr = rng_NextFloat();
-
     vec3 wo_;
-    if (rr <= bsdf_cdf[0]) {
-        //r0 *= fl(1.0) / bsdf_cdf[0];
-        wo_ = sample_hemisphere_cos(uv, pdf);
-        float sample_pdf = 1.0/bsdf_cdf[0] * pdf;
-        weight = diffuse_bsdf_eval(c, dot_wi_n, wo_.z) / sample_pdf;
-    }
-    else if (rr <= bsdf_cdf[1]) {
-        //float selection_pdf =  bsdf_cdf[1] - bsdf_cdf[0];
-        //r0 = (r0 - bsdf_cdf[0]) / selection_pdf;
-        wo_ = microfacet_ggx_smith_sample(c.alpha, wi_, uv, pdf);
-        float sample_pdf = (bsdf_cdf[1] - bsdf_cdf[0]) * pdf;
-        vec3 wh_ = normalize(wi_ + wo_);
-        weight = microfacet_ggx_smith_eval(c.specular_f0, c.specular_f90, c.alpha, wi_, wo_, wh_) / sample_pdf;
+    if (uvw.z <= bsdf_cdf[0]) {
+        wo_ = sample_hemisphere_cos(uvw.xy, pdf);
+        pdf *= 1.0 / bsdf_cdf[0];
+    } else if (uvw.z <= bsdf_cdf[1]) {
+        wo_ = microfacet_ggx_smith_sample(c.alpha, wi_, uvw.xy, pdf);
+        pdf *= (bsdf_cdf[1] - bsdf_cdf[0]);
     }
 
-    //weight = dspbr_eval(rs)* wo_.y;
-    weight *= wo_.z;
+    vec3 wo = transpose(c.to_local) * wo_;
+    weight = dspbr_eval(c, wi, wo) / pdf * wo_.z;
 
-    return transpose(y_to_z_up) * transpose( c.to_local) * wo_;
+    return wo;
 }
 /////////////////////////////////////////////////////////////////////////////// 
