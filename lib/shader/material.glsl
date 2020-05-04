@@ -154,13 +154,16 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
         vec3 n = normalize(evaluateMaterialTextureValue(matTexInfo.normalMap, uv).xyz * 2.0 - vec3(1.0));
         c.n = to_world * n;
         vec3 wi = y_to_z_up*rs.wi;
-        fix_normals(c.n, c.ng, wi);
-        c.n = clamp_normal(c.n, c.ng, wi);
-    }
-  
-    c.t = rotation_to_tangent(matData.anisotropyRotation, c.n, c.t);
 
-    c.to_local = transpose(get_onb(c.n, c.t));
+        // ensure n and ng point into the same hemisphere as wi
+        fix_normals(c.n, c.ng, wi);
+    }
+
+    // ensure orthonormal basis  
+    c.t = get_onb(c.n, c.t)[0];
+
+    // apply aniso rotation
+    c.t = rotation_to_tangent(matData.anisotropyRotation, c.n, c.t);
 
     c.emission = pow(evaluateMaterialTextureValue(matTexInfo.emissionMap, uv).xyz, vec3(2.2)) * matData.emission;
 

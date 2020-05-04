@@ -54,7 +54,7 @@ float ggx_smith_lambda(vec2 alpha, vec3 w, Geometry g)
     float sin_theta_2 = 1.0 - sqr(dot(w, g.n));
 
     if (sin_theta_2 < 0.0001) {
-        return 0.0;
+        return 1.0;
     }
 
     float alpha_w = projected_roughness(alpha, w, g);
@@ -95,20 +95,13 @@ float ggx_eval(vec2 alpha, vec3 wh, Geometry g)
         return 0.0;
     }
 
-    // // simplified alternative
-    // float hx = sqr(wh.x) / sqr(alpha.x);
-    // float hy = sqr(wh.y) / sqr(alpha.y);
-    // float hn = sqr(wh.z);
-    // float norm = 1.0 / (PI * alpha.x * alpha.y);
-    // return norm * (1.0 / sqr(hx + hy + hn));
-
     float cos_theta_2 = sqr(dot(wh, g.n));
     float cos_theta_4 = sqr(cos_theta_2);
     float sin_theta_2 = 1.0 - cos_theta_2;
     float tan_theta_2 = sqr(sqrt(sin_theta_2) / dot(wh, g.n));
 
     if (sin_theta_2 < 0.0001) {
-        return 0.0;
+        return 1.0;
     }
 
     float inv_sin_theta_2 = 1.0 / sin_theta_2;
@@ -202,28 +195,30 @@ vec3 microfacet_ggx_smith_eval(vec3 f0, vec3 f90, vec2 alpha, vec3 wi, vec3 wo, 
     return (f * g * d) / abs(4.0 * dot(wi, geo.n) * dot(wo, geo.n));
 }
 
-vec3 sample_hemisphere_cos(vec2 uv, out float pdf) {
+vec3 diffuse_bsdf_sample(vec3 wi, Geometry g, vec2 uv, out float pdf) {
      float phi = uv.y * 2.0 * PI;
      float cos_theta = sqrt(1.0 - uv.x);
      float sin_theta = sqrt(1.0 - cos_theta * cos_theta);
-     pdf = cos_theta*ONE_OVER_PI;
-     return vec3(cos(phi) * sin_theta, sin(phi) * sin_theta, cos_theta);
+     pdf = cos_theta * ONE_OVER_PI;
+     vec3 wo0 = vec3(cos(phi) * sin_theta, sin(phi) * sin_theta, cos_theta);
+     return g.t * wo0.x + g.b * wo0.y + g.n * wo0.z;
 }
 
-vec3 microfacet_ggx_smith_sample(in vec2 alpha, in vec3 wi, in vec2 uv, out float pdf)
+vec3 microfacet_ggx_smith_sample(vec2 alpha, vec3 wi, Geometry g, vec2 uv, out float pdf)
 {
-    vec3 wh = ggx_sample_vndf(alpha, wi, uv);
-    vec3 wo = reflect(-wi, wh);
+    vec3 wi0 = vec3(dot(wi, g.t), dot(wi, g.b), dot(wi, g.n));
+    vec3 wh0 = ggx_sample_vndf(alpha, wi0, uv);
+    vec3 wo0 = reflect(-wi0, wh0);
 
-    float dwh_dwo = 1.0 / (4.0 * abs(dot(wo, wh)));
+    float dwh_dwo = 1.0 / (4.0 * abs(dot(wo0, wh0)));
 
-    Geometry g;
-    g.n = vec3(0, 0, 1);
-    g.t = vec3(1, 0, 0);
-    g.b = vec3(0, 1, 0);
-    pdf = ggx_eval_vndf(alpha, wi, wh, g) * dwh_dwo;
+    Geometry g0;
+    g0.n = vec3(0, 0, 1);
+    g0.t = vec3(1, 0, 0);
+    g0.b = vec3(0, 1, 0);
+    pdf = ggx_eval_vndf(alpha, wi0, wh0, g0) * dwh_dwo;
 
-    return wo;
+     return g.t * wo0.x + g.b * wo0.y + g.n * wo0.z;
 }
 
 float directional_albedo_ggx_ms(float theta, vec2 alpha, float e0) {
@@ -257,6 +252,14 @@ float diffuse_bsdf_pdf(vec3 wi, vec3 wo, Geometry g) {
 
 vec3 diffuse_bsdf_importance(vec3 tint) {
     return tint;
+}
+
+vec3 sheen_bsdf_importance(float sheen, vec3 sheenColor) {
+    return sheen * sheenColor;
+}
+
+vec3 clearcoat_bsdf_importance(float clearcoat) {
+    return vec3(clearcoat);
 }
 
 float l(float x, float alpha)
@@ -308,7 +311,7 @@ vec3 coating_layer(vec3 base, float clearcoat, float clearcoat_roughness,
     vec3 coating = microfacet_ggx_smith_eval(vec3(0.04), vec3(1.0), alpha_coating, wi, wo, wh, g);
     vec3 Fcv = clearcoat * fresnel_schlick(vec3(0.04), vec3(1.0), abs(dot(wi, g.n)));
     vec3 Fcl = clearcoat * fresnel_schlick(vec3(0.04), vec3(1.0), abs(dot(wo, g.n)));
-    return base * (1.0 - max_(max(Fcv, Fcl))); + clearcoat * coating;
+    return base * (1.0 - max_(max(Fcv, Fcl))) + clearcoat * coating;
 }
 
 vec3 dspbr_eval(const in MaterialClosure c, vec3 wi, vec3 wo) {
@@ -340,13 +343,10 @@ vec3 dspbr_sample(const in MaterialClosure c, vec3 wi, in vec3 uvw, out vec3 wei
     g.t = c.t;
     g.b = cross(c.n, c.t);
 
-    vec3 wi_ = c.to_local * wi;
-    float dot_wi_n = wi_.z;
-
     vec3 diffuse_color = c.albedo * (1.0-c.metallic);
     float bsdf_importance[2];
-    bsdf_importance[0] = luminance(diffuse_bsdf_importance(diffuse_color));
-    bsdf_importance[1] = luminance(ggx_importance(c.specular_f0, dot_wi_n));
+    bsdf_importance[0] = luminance(diffuse_bsdf_importance(diffuse_color) + sheen_bsdf_importance(c.sheen, c.sheen_color) + clearcoat_bsdf_importance(c.clearcoat));
+    bsdf_importance[1] = luminance(ggx_importance(c.specular_f0, dot(wi, g.n)));
 
     float bsdf_cdf[2];
     bsdf_cdf[0] = bsdf_importance[0];
@@ -359,17 +359,34 @@ vec3 dspbr_sample(const in MaterialClosure c, vec3 wi, in vec3 uvw, out vec3 wei
         bsdf_cdf[0] = 1.0;
     }
 
-    vec3 wo_;
+    // TODO Clean up, improve and probably fix importance sampling.
+    vec3 wo;
     if (uvw.z <= bsdf_cdf[0]) {
-        wo_ = sample_hemisphere_cos(uvw.xy, pdf);
-        pdf *= 1.0 / bsdf_cdf[0];
+        wo = diffuse_bsdf_sample(wi, g, uvw.xy, pdf);
+
+        vec3 wh = normalize(wi + wo);
+
+        weight = diffuse_bsdf_eval(c, wi, wo, g);
+
+        weight = sheen_layer(weight, c.sheen, c.sheen_color, c.sheen_roughness, wi, wo, wh, g);
+        weight = coating_layer(weight, c.clearcoat, c.clearcoat_roughness, wi, wo, wh, g);
+
+        weight /= pdf * bsdf_cdf[0];
     } else if (uvw.z <= bsdf_cdf[1]) {
-        wo_ = microfacet_ggx_smith_sample(c.alpha, wi_, uvw.xy, pdf);
-        pdf *= (bsdf_cdf[1] - bsdf_cdf[0]);
+        wo = microfacet_ggx_smith_sample(c.alpha, wi, g, uvw.xy, pdf);
+
+        vec3 wh = normalize(wi + wo);
+
+        weight  = microfacet_ggx_smith_eval(c.specular_f0, c.specular_f90, c.alpha, wi, wo, wh, g);
+        weight += microfacet_ggx_smith_eval_ms(c.specular_f0, c.specular_f90, c.alpha, wi, wo, g);
+
+        weight = sheen_layer(weight, 0.0, c.sheen_color, c.sheen_roughness, wi, wo, wh, g);
+        weight = coating_layer(weight, 0.0, c.clearcoat_roughness, wi, wo, wh, g);
+
+        weight /= pdf * (bsdf_cdf[1] - bsdf_cdf[0]);
     }
 
-    vec3 wo = transpose(c.to_local) * wo_;
-    weight = dspbr_eval(c, wi, wo) / pdf * wo_.z;
+    weight *= abs(dot(wo, g.n));
 
     return wo;
 }
