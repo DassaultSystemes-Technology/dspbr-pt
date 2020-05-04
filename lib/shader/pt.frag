@@ -122,7 +122,6 @@ struct MaterialClosure {
     vec3 n;
     vec3 ng;
     vec3 t;
-    mat3 to_local;
 };
 
 // struct Light {
@@ -180,7 +179,6 @@ void fillRenderState(const in Ray r, const in HitInfo hit, out RenderState rs) {
     rs.normal = calculateInterpolatedNormal(triIdx, hit.uv);
 
     fix_normals(rs.normal, rs.geometryNormal, rs.wi);
-    rs.normal = clamp_normal(rs.normal, rs.geometryNormal, rs.wi);
 
     if(u_bool_hasTangents) {
         rs.tangent = normalize(calculateInterpolatedTangent(triIdx, hit.uv));
