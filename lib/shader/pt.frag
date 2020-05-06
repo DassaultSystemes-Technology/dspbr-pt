@@ -118,7 +118,7 @@ struct MaterialClosure {
     vec3 sheen_color;
     vec2 alpha;
     float clearcoat;
-    float clearcoat_roughness;
+    float clearcoat_alpha;
     vec3 n;
     vec3 ng;
     vec3 t;

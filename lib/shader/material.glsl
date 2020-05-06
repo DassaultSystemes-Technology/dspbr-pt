@@ -168,7 +168,7 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
     c.emission = pow(evaluateMaterialTextureValue(matTexInfo.emissionMap, uv).xyz, vec3(2.2)) * matData.emission;
 
     c.clearcoat = matData.clearcoat;
-    c.clearcoat_roughness = max(matData.clearcoatRoughness, MINIMUM_ROUGHNESS);
+    c.clearcoat_alpha = max(matData.clearcoatRoughness*matData.clearcoatRoughness, MINIMUM_ROUGHNESS);
 }
 
 
