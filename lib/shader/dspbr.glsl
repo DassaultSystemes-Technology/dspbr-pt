@@ -306,11 +306,10 @@ vec3 sheen_layer(out float base_weight, float sheen_intensity, vec3 sheen_color,
     return sheen_intensity * sheen_color * sheen;
 }
 
-vec3 coating_layer(out float base_weight, float clearcoat, float clearcoat_roughness,
+vec3 coating_layer(out float base_weight, float clearcoat, float clearcoat_alpha,
     vec3 wi, vec3 wo, vec3 wh, Geometry g)
 {
-    vec2 alpha_coating = vec2(clearcoat_roughness*clearcoat_roughness);
-    vec3 coating = microfacet_ggx_smith_eval(vec3(0.04), vec3(1.0), alpha_coating, wi, wo, wh, g);
+    vec3 coating = microfacet_ggx_smith_eval(vec3(0.04), vec3(1.0), vec2(clearcoat_alpha), wi, wo, wh, g);
     vec3 Fcv = clearcoat * fresnel_schlick(vec3(0.04), vec3(1.0), abs(dot(wi, g.n)));
     vec3 Fcl = clearcoat * fresnel_schlick(vec3(0.04), vec3(1.0), abs(dot(wo, g.n)));
 
@@ -338,7 +337,7 @@ vec3 dspbr_eval(const in MaterialClosure c, vec3 wi, vec3 wo) {
     bsdf = sheen + bsdf * sheen_base_weight;
 
     float clearcoat_base_weight;
-    vec3 clearcoat = coating_layer(clearcoat_base_weight, c.clearcoat, c.clearcoat_roughness, wi, wo, wh, g);
+    vec3 clearcoat = coating_layer(clearcoat_base_weight, c.clearcoat, c.clearcoat_alpha, wi, wo, wh, g);
     bsdf = clearcoat + bsdf * clearcoat_base_weight;
 
     return bsdf;
@@ -355,17 +354,20 @@ vec3 dspbr_sample(const in MaterialClosure c, vec3 wi, in vec3 uvw, out vec3 bsd
     g.b = cross(c.n, c.t);
 
     vec3 diffuse_color = c.albedo * (1.0-c.metallic);
-    float bsdf_importance[2];
-    bsdf_importance[0] = luminance(diffuse_bsdf_importance(diffuse_color) + sheen_bsdf_importance(c.sheen, c.sheen_color) + clearcoat_bsdf_importance(c.clearcoat));
+    float bsdf_importance[3];
+    bsdf_importance[0] = luminance(diffuse_bsdf_importance(diffuse_color) + sheen_bsdf_importance(c.sheen, c.sheen_color));
     bsdf_importance[1] = luminance(ggx_importance(c.specular_f0, dot(wi, g.n)));
+    bsdf_importance[2] = luminance(clearcoat_bsdf_importance(c.clearcoat));
 
-    float bsdf_cdf[2];
+    float bsdf_cdf[3];
     bsdf_cdf[0] = bsdf_importance[0];
     bsdf_cdf[1] = bsdf_cdf[0] + bsdf_importance[1];
+    bsdf_cdf[2] = bsdf_cdf[1] + bsdf_importance[2];
 
-    if (bsdf_cdf[1] != 0.0) {
-        bsdf_cdf[0] *= 1.0 / bsdf_cdf[1];
-		bsdf_cdf[1] *= 1.0 / bsdf_cdf[1];
+    if (bsdf_cdf[2] != 0.0) {
+        bsdf_cdf[0] *= 1.0 / bsdf_cdf[2];
+        bsdf_cdf[1] *= 1.0 / bsdf_cdf[2];
+        bsdf_cdf[2] *= 1.0 / bsdf_cdf[2];
     } else {
         bsdf_cdf[0] = 1.0;
     }
@@ -383,8 +385,8 @@ vec3 dspbr_sample(const in MaterialClosure c, vec3 wi, in vec3 uvw, out vec3 bsd
         bsdf_over_pdf = sheen + bsdf_over_pdf * sheen_base_weight;
 
         float clearcoat_base_weight;
-        vec3 clearcoat = coating_layer(clearcoat_base_weight, c.clearcoat, c.clearcoat_roughness, wi, wo, wh, g);
-        bsdf_over_pdf = clearcoat + bsdf_over_pdf * clearcoat_base_weight;
+        coating_layer(clearcoat_base_weight, c.clearcoat, c.clearcoat_alpha, wi, wo, wh, g);
+        bsdf_over_pdf *= clearcoat_base_weight;
 
         bsdf_over_pdf /= pdf * bsdf_cdf[0];
     } else if (uvw.z <= bsdf_cdf[1]) {
@@ -400,10 +402,20 @@ vec3 dspbr_sample(const in MaterialClosure c, vec3 wi, in vec3 uvw, out vec3 bsd
         bsdf_over_pdf *= sheen_base_weight;
 
         float clearcoat_base_weight;
-        coating_layer(clearcoat_base_weight, 0.0, c.clearcoat_roughness, wi, wo, wh, g);
+        coating_layer(clearcoat_base_weight, 0.0, c.clearcoat_alpha, wi, wo, wh, g);
         bsdf_over_pdf *= clearcoat_base_weight;
 
         bsdf_over_pdf /= pdf * (bsdf_cdf[1] - bsdf_cdf[0]);
+    } else if (uvw.z < bsdf_cdf[2]) {
+        wo = microfacet_ggx_smith_sample(vec2(c.clearcoat_alpha), wi, g, uvw.xy, pdf);
+
+        vec3 wh = normalize(wi + wo);
+
+        float clearcoat_base_weight;
+        vec3 clearcoat = coating_layer(clearcoat_base_weight, c.clearcoat, c.clearcoat_alpha, wi, wo, wh, g);
+        bsdf_over_pdf = clearcoat;
+
+        bsdf_over_pdf /= pdf * (bsdf_cdf[2] - bsdf_cdf[1]);
     }
 
     bsdf_over_pdf *= abs(dot(wo, g.n));
