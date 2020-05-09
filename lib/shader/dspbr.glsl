@@ -212,16 +212,14 @@ vec3 microfacet_ggx_smith_sample(vec2 alpha, vec3 wi, Geometry g, vec2 uv, out f
     vec3 wi0 = vec3(dot(wi, g.t), dot(wi, g.b), dot(wi, g.n));
     vec3 wh0 = ggx_sample_vndf(alpha, wi0, uv);
     vec3 wo0 = reflect(-wi0, wh0);
+    vec3 wo = g.t * wo0.x + g.b * wo0.y + g.n * wo0.z;
 
-    float dwh_dwo = 1.0 / (4.0 * abs(dot(wo0, wh0)));
+    vec3 wh = normalize(wi + wo);
+    float dwh_dwo = 1.0 / (4.0 * abs(dot(wo, wh)));
 
-    Geometry g0;
-    g0.n = vec3(0, 0, 1);
-    g0.t = vec3(1, 0, 0);
-    g0.b = vec3(0, 1, 0);
-    pdf = ggx_eval_vndf(alpha, wi0, wh0, g0) * dwh_dwo;
+    pdf = ggx_eval_vndf(alpha, wi, wh, g) * dwh_dwo;
 
-     return g.t * wo0.x + g.b * wo0.y + g.n * wo0.z;
+    return wo;
 }
 
 float directional_albedo_ggx_ms(float theta, vec2 alpha, float e0) {
@@ -378,6 +376,7 @@ vec3 dspbr_sample(const in MaterialClosure c, vec3 wi, in vec3 uvw, out vec3 bsd
     vec3 wo;
     if (uvw.z <= bsdf_cdf[0]) {
         wo = diffuse_bsdf_sample(wi, g, uvw.xy, pdf);
+        pdf *= bsdf_cdf[0];
 
         vec3 wh = normalize(wi + wo);
 
@@ -390,10 +389,9 @@ vec3 dspbr_sample(const in MaterialClosure c, vec3 wi, in vec3 uvw, out vec3 bsd
         float clearcoat_base_weight;
         coating_layer(clearcoat_base_weight, c.clearcoat, c.clearcoat_alpha, wi, wo, wh, g);
         bsdf_over_pdf *= clearcoat_base_weight;
-
-        bsdf_over_pdf /= pdf * bsdf_cdf[0];
     } else if (uvw.z <= bsdf_cdf[1]) {
         wo = microfacet_ggx_smith_sample(c.alpha, wi, g, uvw.xy, pdf);
+        pdf *= (bsdf_cdf[1] - bsdf_cdf[0]);
 
         vec3 wh = normalize(wi + wo);
 
@@ -407,20 +405,18 @@ vec3 dspbr_sample(const in MaterialClosure c, vec3 wi, in vec3 uvw, out vec3 bsd
         float clearcoat_base_weight;
         coating_layer(clearcoat_base_weight, 0.0, c.clearcoat_alpha, wi, wo, wh, g);
         bsdf_over_pdf *= clearcoat_base_weight;
-
-        bsdf_over_pdf /= pdf * (bsdf_cdf[1] - bsdf_cdf[0]);
     } else if (uvw.z < bsdf_cdf[2]) {
         wo = microfacet_ggx_smith_sample(vec2(c.clearcoat_alpha), wi, g, uvw.xy, pdf);
+        pdf *= (bsdf_cdf[2] - bsdf_cdf[1]);
 
         vec3 wh = normalize(wi + wo);
 
         float clearcoat_base_weight;
         vec3 clearcoat = coating_layer(clearcoat_base_weight, c.clearcoat, c.clearcoat_alpha, wi, wo, wh, g);
         bsdf_over_pdf = clearcoat;
-
-        bsdf_over_pdf /= pdf * (bsdf_cdf[2] - bsdf_cdf[1]);
     }
 
+    bsdf_over_pdf /= pdf;
     bsdf_over_pdf *= abs(dot(wo, g.n));
 
     return wo;
