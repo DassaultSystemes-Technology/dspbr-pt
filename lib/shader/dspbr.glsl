@@ -187,8 +187,6 @@ vec3 microfacet_ggx_smith_eval(vec3 f0, vec3 f90, vec2 alpha, vec3 wi, vec3 wo, 
         return vec3(0.0);
     }
 
-    alpha = clamp(alpha, vec2(0.001), vec2(1.0));
-
     vec3 f = fresnel_schlick(f0, f90, dot(wi, wh));
     
     float d = ggx_eval(alpha, wh, geo);
@@ -207,8 +205,6 @@ vec3 diffuse_bsdf_sample(vec3 wi, Geometry g, vec2 uv, out float pdf) {
 
 vec3 microfacet_ggx_smith_sample(vec2 alpha, vec3 wi, Geometry g, vec2 uv, out float pdf)
 {
-    alpha = clamp(alpha, vec2(0.001), vec2(1.0));
-
     vec3 wi0 = vec3(dot(wi, g.t), dot(wi, g.b), dot(wi, g.n));
     vec3 wh0 = ggx_sample_vndf(alpha, wi0, uv);
     vec3 wo0 = reflect(-wi0, wh0);

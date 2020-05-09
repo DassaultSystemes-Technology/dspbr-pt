@@ -107,13 +107,12 @@ void unpackMaterialTexInfo(in uint idx, out MaterialTextureInfo matTexInfo) {
     matTexInfo.specularMap = getTextureInfo(specularTexInfoIdx, specularTexTransformsIdx);
 }
 
-// Convert from EVisuPBR roughness and anisotropy to 2d anisotropy.
+// Convert from roughness and anisotropy to 2d anisotropy.
 vec2 roughness_conversion(float roughness, float anisotropy)
 {
     vec2 a = vec2(roughness, roughness * (1.0 - anisotropy));
     return max(a*a, vec2(MINIMUM_ROUGHNESS));
 }
-
 
 void configure_material(const in uint matIdx, inout RenderState rs, out MaterialClosure c)
 {
