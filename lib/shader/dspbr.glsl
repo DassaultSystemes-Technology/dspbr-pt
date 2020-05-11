@@ -53,7 +53,7 @@ float ggx_smith_lambda(vec2 alpha, vec3 w, Geometry g)
 {
     float sin_theta_2 = 1.0 - sqr(dot(w, g.n));
 
-    if (sin_theta_2 < 0.0001) {
+    if (sin_theta_2 < EPSILON) {
         return 0.0;
     }
 
@@ -91,7 +91,7 @@ float ggx_smith_g2(vec2 alpha, vec3 wi, vec3 wo, vec3 wh, Geometry g)
 // GGX distribution, eq. 85
 float ggx_eval(vec2 alpha, vec3 wh, Geometry g)
 {
-    if (dot(wh, g.n) < 0.0) {
+    if (dot(wh, g.n) < EPS_COS) {
         return 0.0;
     }
 
@@ -100,7 +100,7 @@ float ggx_eval(vec2 alpha, vec3 wh, Geometry g)
     float sin_theta_2 = 1.0 - cos_theta_2;
     float tan_theta_2 = sqr(sqrt(sin_theta_2) / dot(wh, g.n));
 
-    if (sin_theta_2 < 0.0001) {
+    if (sin_theta_2 < EPSILON) {
         // avoid 0 * inf
         return 1.0 / (PI * alpha.x * alpha.y * cos_theta_4);
     }
