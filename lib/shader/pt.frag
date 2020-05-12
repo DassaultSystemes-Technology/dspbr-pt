@@ -1,6 +1,6 @@
 #version 300 es
 /* @license
- * Copyright 2020  Dassault Systèmes - All Rights Reserved.
+ * Copyright 2020  Dassault Systï¿½mes - All Rights Reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -192,7 +192,6 @@ void fillRenderState(const in Ray r, const in HitInfo hit, out RenderState rs) {
 }
 
 int sampleBSDFBounce(inout RenderState rs, inout vec3 pathWeight) {
-    //return -1;
     float sample_pdf = 0.0;
     vec3 sample_weight = vec3(0);
 
@@ -202,12 +201,11 @@ int sampleBSDFBounce(inout RenderState rs, inout vec3 pathWeight) {
 
     if(sample_pdf > 0.0) {
         pathWeight *= sample_weight;
-        //pathWeight = rs.normal;
     } else {
         return -1;
     }
 
-    Ray r = createRay(rs.wo, rs.hitPos + rs.geometryNormal * EPS_NORMAL, TFAR_MAX);
+    Ray r = createRay(rs.wo, rs.hitPos + fix_normal(rs.geometryNormal, rs.wo) * EPS_NORMAL, TFAR_MAX);
     HitInfo hit;
 
     if (intersectScene_Nearest(r, hit)) {
@@ -295,6 +293,9 @@ vec3 traceDebug(const Ray r) {
         if(u_int_DebugMode== 6) {
             mat3 onb = get_onb(rs.closure.n, rs.closure.t);
             color = onb[1];
+        }
+         if(u_int_DebugMode== 7) {            
+            color = vec3(rs.closure.transparency);
         }
     }    
     else { // direct background hit

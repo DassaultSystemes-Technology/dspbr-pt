@@ -1,5 +1,5 @@
 /* @license
- * Copyright 2020  Dassault Systèmes - All Rights Reserved.
+ * Copyright 2020  Dassault Systï¿½mes - All Rights Reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -124,7 +124,15 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
     unpackMaterialData(matIdx, matData);
     unpackMaterialTexInfo(matIdx, matTexInfo);
     
-    c.albedo = matData.albedo * pow(evaluateMaterialTextureValue(matTexInfo.albedoMap, rs.uv0).xyz, vec3(2.2));
+    vec4 albedo = evaluateMaterialTextureValue(matTexInfo.albedoMap, rs.uv0);
+    c.albedo = matData.albedo * pow(albedo.xyz, vec3(2.2));
+
+    if(matData.cutoutOpacity == 1.0) { // MASK
+        c.transparency = 1.0-((1.0-matData.transparency) * albedo.w);
+    }
+    else {
+        c.transparency = 1.0-step(1.0-matData.cutoutOpacity, albedo.w);
+    }
 
     vec4 occlusionMetallicRoughness = evaluateMaterialTextureValue(matTexInfo.metallicRoughnessMap, uv);
     c.metallic = matData.metallic * occlusionMetallicRoughness.z;
