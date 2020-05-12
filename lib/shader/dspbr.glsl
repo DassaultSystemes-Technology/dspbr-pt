@@ -1,5 +1,5 @@
 /* @license
- * Copyright 2020  Dassault Systèmes - All Rights Reserved.
+ * Copyright 2020  Dassault Systï¿½mes - All Rights Reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -345,11 +345,18 @@ float luminance(vec3 rgb) {
 }
 
 vec3 dspbr_sample(const in MaterialClosure c, vec3 wi, in vec3 uvw, out vec3 bsdf_over_pdf, out float pdf) {
+    if(c.transparency == 1.0) {
+         //pathWeight = vec3(sqrt(rs.closure.albedo)) *(1.0-rs.closure.transparency);//rs.closure.albedo;//*2.0 * (rs.closure.transparency);
+         bsdf_over_pdf = vec3(1.0);
+         pdf = 1.0;
+         return -wi;
+    } 
+
     Geometry g;
     g.n = c.n;
     g.t = c.t;
     g.b = cross(c.n, c.t);
-
+  
     vec3 diffuse_color = c.albedo * (1.0-c.metallic);
     float bsdf_importance[3];
     bsdf_importance[0] = luminance(diffuse_bsdf_importance(diffuse_color) + sheen_bsdf_importance(c.sheen, c.sheen_color));
