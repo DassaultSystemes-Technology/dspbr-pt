@@ -15,7 +15,7 @@ npm run dev
 
 ```
 
-The renderer fully supports the glTF 2.0 metallic/roughness model. The additional Enterprise PBR material features are supported as 
+The renderer supports the glTF 2.0 metallic/roughness model. The additional Enterprise PBR material features are supported as 
 additional material extensions as defined by following pull requests to the official glTF 2.0 spec.
 
 Summary of the extensions and change proposal to the original core spec
@@ -29,10 +29,9 @@ https://github.com/KhronosGroup/glTF/pull/1738
 
 **NOTE**
 
-When disabling path-tracing, the three.js native rasterizer is used as fallback. This renderer just supports the standard glTF 2.0 material model, the extensions mentioned above will be ignored.
+When disabling path-tracing, the three.js native rasterizer is used as fallback. In rasterizer mode the extensions mentioned above will be ignored.
 
 Please have a look at [this overview](https://k0mplex.uber.space/reports/threejs/) for comparison renderings between the two renderers for several material configurations.
-
 
 ## Enterprise PBR - Sample Implementation
 This renderer serves as a sample implementation for Dassault Systèmes Enterprise PBR material model. Please have a look at 
@@ -124,6 +123,7 @@ Please have a look at src/index.html and lib/renderer.js for the details.
 
 ### General
 - [ ] Move path-tracing renderer to plain WebGL 
+- [ ] Handle gltf scenes without scale normalization
 
 
 ## Reference 
