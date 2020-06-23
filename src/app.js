@@ -136,6 +136,10 @@ function initMenu() {
     renderer.toggleIBL(value);
   });
 
+  gui.add(renderer.settings, 'backgroundFromIBL').onChange(function (value) {
+    renderer.toggleBackgroundFromIBL(value);
+  });
+
   gui.add(renderer.settings, 'autoRotate').onChange(function (value) {
     renderer.toggleAutoRotate(value);
   });
