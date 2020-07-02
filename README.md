@@ -1,6 +1,6 @@
 # Enterprise PBR Sample Renderer
 
-A WebGL2 based [glTF](https://www.khronos.org/gltf/) path-tracer which implements the [Enterprise PBR](https://github.com/DassaultSystemes-Technology/EnterprisePBRShadingModel) material model.
+A WebGL2 based drag & drop [glTF](https://www.khronos.org/gltf/) path-tracer which implements the [Enterprise PBR](https://github.com/DassaultSystemes-Technology/EnterprisePBRShadingModel) material model.
 
 [Demo](https://dassaultsystemes-technology.github.io/dspbr-pt/)
 
@@ -82,14 +82,7 @@ npm start
 npm run dev:electron
 ```
 
-## Using the Render via Code
-
-The renderer can be easily used as stand-alone component.
-Please note that you need to have three.js setup as dependency in your scene. 
-
-```bash
-npm install three 
-```
+## Renderer API Usage
 
 ```javascript
 
@@ -99,7 +92,8 @@ npm install three
  let scene = <path_to_gltf>
  let renderer = new PathtracingRenderer({ "canvas": canvas });
  renderer.loadScene(scene, ibl, function () {
-            renderer.render(-1, () => {
+            renderer.render(-1, (frame) => {
+                console.log("Finished frame number:", frame);
                 stats.update();
             });
         });

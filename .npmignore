@@ -1,5 +1,8 @@
 node_modules
 dist
 .cache
-*.png
-package 
+package
+assets
+scripts
+
+
