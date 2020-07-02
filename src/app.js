@@ -48,6 +48,7 @@ function initApp() {
     container.appendChild(canvas);
 
     renderer = new PathtracingRenderer({ "canvas": canvas });
+    renderer.enableControls(true);
     renderer.loadScene(state.Scene, state.IBL, function () {
         renderer.render(-1, () => {
             stats.update();
