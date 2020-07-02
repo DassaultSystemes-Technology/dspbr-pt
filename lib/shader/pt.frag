@@ -51,6 +51,7 @@ uniform sampler2D u_samplerCube_EnvMap;
 
 uniform int u_int_DebugMode;
 uniform bool u_bool_UseIBL;
+uniform bool u_bool_BackgroundFromIBL;
 
 out vec4 out_FragColor;
 
@@ -343,9 +344,11 @@ vec3 trace(const Ray r) {
         }
     } 
     else { // direct background hit
-        if(u_bool_UseIBL) {
+        if(u_bool_BackgroundFromIBL) {
             vec2 uv = mapDirToUV(r.dir);
             color =  texture(u_samplerCube_EnvMap, uv).xyz;
+        } else {
+          color = vec3(1,1,1);
         }
     }
 
