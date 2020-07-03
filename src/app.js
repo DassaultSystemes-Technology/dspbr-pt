@@ -35,6 +35,15 @@ var state = {
   Scene: Object.values(scene_index)[0],
   IBL: Object.values(ibl_index)[0],
   isRendering: false,
+  pathtracing: true,
+  disableDirectShadows: false,
+  maxBounceDepth: 1,
+  debugMode: "None",
+  autoScaleOnImport: true,
+  useIBL: true,
+  backgroundFromIBL: true,
+  autoRotate: false,
+  pixelRatio: 0.5
 }
 
 initApp();
@@ -51,8 +60,7 @@ function initApp() {
   canvas = document.createElement('canvas');
   container.appendChild(canvas);
 
-  renderer = new PathtracingRenderer({ "canvas": canvas });
-  renderer.enableControls(true);
+  renderer = new PathtracingRenderer(canvas, true);
   renderer.loadScene(state.Scene, state.IBL, function () {
     renderer.render(-1, () => {
       stats.update();
@@ -117,36 +125,38 @@ function initMenu() {
     renderer.loadIBL(value);
   });
 
-  gui.add(renderer.settings, 'pathtracing').onChange(function (value) {
-    renderer.resetAccumulation();
+  gui.add(state, 'pathtracing').onChange(function (value) {
+    renderer.usePathtracing(value);
   });
 
-  gui.add(renderer.settings, 'disableDirectShadows').onChange(function (value) {
-    renderer.resetAccumulation();
+  gui.add(state, 'disableDirectShadows').onChange(function (value) {
+    renderer.disableDirectShadows(value);
   });
 
-  gui.add(renderer.settings, 'maxBounceDepth').min(0).max(5).step(1).onChange(function (value) {
-    renderer.resetAccumulation();
+  gui.add(state, 'maxBounceDepth').min(0).max(5).step(1).onChange(function (value) {
+    renderer.setMaxBounceDepth(value);
   });
-  gui.add(renderer.settings, 'debugMode', renderer.debugModes).onChange(function (value) {
-    renderer.resetAccumulation();
+  gui.add(state, 'debugMode', renderer.debugModes).onChange(function (value) {
+    renderer.setDebugMode(value);
   });
-  gui.add(renderer.settings, 'autoScaleOnImport');
-
-  gui.add(renderer.settings, 'useIBL').onChange(function (value) {
-    renderer.toggleIBL(value);
+  gui.add(state, 'autoScaleOnImport').onChange(function (value) {
+    renderer.doAutoScaleOnImport(value);
   });
 
-  gui.add(renderer.settings, 'backgroundFromIBL').onChange(function (value) {
-    renderer.toggleBackgroundFromIBL(value);
+  gui.add(state, 'useIBL').onChange(function (value) {
+    renderer.useIBL(value);
   });
 
-  gui.add(renderer.settings, 'autoRotate').onChange(function (value) {
-    renderer.toggleAutoRotate(value);
+  gui.add(state, 'backgroundFromIBL').onChange(function (value) {
+    renderer.useBackgroundFromIBL(value);
   });
 
-  gui.add(renderer.settings, 'pixelRatio').min(0.1).max(1.0).onChange(function (value) {
-    // resize updates all rendertarget taking into account current pixelRatio
+  gui.add(state, 'autoRotate').onChange(function (value) {
+    renderer.enableAutoRotate(value);
+  });
+
+  gui.add(state, 'pixelRatio').min(0.1).max(1.0).onChange(function (value) {
+    renderer.setPixelRatio(value);
     renderer.resize(window.innerWidth, window.innerHeight);
   });
 
