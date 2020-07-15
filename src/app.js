@@ -61,7 +61,8 @@ function initApp() {
   container.appendChild(canvas);
 
   renderer = new PathtracingRenderer(canvas, true);
-  renderer.loadScene(state.Scene, state.IBL, function () {
+  renderer.loadScene(state.Scene, function () {
+    // renderer.loadIBL( state.IBL);
     renderer.render(-1, () => {
       stats.update();
     });
@@ -91,11 +92,12 @@ function initApp() {
 
     if (e.dataTransfer.files.length == 1 &&
       getFileExtension(e.dataTransfer.files[0].name) == "hdr") {
-        console.log("loading HDR...");
-        // const url = URL.createObjectURL(e.dataTransfer.getData('text/html'));
-        renderer.loadIBL(URL.createObjectURL(e.dataTransfer.items[0].getAsFile()));
+      console.log("loading HDR...");
+      // const url = URL.createObjectURL(e.dataTransfer.getData('text/html'));
+      renderer.loadIBL(URL.createObjectURL(e.dataTransfer.items[0].getAsFile()));
     } else {
-      renderer.loadSceneFromBlobs(e.dataTransfer.files, state.IBL, function () {
+      renderer.loadSceneFromBlobs(e.dataTransfer.files, function () {
+        renderer.loadIBL(state.IBL);
         renderer.render(-1, () => {
           stats.update();
         });
@@ -113,7 +115,8 @@ function initMenu() {
 
   gui.add(state, "Scene", scene_index).onChange(function (value) {
     console.log(`Loading ${value}`);
-    renderer.loadScene(value, state.IBL, function () {
+    renderer.loadScene(value, function () {
+      renderer.loadIBL(state.IBL);
       renderer.render(-1, () => {
         stats.update();
       });
@@ -162,7 +165,7 @@ function initMenu() {
 
   var obj = {
     reload: function () {
-      renderer.loadScene(state.Scene, state.IBL, function () {
+      renderer.loadScene(state.Scene, function () {
         renderer.render(-1, () => {
           stats.update();
         });

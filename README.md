@@ -15,23 +15,26 @@ npm run dev
 
 ```
 
-The renderer supports the glTF 2.0 metallic/roughness model. The additional Enterprise PBR material features are supported as 
-additional material extensions as defined by following pull requests to the official glTF 2.0 spec.
+## Material Model
+The renderer supports the glTF 2.0 metallic/roughness model. The additional Enterprise PBR material features are supported as custom glTF material extensions [glTF extension proposals](https://github.com/DassaultSystemes-Technology/EnterprisePBRShadingModel/tree/master/gltf_ext)
 
-Summary of the extensions and change proposal to the original core spec
-https://github.com/KhronosGroup/glTF/pull/1738
+> :warning: transparency, transmission and volume not yet supported 
 
+Most of our extension proposals are already covered by pull request to the offical glTF spec
 * [Specular Extensions](https://github.com/KhronosGroup/glTF/pull/1719)
 * [IoR Extension](https://github.com/KhronosGroup/glTF/pull/1718)
 * [Sheen Extension](https://github.com/KhronosGroup/glTF/pull/1688)
 * [Clearcoat Extension](https://github.com/KhronosGroup/glTF/pull/1756)
-* [Transmission Extension](https://github.com/KhronosGroup/glTF/pull/1698) (Not yet implemeted)
+* [Transmission Extension](https://github.com/KhronosGroup/glTF/pull/1698)
 
-**NOTE**
+Summary of the extensions and change proposal to the original core spec
 
-When disabling path-tracing, the three.js native rasterizer is used as fallback. In rasterizer mode the extensions mentioned above will be ignored.
+https://github.com/KhronosGroup/glTF/pull/1738
 
-Please have a look at [this overview](https://k0mplex.uber.space/reports/threejs/) for comparison renderings between the two renderers for several material configurations.
+
+> **NOTE**  
+> When disabling path-tracing, the three.js native rasterizer is used as fallback. In rasterizer mode the extensions mentioned above will be ignored.  
+> Please have a look at [this overview](https://k0mplex.uber.space/reports/threejs/) for comparison renderings between the two renderers for several material configurations.
 
 ## Enterprise PBR - Sample Implementation
 This renderer serves as a sample implementation for Dassault Systèmes Enterprise PBR material model. Please have a look at 
@@ -69,34 +72,20 @@ npm run render -- -- <scene_path> --ibl <hdr_path> --res <width> <height> --samp
 
 For now, this writes the output image to ./output.png
 
-## Running/Developing in Electron 
-
-```bash
-# Runs the viewer in an electron instance
-npm start
-```
-
-
-```bash
-# Runs the viewer in an electron instance with attached code watcher for development
-npm run dev:electron
-```
-
 ## Renderer API Usage
 
 ```javascript
 
- import { PathtracingRenderer } from './lib/renderer.js';
+import { PathtracingRenderer } from './lib/renderer.js';
 
- let ibl = <path_to_ibl>
- let scene = <path_to_gltf>
- let renderer = new PathtracingRenderer({ "canvas": canvas });
- renderer.loadScene(scene, ibl, function () {
-            renderer.render(-1, (frame) => {
-                console.log("Finished frame number:", frame);
-                stats.update();
-            });
-        });
+let renderer = new PathtracingRenderer(canvas, false);
+renderer.loadScene(<path_to_gltf>, function () {
+      renderer.useIBL(<path_to_ibl>)
+      renderer.render(-1, (frame) => {
+          console.log("Finished frame number:", frame);
+          stats.update();
+      });
+  });
 ```
 
 Where the interface of the render function is defined as
@@ -105,15 +94,12 @@ Where the interface of the render function is defined as
  function render(num_samples, frameFinishedCB, renderingFinishedCB)
 ```
 
-Please have a look at src/index.html and lib/renderer.js for the details.
-
+Please have a look at src/app.js and lib/renderer.js for more details.
 
 ## Todo
 
 ### Material
 - [ ] Implement proper transparency and alpha mask (cutout) handling
-- [ ] Implement importance sampling for all components (clearcoat, sheen, ...)
-
 
 ### General
 - [ ] Move path-tracing renderer to plain WebGL 

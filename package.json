@@ -28,6 +28,7 @@
     "build": "npm run clean && parcel build src/index.html --public-url ./",
     "build-all": "npm run clean && parcel build src/index.html --public-url ./ && parcel build src/electron/headless.html --public-url ./",
     "dev": "parcel src/index.html --port 3000 --open",
+    "validation": "npm run build-headless && python scripts/run_validation.py",
     "build-headless": "npm run clean && parcel build src/electron/headless.html --public-url ./",
     "dev:electron": "concurrently \"parcel watch src/index.html\" \"npm start\"",
     "package:mac": "electron-packager . --overwrite --platform=darwin --arch=x64 --out=package",
