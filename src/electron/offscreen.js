@@ -1,5 +1,5 @@
 /* @license
- * Copyright 2020  Dassault Systèmes - All Rights Reserved.
+ * Copyright 2020  Dassault Systemes - All Rights Reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -97,7 +97,7 @@ function createWindow(width, height) {
         frame: false 
     });
 
-    //mainWindow.webContents.openDevTools();
+      //mainWindow.webContents.openDevTools();
 
     mainWindow.loadURL(url.format({
         pathname: path.join(__dirname, "../../dist/headless.html"),

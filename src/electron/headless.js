@@ -1,5 +1,5 @@
 /* @license
- * Copyright 2020  Dassault Systèmes - All Rights Reserved.
+ * Copyright 2020  Dassault Systï¿½mes - All Rights Reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,32 +16,37 @@
 import "core-js/stable";
 import 'regenerator-runtime/runtime'
 import { PathtracingRenderer } from '../../lib/renderer.js';
-   
+
 const { ipcRenderer } = window.require('electron');
 var path = window.require('path');
 
 let remote = window.require('electron').remote,
-    args = remote.getGlobal('sharedObject').args;
+  args = remote.getGlobal('sharedObject').args;
 
 function startRenderer() {
-    let canvas = document.getElementById("canvas");
-    let renderer = new PathtracingRenderer({"canvas": canvas});
-    renderer.setPixelRatio(1.0);
-    renderer.settings.autoScaleOnImport = false;
- 
-    renderer.loadScene(args.gltf_path, args.ibl, function () {
-        if(args.ibl === "None")
-            renderer.toggleIBL(false);
-        else
-            renderer.toggleIBL(true);
+  let canvas = document.getElementById("canvas");
+  let renderer = new PathtracingRenderer(canvas, true);
+  renderer.setPixelRatio(1.0);
+  renderer.autoScaleOnImport(false);
 
-        renderer.render(args.samples, ()=>{}, function (result) {
-            console.log("icpRenderer Ready");
-            ipcRenderer.send('rendererReady');
+  renderer.loadScene(args.gltf_path, function () {
+    if (args.ibl === "None") {
+      renderer.render(args.samples, () => { }, function (result) {
+        console.log("icpRenderer Ready");
+        ipcRenderer.send('rendererReady');
+      });      
+    } else {
+      renderer.loadIBL(args.ibl, () => {
+        console.log("loaded ibl" + args.ibl);
+        renderer.render(args.samples, () => { }, (result) => {
+          console.log("icpRenderer Ready");
+          ipcRenderer.send('rendererReady');
         });
-    });
+      });
+    }
+  });
 }
 
 window.onload = function () {
-    startRenderer();
+  startRenderer();
 };
