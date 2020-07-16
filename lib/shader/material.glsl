@@ -69,6 +69,10 @@ void unpackMaterialData(in uint idx, out MaterialData matData) {
     val = texelFetch(u_sampler2D_MaterialData, getStructParameterTexCoord(idx, 9u, MATERIAL_SIZE), 0);
     matData.subsurfaceColor = val.xyz;
     matData.thinWalled = int(val.w);
+
+    val = texelFetch(u_sampler2D_MaterialData, getStructParameterTexCoord(idx,10u, MATERIAL_SIZE), 0);
+    matData.translucency = val.x;
+    matData.alphaCutoff = val.y;
 }
 
 TexInfo getTextureInfo(ivec2 texInfoIdx, ivec2 transformInfoIdx) {
@@ -127,14 +131,15 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
     vec4 albedo = evaluateMaterialTextureValue(matTexInfo.albedoMap, rs.uv0);
     c.albedo = matData.albedo * pow(albedo.xyz, vec3(2.2));
 
-    if(matData.cutoutOpacity == 1.0) { // MASK
-        c.transparency = 1.0-((1.0-matData.transparency) * albedo.w);
+    c.cutout_opacity = matData.cutoutOpacity * albedo.w;
+    if(matData.alphaCutoff > 0.0) { // MASK
+      c.cutout_opacity = step(matData.alphaCutoff, c.cutout_opacity); 
     }
-    else {
-        c.transparency = 1.0-step(1.0-matData.cutoutOpacity, albedo.w);
+    if(matData.alphaCutoff == 1.0) { // OPAQUE
+      c.cutout_opacity = 1.0;
     }
-
-    //c.cutout_opacity = matData.cutoutOpacity;
+    
+    c.transparency = matData.transparency;
     
     vec4 occlusionMetallicRoughness = evaluateMaterialTextureValue(matTexInfo.metallicRoughnessMap, uv);
     c.metallic = matData.metallic * occlusionMetallicRoughness.z;

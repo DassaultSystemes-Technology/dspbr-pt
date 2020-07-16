@@ -57,7 +57,7 @@ out vec4 out_FragColor;
 
 struct MaterialData {
     // 0
-	vec3 albedo;
+    vec3 albedo;
     float metallic;
 
     //1
@@ -101,6 +101,11 @@ struct MaterialData {
     //9
     vec3 subsurfaceColor;
     int thinWalled;
+
+    //10
+    float translucency;
+    float alphaCutoff;
+    vec2 padding;
 };
 
 struct MaterialClosure {
@@ -194,22 +199,29 @@ void fillRenderState(const in Ray r, const in HitInfo hit, out RenderState rs) {
 }
 
 int sampleBSDFBounce(inout RenderState rs, inout vec3 pathWeight, out uint eventType) {
-    float sample_pdf = 0.0;
-    vec3 sample_weight = vec3(0);
-
-    vec3 wi = y_to_z_up * rs.wi;
-    vec3 wo = dspbr_sample(rs.closure, wi, vec3(rng_NextFloat(), rng_NextFloat(), rng_NextFloat()), sample_weight, sample_pdf, eventType);
-    rs.wo = transpose(y_to_z_up) * wo;
-
-    if(sample_pdf > 0.0) {
-        pathWeight *= sample_weight;
+    Ray r;
+    float rr_cutout = rng_NextFloat();
+    if(rr_cutout > rs.closure.cutout_opacity) {
+      eventType |= EVENT_SPECULAR;
+      rs.wo = -rs.wi;
+      r = createRay(rs.wo, rs.hitPos + fix_normal(rs.geometryNormal, rs.wo) * EPS_NORMAL, TFAR_MAX);
     } else {
-        return -1;
+      float sample_pdf = 0.0;
+      vec3 sample_weight = vec3(0);
+
+      vec3 wi = y_to_z_up * rs.wi;
+      vec3 wo = dspbr_sample(rs.closure, wi, vec3(rng_NextFloat(), rng_NextFloat(), rng_NextFloat()), sample_weight, sample_pdf, eventType);
+      rs.wo = transpose(y_to_z_up) * wo;
+
+      if(sample_pdf > 0.0) {
+          pathWeight *= sample_weight;
+      } else {
+          return -1;
+      }
+      r = createRay(rs.wo, rs.hitPos + fix_normal(rs.geometryNormal, rs.wo) * EPS_NORMAL, TFAR_MAX);
     }
 
-    Ray r = createRay(rs.wo, rs.hitPos + fix_normal(rs.geometryNormal, rs.wo) * EPS_NORMAL, TFAR_MAX);
     HitInfo hit;
-
     if (intersectScene_Nearest(r, hit)) {
         fillRenderState(r, hit, rs);
         return 1;
