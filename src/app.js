@@ -40,7 +40,7 @@ var state = {
   maxBounceDepth: 4,
   debugMode: "None",
   autoScaleOnImport: true,
-  useIBL: true,
+  useIBL: false,
   backgroundFromIBL: true,
   autoRotate: false,
   pixelRatio: 0.5
@@ -62,7 +62,9 @@ function initApp() {
 
   renderer = new PathtracingRenderer(canvas, true);
   renderer.loadScene(state.Scene, function () {
-    // renderer.loadIBL( state.IBL);
+    renderer.loadIBL( state.IBL, ()=>{
+      renderer.useIBL( false);
+    });
     renderer.render(-1, () => {
       stats.update();
     });
