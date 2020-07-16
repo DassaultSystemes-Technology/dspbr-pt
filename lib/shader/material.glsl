@@ -134,6 +134,8 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
         c.transparency = 1.0-step(1.0-matData.cutoutOpacity, albedo.w);
     }
 
+    //c.cutout_opacity = matData.cutoutOpacity;
+    
     vec4 occlusionMetallicRoughness = evaluateMaterialTextureValue(matTexInfo.metallicRoughnessMap, uv);
     c.metallic = matData.metallic * occlusionMetallicRoughness.z;
     float roughness = matData.roughness * occlusionMetallicRoughness.y;

@@ -106,6 +106,7 @@ struct MaterialData {
 struct MaterialClosure {
     vec3 albedo;
     float transparency;
+    float cutout_opacity;
     float metallic;
     float specular;
     float f0;
