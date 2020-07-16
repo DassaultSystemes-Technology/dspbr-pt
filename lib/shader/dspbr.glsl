@@ -13,6 +13,10 @@
  * limitations under the License.
  */
 
+const uint EVENT_REFLECTION = 0x00000001u;
+const uint EVENT_TRANSMISSION = 0x00000002u;
+const uint EVENT_SPECULAR = 0x00000004u; 
+
 struct Geometry { vec3 n, t, b; };
 
 vec3 fresnel_schlick(vec3 f0, vec3 f90, float theta)
@@ -344,12 +348,13 @@ float luminance(vec3 rgb) {
     return 0.2126*rgb.x + 0.7152*rgb.y + 0.0722*rgb.z;
 }
 
-vec3 dspbr_sample(const in MaterialClosure c, vec3 wi, in vec3 uvw, out vec3 bsdf_over_pdf, out float pdf) {
+vec3 dspbr_sample(const in MaterialClosure c, vec3 wi, in vec3 uvw, out vec3 bsdf_over_pdf, out float pdf, out uint eventType) {
     if(c.transparency == 1.0) {
-         //pathWeight = vec3(sqrt(rs.closure.albedo)) *(1.0-rs.closure.transparency);//rs.closure.albedo;//*2.0 * (rs.closure.transparency);
-         bsdf_over_pdf = vec3(1.0);
-         pdf = 1.0;
-         return -wi;
+        //bsdf_over_pdf = vec3(sqrt(c.albedo)) *(1.0-c.transparency);//rs.closure.albedo;//*2.0 * (rs.closure.transparency);
+        bsdf_over_pdf = vec3(1.0);
+        pdf = 1.0;
+        eventType |= EVENT_SPECULAR;
+        return -wi;
     } 
 
     Geometry g;
@@ -375,6 +380,8 @@ vec3 dspbr_sample(const in MaterialClosure c, vec3 wi, in vec3 uvw, out vec3 bsd
     } else {
         bsdf_cdf[0] = 1.0;
     }
+
+    //eventType = EVENT_REFLECTION;
 
     vec3 wo;
     if (uvw.z <= bsdf_cdf[0]) {
@@ -408,6 +415,10 @@ vec3 dspbr_sample(const in MaterialClosure c, vec3 wi, in vec3 uvw, out vec3 bsd
         float clearcoat_base_weight;
         coating_layer(clearcoat_base_weight, 0.0, c.clearcoat_alpha, wi, wo, wh, g);
         bsdf_over_pdf *= clearcoat_base_weight;
+
+        if(c.alpha.x == MINIMUM_ROUGHNESS) {
+            eventType |= EVENT_SPECULAR;
+        }
     } else if (uvw.z < bsdf_cdf[2]) {
         wo = microfacet_ggx_smith_sample(vec2(c.clearcoat_alpha), wi, g, uvw.xy, pdf);
         pdf *= (bsdf_cdf[2] - bsdf_cdf[1]);

@@ -24,7 +24,7 @@ precision highp sampler2DArray;
 
 in vec2 v_uv;
 
-uniform float u_int_FrameCount;
+uniform int u_int_FrameCount;
 uniform uint u_int_MaxTextureSize; // used for data acessing of linear data in 2d textures
 uniform float u_float_FilmHeight;
 uniform float u_float_FocalLength;
@@ -34,7 +34,7 @@ uniform mat4 u_mat4_ViewMatrix;
 uniform uint u_int_NumTriangles;
 uniform int u_int_MaxBounceDepth;
 uniform bool u_bool_hasTangents;
-uniform bool u_bool_disableDirectShadows;
+uniform bool u_bool_forceIBLEvalOnLastBounce;
 
 uniform sampler2D u_sampler2D_PreviousTexture;
 
@@ -192,12 +192,12 @@ void fillRenderState(const in Ray r, const in HitInfo hit, out RenderState rs) {
     configure_material(matIdx, rs, rs.closure);
 }
 
-int sampleBSDFBounce(inout RenderState rs, inout vec3 pathWeight) {
+int sampleBSDFBounce(inout RenderState rs, inout vec3 pathWeight, out uint eventType) {
     float sample_pdf = 0.0;
     vec3 sample_weight = vec3(0);
 
     vec3 wi = y_to_z_up * rs.wi;
-    vec3 wo = dspbr_sample(rs.closure, wi, vec3(rng_NextFloat(), rng_NextFloat(), rng_NextFloat()), sample_weight, sample_pdf);
+    vec3 wo = dspbr_sample(rs.closure, wi, vec3(rng_NextFloat(), rng_NextFloat(), rng_NextFloat()), sample_weight, sample_pdf, eventType);
     rs.wo = transpose(y_to_z_up) * wo;
 
     if(sample_pdf > 0.0) {
@@ -309,6 +309,12 @@ vec3 traceDebug(const Ray r) {
     return color;
 }
 
+vec3 sampleIBL(in vec3 dir) {
+    if(u_bool_UseIBL) { 
+        return texture(u_samplerCube_EnvMap, mapDirToUV(dir)).xyz;
+    }
+    return vec3(0);
+}
 
 vec3 trace(const Ray r) {
     HitInfo hit;
@@ -319,34 +325,47 @@ vec3 trace(const Ray r) {
     if (intersectScene_Nearest(r, hit)) { // primary camera ray
         RenderState rs;
         fillRenderState(r, hit, rs);
-           
-        for (int depth = 0; depth < u_int_MaxBounceDepth; depth++) {
+
+        int i = 0;
+        bool lastBounceSpecular = false;
+        while(i < u_int_MaxBounceDepth || lastBounceSpecular) { 
+            // start russion roulette path termination for bounce depth > 2
+            if(i>2 && rng_NextFloat() > RR_TERMINATION_PROB) { 
+                if(u_bool_forceIBLEvalOnLastBounce)
+                    color += sampleIBL(rs.wo) * pathWeight;
+                break;
+            }
+
 #ifdef HAS_LIGHTS
             color += (rs.closure.emission + sampleAndEvaluateDirectLight(rs)) * pathWeight;
 #else
             color += rs.closure.emission * pathWeight;
 #endif
 
-            int bounceType = sampleBSDFBounce(rs, pathWeight); // generate sample and proceed with next intersection
+            uint eventType = 0u;
+            int bounceType = sampleBSDFBounce(rs, pathWeight, eventType); // generate sample and proceed with next intersection
+            if(bounceType == -1) break; // absorbed
 
-            if (bounceType == -1) { // absorbed
-                break;
+            if(i>2) {
+                pathWeight *= 1.0 / RR_TERMINATION_PROB;
             }
 
-            if (bounceType == 0  || (depth == 0 && u_bool_disableDirectShadows)) { // background
-                if(u_bool_UseIBL) {
-                     color += texture(u_samplerCube_EnvMap, mapDirToUV(rs.wo)).xyz * pathWeight ;
-                }
+            lastBounceSpecular = bool(eventType & EVENT_SPECULAR);
+
+            bool isPathEnd = (i == (u_int_MaxBounceDepth-1));
+            bool forcedIBLSampleOnPathEnd = (isPathEnd && u_bool_forceIBLEvalOnLastBounce);
+            if ( bounceType == 0 || forcedIBLSampleOnPathEnd) { // background sample
+                color += sampleIBL(rs.wo) * pathWeight;
                 break;
             }
 
             // all clear - next sample has properly been generated and intersection was found. Render state contains new intersection info.
+            i++;
         }
     } 
     else { // direct background hit
         if(u_bool_BackgroundFromIBL) {
-            vec2 uv = mapDirToUV(r.dir);
-            color =  texture(u_samplerCube_EnvMap, uv).xyz;
+            color = sampleIBL(r.dir);
         } else {
           color = vec3(1,1,1);
         }
@@ -372,7 +391,7 @@ Ray calcuateRay(float r0, float r1) {
 }
 
 void main() {
-    init_RNG(int(u_int_FrameCount));
+    init_RNG(u_int_FrameCount);
 
     Ray r = calcuateRay(rng_NextFloat(), rng_NextFloat());
     
@@ -382,7 +401,7 @@ void main() {
         color = traceDebug(r);
 
     vec3 previousFrameColor = texelFetch(u_sampler2D_PreviousTexture,  ivec2(gl_FragCoord.xy), 0).xyz;
-    color = (previousFrameColor * (u_int_FrameCount-1.0) + color) / u_int_FrameCount;
+    color = (previousFrameColor * float(u_int_FrameCount-1) + color) / float(u_int_FrameCount);
 
     //color = texelFetch(u_sampler2D_LightData, getStructParameterTexCoord(0u, 0u, LIGHT_SIZE), 0).xyz;
     out_FragColor = vec4(color, 1);

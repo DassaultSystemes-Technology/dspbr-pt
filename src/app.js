@@ -36,8 +36,8 @@ var state = {
   IBL: Object.values(ibl_index)[0],
   isRendering: false,
   pathtracing: true,
-  disableDirectShadows: false,
-  maxBounceDepth: 1,
+  forceIBLEvalOnLastBounce: false,
+  maxBounceDepth: 4,
   debugMode: "None",
   autoScaleOnImport: true,
   useIBL: true,
@@ -132,11 +132,11 @@ function initMenu() {
     renderer.usePathtracing(value);
   });
 
-  gui.add(state, 'disableDirectShadows').onChange(function (value) {
-    renderer.disableDirectShadows(value);
+  gui.add(state, 'forceIBLEvalOnLastBounce').onChange(function (value) {
+    renderer.forceIBLEvalOnLastBounce(value);
   });
 
-  gui.add(state, 'maxBounceDepth').min(0).max(5).step(1).onChange(function (value) {
+  gui.add(state, 'maxBounceDepth').min(0).max(16).step(1).onChange(function (value) {
     renderer.setMaxBounceDepth(value);
   });
   gui.add(state, 'debugMode', renderer.debugModes).onChange(function (value) {
