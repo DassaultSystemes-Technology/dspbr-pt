@@ -44,7 +44,7 @@ vec3 clamp_normal(vec3 n, vec3 ng, vec3 wi)
 // bottom (two-sided materials).
 void fix_normals(inout vec3 n, inout vec3 ng, in vec3 wi) {
     ng = dot(wi, ng) < 0.0 ? -ng : ng;
-    n = dot(wi, n) < 0.0 ? -n : n;
+    n = dot(ng, n) < 0.0 ? -n : n;
 }
 
 vec3 fix_normal(in vec3 n, in vec3 wi) {
