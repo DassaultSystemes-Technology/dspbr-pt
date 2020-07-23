@@ -243,7 +243,7 @@ float coupled_diffuse(vec2 alpha, float dot_wi_n, float dot_wo_n, float e0)
 vec3 diffuse_bsdf_eval(const in MaterialClosure c, vec3 wi, vec3 wo, Geometry g) {
     float lambert = ONE_OVER_PI;
     float coupled = coupled_diffuse(c.alpha, abs(dot(wi, g.n)), abs(dot(wo, g.n)), max_(c.f0*c.specular_tint));
-    vec3 diffuse_color = c.albedo * (1.0-c.metallic);
+    vec3 diffuse_color = c.albedo * (1.0-c.metallic) * (1.0-c.transparency);
     return diffuse_color * mix(lambert, coupled, c.specular);
 }
 
@@ -349,34 +349,29 @@ float luminance(vec3 rgb) {
 }
 
 vec3 dspbr_sample(const in MaterialClosure c, vec3 wi, in vec3 uvw, out vec3 bsdf_over_pdf, out float pdf, out uint eventType) {
-    if(c.transparency == 1.0) {
-        //bsdf_over_pdf = vec3(sqrt(c.albedo)) *(1.0-c.transparency);//rs.closure.albedo;//*2.0 * (rs.closure.transparency);
-        bsdf_over_pdf = vec3(1.0);
-        pdf = 1.0;
-        eventType |= EVENT_SPECULAR;
-        return -wi;
-    } 
-
     Geometry g;
     g.n = c.n;
     g.t = c.t;
     g.b = cross(c.n, c.t);
   
-    vec3 diffuse_color = c.albedo * (1.0-c.metallic);
-    float bsdf_importance[3];
+    vec3 diffuse_color = c.albedo * (1.0-c.metallic) * (1.0-c.transparency);
+    float bsdf_importance[4];
     bsdf_importance[0] = luminance(diffuse_bsdf_importance(diffuse_color) + sheen_bsdf_importance(c.sheen, c.sheen_color));
     bsdf_importance[1] = luminance(ggx_importance(c.specular_f0, dot(wi, g.n)));
     bsdf_importance[2] = luminance(clearcoat_bsdf_importance(c.clearcoat));
+    bsdf_importance[3] = c.transparency;
 
-    float bsdf_cdf[3];
+    float bsdf_cdf[4];
     bsdf_cdf[0] = bsdf_importance[0];
     bsdf_cdf[1] = bsdf_cdf[0] + bsdf_importance[1];
     bsdf_cdf[2] = bsdf_cdf[1] + bsdf_importance[2];
+    bsdf_cdf[3] = bsdf_cdf[2] + bsdf_importance[3];
 
-    if (bsdf_cdf[2] != 0.0) {
-        bsdf_cdf[0] *= 1.0 / bsdf_cdf[2];
-        bsdf_cdf[1] *= 1.0 / bsdf_cdf[2];
-        bsdf_cdf[2] *= 1.0 / bsdf_cdf[2];
+    if (bsdf_cdf[3] != 0.0) {
+        bsdf_cdf[0] *= 1.0 / bsdf_cdf[3];
+        bsdf_cdf[1] *= 1.0 / bsdf_cdf[3];
+        bsdf_cdf[2] *= 1.0 / bsdf_cdf[3];
+        bsdf_cdf[3] *= 1.0 / bsdf_cdf[3];
     } else {
         bsdf_cdf[0] = 1.0;
     }
@@ -428,6 +423,14 @@ vec3 dspbr_sample(const in MaterialClosure c, vec3 wi, in vec3 uvw, out vec3 bsd
         float clearcoat_base_weight;
         vec3 clearcoat = coating_layer(clearcoat_base_weight, c.clearcoat, c.clearcoat_alpha, wi, wo, wh, g);
         bsdf_over_pdf = clearcoat;
+    } else if (uvw.z < bsdf_cdf[3]) {
+        wo = -wi;
+        pdf = (bsdf_cdf[3] - bsdf_cdf[2]);
+       
+        //bsdf_over_pdf = c.albedo * (1.0-c.metallic) * c.transparency;
+        bsdf_over_pdf = vec3(c.transparency);
+        if(c.transparency == 1.0) 
+            eventType |= EVENT_SPECULAR;    
     }
 
     bsdf_over_pdf /= pdf;
