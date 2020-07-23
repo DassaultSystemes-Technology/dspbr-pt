@@ -145,7 +145,7 @@ function initMenu() {
     renderer.setDebugMode(value);
   });
   gui.add(state, 'autoScaleOnImport').onChange(function (value) {
-    renderer.doAutoScaleOnImport(value);
+    renderer.autoScaleOnImport(value);
   });
 
   gui.add(state, 'useIBL').onChange(function (value) {
