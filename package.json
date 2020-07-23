@@ -8,18 +8,18 @@
     "argparse": "^1.0.10",
     "core-js": "^3.6.5",
     "dat.gui": "^0.7.7",
-    "three": "^0.115.0",
-    "open": "^7.0.3",
-    "shx": "^0.3.2",
+    "open": "^7.1.0",
     "parcel": "^1.12.4",
-    "parcel-plugin-static-files-copy": "^2.3.1"
+    "parcel-plugin-static-files-copy": "^2.4.3",
+    "shx": "^0.3.2",
+    "three": "^0.115.0"
   },
   "devDependencies": {
     "concurrently": "^5.2.0",
-    "electron-serve": "^1.0.0",
     "cssnano": "^4.1.10",
-    "electron": "^8.2.3",
-    "electron-packager": "^14.2.1"
+    "electron": "^8.4.1",
+    "electron-packager": "^14.2.1",
+    "electron-serve": "^1.0.0"
   },
   "scripts": {
     "start": "electron .",
