@@ -51,7 +51,7 @@ uniform sampler2D u_samplerCube_EnvMap;
 
 uniform int u_int_DebugMode;
 uniform bool u_bool_UseIBL;
-uniform bool u_bool_BackgroundFromIBL;
+uniform bool u_bool_DisableBackground;
 
 out vec4 out_FragColor;
 
@@ -272,38 +272,39 @@ vec2 mapDirToUV(vec3 dir) {
 }
 
 
-vec3 traceDebug(const Ray r) {
+vec4 traceDebug(const Ray r) {
     HitInfo hit;
 
-    vec3 color;
+    vec4 color = vec4(0);
     if (intersectScene_Nearest(r, hit)) {
+        vec3 contrib = vec3(0);
         RenderState rs;
         fillRenderState(r, hit, rs);
 
         if(u_int_DebugMode== 1) 
-            color = rs.closure.albedo;
+            contrib = rs.closure.albedo;
         if(u_int_DebugMode== 2) 
-            color = vec3(rs.closure.metallic);
+            contrib = vec3(rs.closure.metallic);
         if(u_int_DebugMode== 3) 
-            color = vec3(rs.closure.alpha, 0.0);
+            contrib = vec3(rs.closure.alpha, 0.0);
         if(u_int_DebugMode== 4) 
-            color = rs.closure.n;
+            contrib = rs.closure.n;
         if(u_int_DebugMode== 5) {
-            color = rs.closure.t;           
+            contrib = rs.closure.t;           
         }
         if(u_int_DebugMode== 6) {
             mat3 onb = get_onb(rs.closure.n, rs.closure.t);
-            color = onb[1];
+            contrib = onb[1];
         }
          if(u_int_DebugMode== 7) {            
-            color = vec3(rs.closure.transparency);
+            contrib = vec3(rs.closure.transparency);
         }
+        color = vec4(contrib, 1.0);
     }    
     else { // direct background hit
-        if(u_bool_UseIBL) {
-            color =  texture(u_samplerCube_EnvMap, mapDirToUV(r.dir)).xyz;
-        }
-
+        if(!u_bool_DisableBackground) {
+            color = vec4(texture(u_samplerCube_EnvMap, mapDirToUV(r.dir)).xyz, 1.0);
+        } 
     }
 
     return color;
@@ -316,13 +317,15 @@ vec3 sampleIBL(in vec3 dir) {
     return vec3(0);
 }
 
-vec3 trace(const Ray r) {
+vec4 trace(const Ray r) {
     HitInfo hit;
 
     vec3 pathWeight = vec3(1.0);
-    vec3 color = vec3(0);
+    vec4 color = vec4(0);
 
     if (intersectScene_Nearest(r, hit)) { // primary camera ray
+        vec3 contrib = vec3(0);
+
         RenderState rs;
         fillRenderState(r, hit, rs);
 
@@ -332,14 +335,14 @@ vec3 trace(const Ray r) {
             // start russion roulette path termination for bounce depth > 2
             if(i>2 && rng_NextFloat() > RR_TERMINATION_PROB) { 
                 if(u_bool_forceIBLEvalOnLastBounce)
-                    color += sampleIBL(rs.wo) * pathWeight;
+                    contrib += sampleIBL(rs.wo) * pathWeight;
                 break;
             }
 
 #ifdef HAS_LIGHTS
-            color += (rs.closure.emission + sampleAndEvaluateDirectLight(rs)) * pathWeight;
+            contrib += (rs.closure.emission + sampleAndEvaluateDirectLight(rs)) * pathWeight;
 #else
-            color += rs.closure.emission * pathWeight;
+            contrib += rs.closure.emission * pathWeight;
 #endif
 
             uint eventType = 0u;
@@ -355,19 +358,21 @@ vec3 trace(const Ray r) {
             bool isPathEnd = (i == (u_int_MaxBounceDepth-1));
             bool forcedIBLSampleOnPathEnd = (isPathEnd && u_bool_forceIBLEvalOnLastBounce);
             if ( bounceType == 0 || forcedIBLSampleOnPathEnd) { // background sample
-                color += sampleIBL(rs.wo) * pathWeight;
+                contrib += sampleIBL(rs.wo) * pathWeight;
                 break;
             }
 
             // all clear - next sample has properly been generated and intersection was found. Render state contains new intersection info.
             i++;
         }
+
+        color = vec4(contrib, 1.0);
     } 
     else { // direct background hit
-        if(u_bool_BackgroundFromIBL) {
-            color = sampleIBL(r.dir);
+        if(u_bool_DisableBackground) {
+            color = vec4(0,0,0,0);
         } else {
-          color = vec3(1,1,1);
+            color = vec4(sampleIBL(r.dir), 1.0);
         }
     }
 
@@ -395,14 +400,14 @@ void main() {
 
     Ray r = calcuateRay(rng_NextFloat(), rng_NextFloat());
     
-    vec3 color = trace(r);
+    vec4 color = trace(r);
 
     if(u_int_DebugMode> 0)
         color = traceDebug(r);
 
-    vec3 previousFrameColor = texelFetch(u_sampler2D_PreviousTexture,  ivec2(gl_FragCoord.xy), 0).xyz;
+    vec4 previousFrameColor = texelFetch(u_sampler2D_PreviousTexture,  ivec2(gl_FragCoord.xy), 0);
     color = (previousFrameColor * float(u_int_FrameCount-1) + color) / float(u_int_FrameCount);
 
     //color = texelFetch(u_sampler2D_LightData, getStructParameterTexCoord(0u, 0u, LIGHT_SIZE), 0).xyz;
-    out_FragColor = vec4(color, 1);
+    out_FragColor = color;
 }

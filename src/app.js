@@ -41,7 +41,7 @@ var state = {
   debugMode: "None",
   autoScaleOnImport: true,
   useIBL: true,
-  backgroundFromIBL: true,
+  disableBackground: false,
   autoRotate: false,
   pixelRatio: 0.5
 }
@@ -62,7 +62,7 @@ function initApp() {
 
   renderer = new PathtracingRenderer(canvas, true);
   renderer.loadScene(state.Scene, function () {
-    // renderer.loadIBL( state.IBL);
+    renderer.loadIBL( state.IBL);
     renderer.render(-1, () => {
       stats.update();
     });
@@ -150,8 +150,8 @@ function initMenu() {
     renderer.useIBL(value);
   });
 
-  gui.add(state, 'backgroundFromIBL').onChange(function (value) {
-    renderer.useBackgroundFromIBL(value);
+  gui.add(state, 'disableBackground').onChange(function (value) {
+    renderer.disableBackground(value);
   });
 
   gui.add(state, 'autoRotate').onChange(function (value) {
