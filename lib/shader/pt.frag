@@ -199,33 +199,38 @@ void fillRenderState(const in Ray r, const in HitInfo hit, out RenderState rs) {
 }
 
 int sampleBSDFBounce(inout RenderState rs, inout vec3 pathWeight, out uint eventType) {
-    Ray r;
     float rr_cutout = rng_NextFloat();
     if(rr_cutout > rs.closure.cutout_opacity) {
-      eventType |= EVENT_SPECULAR;
-      rs.wo = -rs.wi;
-      r = createRay(rs.wo, rs.hitPos + fix_normal(rs.geometryNormal, rs.wo) * EPS_NORMAL, TFAR_MAX);
+        eventType |= EVENT_SPECULAR;
+        rs.wo = -rs.wi;
+        Ray r = createRay(rs.wo, rs.hitPos + fix_normal(rs.geometryNormal, rs.wo) * EPS_NORMAL, TFAR_MAX);
+        HitInfo hit;
+        if (intersectScene_Nearest(r, hit)) {
+            fillRenderState(r, hit, rs);
+            return 1;
+        }
     } else {
-      float sample_pdf = 0.0;
-      vec3 sample_weight = vec3(0);
+        float sample_pdf = 0.0;
+        vec3 sample_weight = vec3(0);
 
-      vec3 wi = y_to_z_up * rs.wi;
-      vec3 wo = dspbr_sample(rs.closure, wi, vec3(rng_NextFloat(), rng_NextFloat(), rng_NextFloat()), sample_weight, sample_pdf, eventType);
-      rs.wo = transpose(y_to_z_up) * wo;
+        vec3 wi = y_to_z_up * rs.wi;
+        vec3 wo = dspbr_sample(rs.closure, wi, vec3(rng_NextFloat(), rng_NextFloat(), rng_NextFloat()), sample_weight, sample_pdf, eventType);
+        rs.wo = transpose(y_to_z_up) * wo;
 
-      if(sample_pdf > EPS_PDF) {
-          pathWeight *= sample_weight;
-      } else {
-          return -1;
-      }
-      r = createRay(rs.wo, rs.hitPos + fix_normal(rs.geometryNormal, rs.wo) * EPS_NORMAL, TFAR_MAX);
+        if(sample_pdf > EPS_PDF) {
+            pathWeight *= sample_weight;
+        } else {
+            return -1;
+        }
+        Ray r = createRay(rs.wo, rs.hitPos + fix_normal(rs.geometryNormal, rs.wo) * EPS_NORMAL, TFAR_MAX);
+        HitInfo hit;
+        if (intersectScene_Nearest(r, hit)) {
+            fillRenderState(r, hit, rs);
+            return 1;
+        }
     }
 
-    HitInfo hit;
-    if (intersectScene_Nearest(r, hit)) {
-        fillRenderState(r, hit, rs);
-        return 1;
-    }
+   
 
     return 0;
 }
@@ -375,7 +380,7 @@ vec4 trace(const Ray r) {
                 break;
             }
 
-            // all clear - next sample has properly been generated and intersection was found. Render state contains new intersection info.
+//             // all clear - next sample has properly been generated and intersection was found. Render state contains new intersection info.
             i++;
         }
 
