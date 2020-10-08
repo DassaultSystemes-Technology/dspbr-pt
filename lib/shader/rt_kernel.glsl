@@ -1,5 +1,5 @@
 /* @license
- * Copyright 2020  Dassault Systèmes - All Rights Reserved.
+ * Copyright 2020  Dassault Systemes - All Rights Reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -181,7 +181,7 @@ bool intersectSceneTriangles_BVH(const in Ray r, out HitInfo hit) {
     hit.tfar = r.tfar;
     hit.triIndex = -1;
 
-    int stack[32];
+    int stack[64];
     int top = 1;
     int pn = 0;
 
