@@ -3,7 +3,7 @@
   "version": "0.2.1",
   "description": "A WebGL2 Enterprise PBR sample renderer",
   "main": "src/electron/main.js",
-  "browser": "src/app.js",
+  "browser": "src/app.ts",
   "dependencies": {
     "argparse": "^1.0.10",
     "core-js": "^3.6.5",
@@ -19,14 +19,15 @@
     "cssnano": "^4.1.10",
     "electron": "^8.4.1",
     "electron-packager": "^14.2.1",
-    "electron-serve": "^1.0.0"
+    "electron-serve": "^1.0.0",
+    "typescript": "^4.1.2"
   },
   "scripts": {
     "start": "electron .",
     "render": "electron src/electron/offscreen.js --enable-logging",
     "clean": "shx rm -rf dist/*",
-    "build": "npm run clean && parcel build src/index.html --public-url ./",
-    "build-all": "npm run clean && parcel build src/index.html --public-url ./ && parcel build src/electron/headless.html --public-url ./",
+    "build": "npm run clean && parcel build src/index.html",
+    "build-all": "npm run clean && parcel build src/index.html && parcel build src/electron/headless.html",
     "dev": "parcel src/index.html --port 3000 --open",
     "validation": "npm run build-headless && python scripts/run_validation.py",
     "build-headless": "npm run clean && parcel build src/electron/headless.html --public-url ./",
