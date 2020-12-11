@@ -13,371 +13,490 @@
  * limitations under the License.
  */
 
-import * as THREE from 'three/build/three.module.js';
+import * as THREE from 'three';
 import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { SimpleTriangleBVH } from './bvh.js';
+import { Material } from 'three';
 
-function PathtracingRenderer(canvas, useControls) {
-  console.time("Init Pathtracing Renderer");
+var fileLoader = new THREE.FileLoader();
+function filePromiseLoader(url, onProgress?) {
+  return new Promise<string>((resolve, reject) => {
+    fileLoader.load(url, resolve, onProgress, reject);
+  });
+}
 
-  //var y_to_z_up = new THREE.Matrix4().makeRotationX(-Math.PI *0.5);
-  var clock = new THREE.Clock();
-
-  var _this = this,
-    _canvas = canvas !== undefined ? canvas : document.createElementNS('http://www.w3.org/1999/xhtml', 'canvas'),
-    _gl = _canvas.getContext('webgl2'),
-    _renderer,
-    _controls,
-    _camera,
-    _quadCamera,
-    _pathtracingScene,
-    _pathTracingMesh,
-    _accumBufferScene,
-    _displayScene,
-    _pathTracingRenderTarget,
-    _accumRenderTarget,
-    _pathTracingUniforms,
-    _frameCount = 1,
-    _glCubeIBL,
-    _boundingBox,
-    _sceneScaleFactor = 1.0,
-    _pmremGenerator,
-    _isRendering = false,
-    _usePathtracing = true,
-    _debugMode = "None",
-    _maxBounceDepth = 4,
-    _useIBL = false,
-    _disableBackground = false,
-    _autoScaleOnImport = true,
-    _pixelRatio = 0.5, // this serves as a multiplier to the devcice pixel ratio, which might be > 1 for e.g. retiana displays
-    _autoRotate = false,
-    _forceIBLEvalOnLastBounce = false;
-
-  let _scene = new THREE.Scene();
-  let _content = null;
-
-  this.domElement = _canvas;
-  this.debugModes = ["None", "Albedo", "Metalness", "Roughness", "Normals", "Tangents", "Bitangents", "Transparency"];
-
-  let texArrayList = [];
-  let texArrayDict = {};
-  let texArray;
-
-  var fileLoader = new THREE.FileLoader();
-  function filePromiseLoader(url, onProgress) {
-    return new Promise((resolve, reject) => {
-      fileLoader.load(url, resolve, onProgress, reject);
-    });
-  }
-
-  var cleanupScene = function (scene) {
-    console.log('Cleaning up scene data...!')
-
-    const cleanMaterial = material => {
-      console.log('dispose material!')
-      material.dispose()
-
-      // dispose textures
-      for (const key of Object.keys(material)) {
-        const value = material[key]
-        if (value && typeof value === 'object' && 'minFilter' in value) {
-          console.log('dispose texture!')
-          value.dispose()
-        }
-      }
-    };
-
-    scene.traverse(object => {
-      if (!object.isMesh) return
-
-      console.log('dispose geometry!')
-      object.geometry.dispose()
-
-      if (object.material.isMaterial) {
-        cleanMaterial(object.material)
-      } else {
-        // an array of materials
-        for (const material of object.material) cleanMaterial(material)
-      }
-    });
-  }
-
-  this.cleanup = function () {
-    texArrayDict = {};
-
-    for (let ta in texArrayList) {
-      for (let t in texArrayList[ta]) {
-        texArrayList[ta][t].dispose();
-      }
-
-      _pathTracingUniforms[`u_sampler2DArray_MaterialTextures_${ta}`].value.dispose();
+function flattenArray(arr, result = []) {
+  for (let i = 0, length = arr.length; i < length; i++) {
+    const value = arr[i];
+    if (Array.isArray(value)) {
+      flattenArray(value, result);
+    } else {
+      result.push(value);
     }
-
-    texArrayList = [];
-
-    if (_content) {
-      _scene.remove(_content);
-      cleanupScene(_content);
-
-      _scene.background = new THREE.Color(0, 0, 0);
-      _scene.environment = new THREE.Color(0, 0, 0);
-    }
-
-    if (_glCubeIBL !== undefined)
-      _glCubeIBL.dispose();
   }
+  return result;
+};
 
-  this.getContext = function () {
-    return _gl;
+function cleanupScene(scene) {
+  console.log('Cleaning up scene data...!')
+
+  const cleanMaterial = material => {
+    console.log('dispose material!')
+    material.dispose()
+
+    // dispose textures
+    for (const key of Object.keys(material)) {
+      const value = material[key]
+      if (value && typeof value === 'object' && 'minFilter' in value) {
+        console.log('dispose texture!')
+        value.dispose()
+      }
+    }
   };
 
-  this.getGLRenderer = function () {
-    return _renderer;
+  scene.traverse(object => {
+    if (!object.isMesh) return
+
+    console.log('dispose geometry!')
+    object.geometry.dispose()
+
+    if (object.material.isMaterial) {
+      cleanMaterial(object.material)
+    } else {
+      // an array of materials
+      for (const material of object.material) cleanMaterial(material)
+    }
+  });
+}
+
+type DebugMode = "None" | "Albedo" | "Metalness" | "Roughness" | "Normals" | "Tangents" | "Bitangents" | "Transparency";
+
+class MaterialData {
+  albedo = [1.0, 1.0, 1.0];
+  metallic = 0.0;
+
+  roughness = 0.0;
+  anisotropy = 0.0;
+  anisotropyRotation = 0.0;
+  transparency = 0.0;
+
+  cutoutOpacity = 1.0;
+  sheen = 0.0;
+  normalScale = 1.0;
+  ior = 1.5;
+
+  specular = 1.0;
+  specularTint = [1.0, 1.0, 1.0];
+
+  sheenRoughness = 0.0;
+  sheenColor = [1.0, 1.0, 1.0];
+
+  normalScaleClearcoat = 1.0;
+  emission = [0.0, 0.0, 0.0];
+
+  clearcoat = 0.0;
+  clearcoatRoughness = 0.0;
+  flakeCoverage = 0.0;
+  flakeSize = 0.02;
+
+  flakeRoughness = 0.2;
+  flakeColor = [1.0, 1.0, 1.0];
+
+  attenuationDistance = 100000.0;
+  attenuationColor = [1.0, 1.0, 1.0];
+
+  subsurfaceColor = [1.0, 1.0, 1.0];
+  thinWalled = 0;
+
+  translucency = 0.0;
+  alphaCutoff = 0.0;
+  padding = [0.0, 0.0];
+}
+
+class TexInfo {
+  texArrayIdx = -1;
+  texIdx = -1;
+  texCoordSet = -1;
+  pad = -1;
+  texOffset = [0, 0]; // TODO: Where to put these? Removing them here allows to use byte type for texInfoArray.
+  texScale = [1, 1];
+}
+
+class MaterialTextureInfo {
+  albedoMap = new TexInfo;
+  metallicRoughnessMap = new TexInfo();
+  normalMap = new TexInfo();
+  emissionMap = new TexInfo();
+  specularMap = new TexInfo();
+}
+
+class Light {
+  position = [1, 1, 1];
+  type = 0;
+  emission = [1, 1, 1];
+  pad = 0;
+}
+
+let clock = new THREE.Clock();
+
+export class PathtracingRenderer {
+  _gl: any;
+  _canvas: any | undefined;
+  _scene: THREE.Scene | null;
+  _renderer: any;
+  _controls: any;
+  _camera: any;
+  _quadCamera: any;
+  _pathtracingScene: any;
+  _pathTracingMesh: any;
+  _accumBufferScene: any;
+  _displayScene: any;
+  _pathTracingRenderTarget: any;
+  _accumRenderTarget: any;
+  _pathTracingUniforms: any;
+  _glCubeIBL: any;
+  _boundingBox: any;
+  _pmremGenerator: any;
+  _content: any | null;
+
+  _frameCount = 1;
+  _sceneScaleFactor = 1.0;
+  _isRendering = false;
+  _usePathtracing = true;
+  _debugMode: DebugMode = "None";
+  _maxBounceDepth = 4;
+  _useIBL = false;
+  _disableBackground = false;
+  _autoScaleOnImport = true;
+  _pixelRatio = 0.5; // this serves as a multiplier to the devcice pixel ratio, which might be > 1 for e.g. retiana displays
+  _autoRotate = false;
+  _forceIBLEvalOnLastBounce = false;
+  _useControls = true;
+
+  _texArrayList: any[] = [];
+  _texArrayDict: { [idx: string]: any; } = {};
+  _texArray;
+
+  debugModes = ["None", "Albedo", "Metalness", "Roughness", "Normals", "Tangents", "Bitangents", "Transparency"];
+
+  //   //var y_to_z_up = new THREE.Matrix4().makeRotationX(-Math.PI *0.5);
+
+  constructor(canvas: any | undefined, useControls: any | undefined) {
+    console.time("Init Pathtracing Renderer");
+    this._canvas = canvas !== undefined ? canvas : document.createElementNS('http://www.w3.org/1999/xhtml', 'canvas');
+    this._gl = this._canvas.getContext('webgl2');
+
+    this._scene = new THREE.Scene();
+    this._useControls = useControls;
+
+    THREE.ShaderChunk['pathtracing_defines'] = `
+          #define PI               3.14159265358979323
+          #define TWO_PI           6.28318530717958648
+          #define FOUR_PI          12.5663706143591729
+          #define ONE_OVER_PI      0.31830988618379067
+          #define ONE_OVER_TWO_PI  0.15915494309
+          #define ONE_OVER_FOUR_PI 0.07957747154594767
+          #define PI_OVER_TWO      1.57079632679489662
+          #define ONE_OVER_THREE   0.33333333333333333
+          #define E                2.71828182845904524
+          #define INFINITY         1000000.0
+
+          const float EPS_NORMAL = 0.001;
+          const float EPS_COS = 0.001;
+          const float EPS_PDF = 0.001;
+          const float EPSILON  = 1e-6;
+
+          const float MINIMUM_ROUGHNESS = 0.001;
+          const float TFAR_MAX = 100000.0;
+
+          const float RR_TERMINATION_PROB = 0.9;
+
+          const uint MATERIAL_SIZE = 11u;
+          const uint MATERIAL_TEX_INFO_SIZE = 5u;
+          const uint TEX_INFO_SIZE = 2u;
+      `;
+
+    this.initRenderer();
+  }
+
+  cleanup() {
+    this._texArrayDict = {};
+
+    for (let ta in this._texArrayList) {
+      for (let t in this._texArrayList[ta]) {
+        this._texArrayList[ta][t].dispose();
+      }
+
+      this._pathTracingUniforms[`u_sampler2DArray_MaterialTextures_${ta}`].value.dispose();
+    }
+
+    this._texArrayList = [];
+
+    if (this._content) {
+      this._scene.remove(this._content);
+      cleanupScene(this._content);
+
+      this._scene.background = new THREE.Color(0, 0, 0);
+      this._scene.environment = null;
+    }
+
+    if (this._glCubeIBL !== undefined)
+      this._glCubeIBL.dispose();
+  }
+
+
+  getContext() {
+    return this._gl;
+  }
+
+  getGLRenderer() {
+    return this._renderer;
   };
 
-  this.resetAccumulation = function () {
-    _frameCount = 1;
+  resetAccumulation() {
+    this._frameCount = 1;
     // console.log("Reset Accumulation");
-  };
-
-  this.setPixelRatio = function (ratio) {
-    _pixelRatio = ratio;
-    _this.resize(window.innerWidth, window.innerHeight);
   }
 
-  this.setMaxBounceDepth = function (value) {
-    _maxBounceDepth = value;
-    _this.resetAccumulation();
+  setPixelRatio(ratio) {
+    this._pixelRatio = ratio;
+    this.resize(window.innerWidth, window.innerHeight);
   }
 
-  this.usePathtracing = function (flag) {
-    _usePathtracing = flag;
-    _this.resetAccumulation();
+  setMaxBounceDepth(value) {
+    this._maxBounceDepth = value;
+    this.resetAccumulation();
   }
 
-  this.autoScaleOnImport = function (flag) {
-    _autoScaleOnImport = flag;
+  usePathtracing(flag) {
+    this._usePathtracing = flag;
+    this.resetAccumulation();
   }
 
-  this.forceIBLEvalOnLastBounce = function (flag) {
-    _forceIBLEvalOnLastBounce = flag;
-    _this.resetAccumulation();
+  autoScaleOnImport(flag) {
+    this._autoScaleOnImport = flag;
   }
 
-  this.enableAutoRotate = function (flag) {
-    if (_controls) {
-      _controls.autoRotate = flag;
-      _this.resetAccumulation();
+  forceIBLEvalOnLastBounce(flag) {
+    this._forceIBLEvalOnLastBounce = flag;
+    this.resetAccumulation();
+  }
+
+  enableAutoRotate(flag) {
+    if (this._controls) {
+      this._controls.autoRotate = flag;
+      this.resetAccumulation();
     }
   }
 
-  this.disableBackground = function (flag) {
-    _disableBackground = flag
+  disableBackground(flag) {
+    this._disableBackground = flag
     if (!flag) {
-      _scene.background = _glCubeIBL;
+      this._scene.background = this._glCubeIBL;
     } else {
-      _scene.background = new THREE.Color( 0x000000 );
+      this._scene.background = new THREE.Color(0x000000);
     }
-    _this.resetAccumulation();
+    this.resetAccumulation();
   }
 
-  this.setDebugMode = function (mode) {
-    _debugMode = mode;
-    _this.resetAccumulation();
+  setDebugMode(mode) {
+    this._debugMode = mode;
+    this.resetAccumulation();
   }
 
-  this.useIBL = function (flag) {
-    _useIBL = flag;
+  useIBL(flag) {
+    this._useIBL = flag;
 
     if (!flag) {
-      _scene.environment = undefined;
+      this._scene.environment = undefined;
     } else {
-      _scene.environment = _glCubeIBL;
+      this._scene.environment = this._glCubeIBL;
     }
 
-    _this.resetAccumulation();
+    this.resetAccumulation();
   }
 
-  this.resize = function (width, height) {
-    let renderPixelRatio = _pixelRatio * window.devicePixelRatio
-    _renderer.setPixelRatio(renderPixelRatio);
-    _renderer.setSize(width, height);
-    _pathTracingRenderTarget.setSize(width * renderPixelRatio, height * renderPixelRatio);
-    _accumRenderTarget.setSize(width * renderPixelRatio, height * renderPixelRatio);
-    _camera.aspect = width / height;
-    _camera.updateProjectionMatrix();
-    _this.resetAccumulation();
+  resize(width, height) {
+    let renderPixelRatio = this._pixelRatio * window.devicePixelRatio
+    this._renderer.setPixelRatio(renderPixelRatio);
+    this._renderer.setSize(width, height);
+    this._pathTracingRenderTarget.setSize(width * renderPixelRatio, height * renderPixelRatio);
+    this._accumRenderTarget.setSize(width * renderPixelRatio, height * renderPixelRatio);
+    this._camera.aspect = width / height;
+    this._camera.updateProjectionMatrix();
+    this.resetAccumulation();
   }
 
-  this.getCamera = function () {
-    return _camera;
+  getCamera() {
+    return this._camera;
   }
 
-  this.setLookAt = function (from, at, up) {
-    _camera.position.set(from[0]*_sceneScaleFactor, from[1]*_sceneScaleFactor, from[2]*_sceneScaleFactor);
-    _camera.up.set(up[0], up[1], up[2]);
-    _camera.lookAt(at[0]*_sceneScaleFactor, at[1]*_sceneScaleFactor, at[2]*_sceneScaleFactor);
-    _camera.updateMatrixWorld();
-    if (_controls) _controls.update();
+  setLookAt(from, at, up) {
+    this._camera.position.set(from[0] * this._sceneScaleFactor, from[1] * this._sceneScaleFactor, from[2] * this._sceneScaleFactor);
+    this._camera.up.set(up[0], up[1], up[2]);
+    this._camera.lookAt(at[0] * this._sceneScaleFactor, at[1] * this._sceneScaleFactor, at[2] * this._sceneScaleFactor);
+    this._camera.updateMatrixWorld();
+    if (this._controls) this._controls.update();
   }
 
-  this.setPerspective = function (vFov, near, far) {
-    _camera.fov = vFov;
-    _camera.near = near;
-    _camera.far = far;
-    _camera.updateProjectionMatrix();
+  setPerspective(vFov, near, far) {
+    this._camera.fov = vFov;
+    this._camera.near = near;
+    this._camera.far = far;
+    this._camera.updateProjectionMatrix();
   }
 
-  this.getBoundingBox = function () {
-    return _boundingBox;
+  getBoundingBox() {
+    return this._boundingBox;
   }
 
-  this.centerView = function () {
-    if (_controls) { // Todo: implement on camera, no controls needed for this
+  centerView() {
+    if (this._controls) { // Todo: implement on camera, no controls needed for this
       let center = new THREE.Vector3();
-      _boundingBox.getCenter(center);
-      _controls.target = center;
-      _controls.update();
-      _this.resetAccumulation();
+      this._boundingBox.getCenter(center);
+      this._controls.target = center;
+      this._controls.update();
+      this.resetAccumulation();
     }
   }
 
-  this.stopRendering = function () {
-    _isRendering = false;
+  stopRendering() {
+    this._isRendering = false;
   };
 
-  this.render = function (num_samples, frameFinishedCB, renderingFinishedCB) {
-    if (_camera instanceof THREE.Camera === false) {
+  render(num_samples, frameFinishedCB, renderingFinishedCB) {
+    if (this._camera instanceof THREE.Camera === false) {
       console.error('PathtracingRenderer.render: camera is not an instance of THREE.Camera.');
       return;
     }
 
-    _isRendering = true;
-    _this.resetAccumulation();
+    this._isRendering = true;
+    this.resetAccumulation();
 
-    function renderFrame() {
-      if (!_isRendering || _renderer === undefined)
+    let _this = this;
+    let renderFrame = function() {
+      if (!_this._isRendering || _this._renderer === undefined)
         return;
 
-      if (_controls)
-        _controls.update(clock.getDelta());
+      if (_this._controls)
+        _this._controls.update(clock.getDelta());
 
-      if (_usePathtracing) {
+      if (_this._usePathtracing) {
 
-        if (_pathTracingUniforms !== undefined) {
-          _pathTracingUniforms.u_mat4_ViewMatrix.value.copy(_camera.matrixWorld);
-          _pathTracingUniforms.u_vec3_CameraPosition.value.copy(_camera.position);
-          _pathTracingUniforms.u_int_FrameCount.value = _frameCount;
-          _pathTracingUniforms.u_int_DebugMode.value = _this.debugModes.indexOf(_debugMode);
-          _pathTracingUniforms.u_bool_UseIBL.value = _useIBL;
-          _pathTracingUniforms.u_bool_DisableBackground.value = _disableBackground;
-          _pathTracingUniforms.u_int_MaxBounceDepth.value = _maxBounceDepth;
-          _pathTracingUniforms.u_vec2_InverseResolution.value.set(1.0 / window.innerWidth, 1.0 / window.innerHeight);
-          let filmHeight = Math.tan(_camera.fov * 0.5 * Math.PI / 180.0) * _camera.near;
-          _pathTracingUniforms.u_float_FilmHeight.value = filmHeight; //TODO move to shader 
-          _pathTracingUniforms.u_float_FocalLength.value = _camera.near;
-          _pathTracingUniforms.u_bool_forceIBLEvalOnLastBounce.value = _forceIBLEvalOnLastBounce;
+        if (_this._pathTracingUniforms !== undefined) {
+          _this._pathTracingUniforms.u_mat4_ViewMatrix.value.copy(_this._camera.matrixWorld);
+          _this._pathTracingUniforms.u_vec3_CameraPosition.value.copy(_this._camera.position);
+          _this._pathTracingUniforms.u_int_FrameCount.value = _this._frameCount;
+          _this._pathTracingUniforms.u_int_DebugMode.value = _this.debugModes.indexOf(_this._debugMode);
+          _this._pathTracingUniforms.u_bool_UseIBL.value = _this._useIBL;
+          _this._pathTracingUniforms.u_bool_DisableBackground.value = _this._disableBackground;
+          _this._pathTracingUniforms.u_int_MaxBounceDepth.value = _this._maxBounceDepth;
+          _this._pathTracingUniforms.u_vec2_InverseResolution.value.set(1.0 / window.innerWidth, 1.0 / window.innerHeight);
+          let filmHeight = Math.tan(_this._camera.fov * 0.5 * Math.PI / 180.0) * _this._camera.near;
+          _this._pathTracingUniforms.u_float_FilmHeight.value = filmHeight; //TODO move to shader 
+          _this._pathTracingUniforms.u_float_FocalLength.value = _this._camera.near;
+          _this._pathTracingUniforms.u_bool_forceIBLEvalOnLastBounce.value = _this._forceIBLEvalOnLastBounce;
           // _pathTracingUniforms.u_float_FilmHeight.value = _camera.getFilmHeight();
           // _pathTracingUniforms.u_float_FocalLength.value = _camera.getFocalLength();
         }
 
-        if (_debugMode !== "None") {
+        if (_this._debugMode !== "None") {
 
-          _renderer.setRenderTarget(_pathTracingRenderTarget);
-          _renderer.render(_pathtracingScene, _camera);
+          _this._renderer.setRenderTarget(_this._pathTracingRenderTarget);
+          _this._renderer.render(_this._pathtracingScene, _this._camera);
 
-          _renderer.setRenderTarget(_accumRenderTarget);
-          _renderer.render(_accumBufferScene, _quadCamera);
+          _this._renderer.setRenderTarget(_this._accumRenderTarget);
+          _this._renderer.render(_this._accumBufferScene, _this._quadCamera);
 
-          _renderer.setRenderTarget(null);
-          _renderer.render(_accumBufferScene, _quadCamera);
+          _this._renderer.setRenderTarget(null);
+          _this._renderer.render(_this._accumBufferScene, _this._quadCamera);
 
         } else {
 
-          _renderer.setRenderTarget(_pathTracingRenderTarget);
-          _renderer.render(_pathtracingScene, _camera);
+          _this._renderer.setRenderTarget(_this._pathTracingRenderTarget);
+          _this._renderer.render(_this._pathtracingScene, _this._camera);
 
           // STEP 2
           // Render(copy) the pathTracingScene output(pathTracingRenderTarget above) into screenTextureRenderTarget.
-          // This will be used as a new starting point for Step 1 above (essentially creating ping-pong buffers)
-          _renderer.setRenderTarget(_accumRenderTarget);
-          _renderer.render(_accumBufferScene, _quadCamera);
+          // _This will be used as a new starting point for Step 1 above (essentially creating ping-pong buffers)
+          _this._renderer.setRenderTarget(_this._accumRenderTarget);
+          _this._renderer.render(_this._accumBufferScene, _this._quadCamera);
 
           // STEP 3
           // Render full screen quad with generated pathTracingRenderTarget in STEP 1 above.
           // After the image is gamma-corrected, it will be shown on the screen as the final accumulated output
-          _renderer.setRenderTarget(null);
-          _renderer.render(_displayScene, _quadCamera);
+          _this._renderer.setRenderTarget(null);
+          _this._renderer.render(_this._displayScene, _this._quadCamera);
         }
       } else {
-        _renderer.render(_scene, _camera); // render GL view
+        _this._renderer.render(_this._scene, _this._camera); // render GL view
       }
 
-      _frameCount++;
+      _this._frameCount++;
 
-      if (num_samples !== -1 && _frameCount >= num_samples) {
+      if (num_samples !== -1 && _this._frameCount >= num_samples) {
         renderingFinishedCB(); // finished rendering num_samples
-        _isRendering = false;
+        _this._isRendering = false;
       }
 
-      frameFinishedCB(_frameCount);
+      frameFinishedCB(_this._frameCount);
       requestAnimationFrame(renderFrame); // num_samples == -1 || _frameCount < num_samples
-
-    }
+    };
 
     requestAnimationFrame(renderFrame); // start render loop
-  };
+  }
 
-  function initRenderer() {
+  initRenderer() {
     //THREE.Object3D.DefaultUp = new THREE.Vector3(0,0,1);
 
-    _pathtracingScene = new THREE.Scene();
-    _accumBufferScene = new THREE.Scene();
-    _displayScene = new THREE.Scene();
+    this._pathtracingScene = new THREE.Scene();
+    this._accumBufferScene = new THREE.Scene();
+    this._displayScene = new THREE.Scene();
 
-    _renderer = new THREE.WebGLRenderer({ canvas: _canvas, context: _gl, powerPreference: "high-performance", alpha: true });
-    _renderer.setPixelRatio(_pixelRatio * window.devicePixelRatio);
-    _renderer.setSize(window.innerWidth, window.innerHeight);
-    _renderer.getContext().getExtension('EXT_color_buffer_float');
-    _renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    // _renderer.toneMapping = THREE.NoToneMapping
-    _renderer.toneMappingExposure = 1.0;
-    _renderer.outputEncoding = THREE.GammaEncoding;
-    _renderer.physicallyCorrectLights = true;
+    this._renderer = new THREE.WebGLRenderer({ canvas: this._canvas, context: this._gl, powerPreference: "high-performance", alpha: true });
+    this._renderer.setPixelRatio(this._pixelRatio * window.devicePixelRatio);
+    this._renderer.setSize(window.innerWidth, window.innerHeight);
+    this._renderer.getContext().getExtension('EXT_color_buffer_float');
+    this._renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    // this._renderer.toneMapping = THREE.NoToneMapping
+    this._renderer.toneMappingExposure = 1.0;
+    this._renderer.outputEncoding = THREE.GammaEncoding;
+    this._renderer.physicallyCorrectLights = true;
 
-    _pmremGenerator = new THREE.PMREMGenerator(_renderer);
-    _pmremGenerator.compileEquirectangularShader();
+    this._pmremGenerator = new THREE.PMREMGenerator(this._renderer);
+    this._pmremGenerator.compileEquirectangularShader();
 
     let aspect = window.innerWidth / window.innerHeight;
-    _camera = new THREE.PerspectiveCamera(45, aspect, 0.01, 1000);
-    _camera.position.set(0, 0, 3);
+    this._camera = new THREE.PerspectiveCamera(45, aspect, 0.01, 1000);
+    this._camera.position.set(0, 0, 3);
 
-    if (useControls) {
-      _controls = new OrbitControls(_camera, _canvas);
-      _controls.screenSpacePanning = true;
+    if (this._useControls) {
+      this._controls = new OrbitControls(this._camera, this._canvas);
+      this._controls.screenSpacePanning = true;
 
-      _controls.addEventListener('change', function () {
-        _this.resetAccumulation();
+      let that = this;
+      this._controls.addEventListener('change', function () {
+        that.resetAccumulation();
       });
 
-      _controls.mouseButtons = {
+      this._controls.mouseButtons = {
         LEFT: THREE.MOUSE.ROTATE,
         MIDDLE: THREE.MOUSE.PAN,
         RIGHT: THREE.MOUSE.DOLLY
       }
     }
 
-    _quadCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    _accumBufferScene.add(_quadCamera);
-    _displayScene.add(_quadCamera);
+    this._quadCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    this._accumBufferScene.add(this._quadCamera);
+    this._displayScene.add(this._quadCamera);
 
     let quadGeometry = new THREE.PlaneBufferGeometry(2, 2);
 
-    let renderPixelRatio = _pixelRatio * window.devicePixelRatio
-    _pathTracingRenderTarget = new THREE.WebGLRenderTarget((window.innerWidth * renderPixelRatio), (window.innerHeight * renderPixelRatio), {
+    let renderPixelRatio = this._pixelRatio * window.devicePixelRatio
+    this._pathTracingRenderTarget = new THREE.WebGLRenderTarget((window.innerWidth * renderPixelRatio), (window.innerHeight * renderPixelRatio), {
       minFilter: THREE.NearestFilter,
       magFilter: THREE.NearestFilter,
       format: THREE.RGBAFormat,
@@ -387,39 +506,39 @@ function PathtracingRenderer(canvas, useControls) {
     });
 
     let accumMaterial = new THREE.ShaderMaterial({
-      uniforms: screenTextureShader.uniforms,
-      vertexShader: screenTextureShader.vertexShader,
-      fragmentShader: screenTextureShader.fragmentShader,
+      uniforms: this.screenTextureShader.uniforms,
+      vertexShader: this.screenTextureShader.vertexShader,
+      fragmentShader: this.screenTextureShader.fragmentShader,
       depthWrite: false,
       depthTest: false
     });
 
-    accumMaterial.uniforms.tex.value = _pathTracingRenderTarget.texture;
+    accumMaterial.uniforms.tex.value = this._pathTracingRenderTarget.texture;
 
     let screenTextureMesh = new THREE.Mesh(quadGeometry, accumMaterial);
-    _accumBufferScene.add(screenTextureMesh);
+    this._accumBufferScene.add(screenTextureMesh);
 
     accumMaterial.dispose();
 
     let displayMaterial = new THREE.ShaderMaterial({
-      uniforms: screenOutputShader.uniforms,
-      vertexShader: screenOutputShader.vertexShader,
-      fragmentShader: screenOutputShader.fragmentShader,
+      uniforms: this.screenOutputShader.uniforms,
+      vertexShader: this.screenOutputShader.vertexShader,
+      fragmentShader: this.screenOutputShader.fragmentShader,
       depthWrite: false,
       depthTest: false
     });
 
-    displayMaterial.uniforms.tex.value = _pathTracingRenderTarget.texture;
+    displayMaterial.uniforms.tex.value = this._pathTracingRenderTarget.texture;
 
     let displayMesh = new THREE.Mesh(quadGeometry, displayMaterial);
-    _displayScene.add(displayMesh);
+    this._displayScene.add(displayMesh);
 
     quadGeometry.dispose();
     displayMaterial.dispose();
 
     console.timeEnd("Init Pathtracing Renderer");
 
-    _accumRenderTarget = new THREE.WebGLRenderTarget((window.innerWidth * renderPixelRatio), (window.innerHeight * renderPixelRatio), {
+    this._accumRenderTarget = new THREE.WebGLRenderTarget((window.innerWidth * renderPixelRatio), (window.innerHeight * renderPixelRatio), {
       minFilter: THREE.NearestFilter,
       magFilter: THREE.NearestFilter,
       format: THREE.RGBAFormat,
@@ -429,73 +548,7 @@ function PathtracingRenderer(canvas, useControls) {
     });
   }
 
-  function MaterialData() {
-    this.albedo = [1.0, 1.0, 1.0];
-    this.metallic = 0.0;
-
-    this.roughness = 0.0;
-    this.anisotropy = 0.0;
-    this.anisotropyRotation = 0.0;
-    this.transparency = 0.0;
-
-    this.cutoutOpacity = 1.0;
-    this.sheen = 0.0;
-    this.normalScale = 1.0;
-    this.ior = 1.5;
-
-    this.specular = 1.0;
-    this.specularTint = [1.0, 1.0, 1.0];
-
-    this.sheenRoughness = 0.0;
-    this.sheenColor = [1.0, 1.0, 1.0];
-
-    this.normalScaleClearcoat = 1.0;
-    this.emission = [0.0, 0.0, 0.0];
-
-    this.clearcoat = 0.0;
-    this.clearcoatRoughness = 0.0;
-    this.flakeCoverage = 0.0;
-    this.flakeSize = 0.02;
-
-    this.flakeRoughness = 0.2;
-    this.flakeColor = [1.0, 1.0, 1.0];
-
-    this.attenuationDistance = 100000.0;
-    this.attenuationColor = [1.0, 1.0, 1.0];
-
-    this.subsurfaceColor = [1.0, 1.0, 1.0];
-    this.thinWalled = 0;
-
-    this.translucency = 0.0;
-    this.alphaCutoff = 0.0;
-    this.padding = [0.0, 0.0];
-  };
-
-  function TexInfo() {
-    this.texArrayIdx = -1;
-    this.texIdx = -1;
-    this.texCoordSet = -1;
-    this.pad = -1;
-    this.texOffset = [0, 0]; // TODO: Where to put these? Removing them here allows to use byte type for texInfoArray.
-    this.texScale = [1, 1];
-  }
-
-  function MaterialTextureInfo() {
-    this.albedoMap = new TexInfo;
-    this.metallicRoughnessMap = new TexInfo();
-    this.normalMap = new TexInfo();
-    this.emissionMap = new TexInfo();
-    this.specularMap = new TexInfo();
-  }
-
-  function Light() {
-    this.position = [1, 1, 1];
-    this.type = 0;
-    this.emission = [1, 1, 1];
-    this.pad = 0;
-  }
-
-  function findTextureInList(tex, texList) {
+  findTextureInList(tex, texList) {
     for (let i = 0; i < texList.length; i++) {
       if (tex.image.src === texList[i].image.src)
         return i;
@@ -504,24 +557,24 @@ function PathtracingRenderer(canvas, useControls) {
     return -1;
   }
 
-  function parseTexture(tex) {
+  parseTexture(tex) {
     let texInfo = new TexInfo();
 
-    let res = [tex.image.width, tex.image.height];
-    if (res in texArrayDict) {
-      let texArrayIdx = texArrayDict[res];
-      let texIdxInArray = findTextureInList(tex, texArrayList[texArrayIdx]);
+    let res = [tex.image.width, tex.image.height].join(',');
+    if (res in this._texArrayDict) {
+      let texArrayIdx = this._texArrayDict[res];
+      let texIdxInArray = this.findTextureInList(tex, this._texArrayList[texArrayIdx]);
       if (texIdxInArray < 0) {
-        texArrayList[texArrayIdx].push(tex);
-        texIdxInArray = texArrayList[texArrayIdx].length - 1;
+        this._texArrayList[texArrayIdx].push(tex);
+        texIdxInArray = this._texArrayList[texArrayIdx].length - 1;
       }
       texInfo.texArrayIdx = texArrayIdx;
       texInfo.texIdx = texIdxInArray;
     } else {
-      texArrayDict[res] = texArrayList.length;
+      this._texArrayDict[res] = this._texArrayList.length;
       let tex_array = [tex];
-      texArrayList.push(tex_array);
-      texInfo.texArrayIdx = texArrayList.length - 1;
+      this._texArrayList.push(tex_array);
+      texInfo.texArrayIdx = this._texArrayList.length - 1;
       texInfo.texIdx = 0;
     }
 
@@ -530,17 +583,17 @@ function PathtracingRenderer(canvas, useControls) {
 
     texInfo.texCoordSet = 0; // TODO Handle second uv set
     return texInfo;
-  };
+  }
 
 
-  function parseMaterial(mat, materialBuffer, materialTextureInfoBuffer) {
+  parseMaterial(mat: THREE.MeshStandardMaterial, materialBuffer: any[], materialTextureInfoBuffer: any[]) {
     let matInfo = new MaterialData();
     let matTexInfo = new MaterialTextureInfo();
 
     matInfo.albedo = mat.color.toArray();
 
     if (mat.map) {
-      matTexInfo.albedoMap = parseTexture(mat.map);
+      matTexInfo.albedoMap = this.parseTexture(mat.map);
     }
 
     matInfo.metallic = mat.metalness || 0;
@@ -548,28 +601,28 @@ function PathtracingRenderer(canvas, useControls) {
 
     matInfo.cutoutOpacity = mat.opacity;
     matInfo.alphaCutoff = mat.alphaTest;
-    if(mat.alphaTest == 0.0 && !mat.transparent)
+    if (mat.alphaTest == 0.0 && !mat.transparent)
       matInfo.alphaCutoff = 1.0;
 
     if (mat.metalnessMap) {
-      matTexInfo.metallicRoughnessMap = parseTexture(mat.metalnessMap);
+      matTexInfo.metallicRoughnessMap = this.parseTexture(mat.metalnessMap);
     }
 
     if (mat.normalMap) {
-      matTexInfo.normalMap = parseTexture(mat.normalMap);
+      matTexInfo.normalMap = this.parseTexture(mat.normalMap);
       matInfo.normalScale = mat.normalScale.x;
     }
 
     if (mat.emissiveMap) {
-      matTexInfo.emissionMap = parseTexture(mat.emissiveMap);
+      matTexInfo.emissionMap = this.parseTexture(mat.emissiveMap);
       matInfo.emission = mat.emissive.toArray();
     }
 
     if ("gltfExtensions" in mat.userData) {
 
-      function get_param(name, obj, default_value) {
+      let get_param = function (name, obj, default_value) {
         return (name in obj) ? obj[name] : default_value;
-      }
+      };
 
       let extensions = mat.userData.gltfExtensions;
 
@@ -587,7 +640,7 @@ function PathtracingRenderer(canvas, useControls) {
         let ext = extensions["3DS_materials_transmission"];
         matInfo.transparency = get_param("transmissionFactor", ext, matInfo.transparency);
       }
-       if ('KHR_materials_transmission' in extensions) {
+      if ('KHR_materials_transmission' in extensions) {
         let ext = extensions["KHR_materials_transmission"];
         matInfo.transparency = get_param("transmissionFactor", ext, matInfo.transparency);
       }
@@ -629,7 +682,7 @@ function PathtracingRenderer(canvas, useControls) {
     materialTextureInfoBuffer.push(Object.values(matTexInfo));
   }
 
-  this.loadSceneFromBlobs = function (fileList, callback) {
+  loadSceneFromBlobs(fileList, callback) {
     var manager = new THREE.LoadingManager();
 
     let blobs = {};
@@ -662,39 +715,41 @@ function PathtracingRenderer(canvas, useControls) {
     for (var i = 0; i < fileList.length; i++) {
       if (getFileExtension(fileList[i].name) === "gltf" ||
         getFileExtension(fileList[i].name) === "glb")
-        _this.loadScene(fileList[i].name, callback, manager);
+        this.loadScene(fileList[i].name, callback, manager);
     }
   }
 
-  this.loadIBL = function (ibl, callback) {
+  loadIBL(ibl, callback) {
     new RGBELoader()
       .setDataType(THREE.FloatType)
       .load(ibl, function (texture) {
-        _glCubeIBL = _pmremGenerator.fromEquirectangular(texture).texture;
-        _pmremGenerator.dispose();
+        this._glCubeIBL = this._pmremGenerator.fromEquirectangular(texture).texture;
+        this._pmremGenerator.dispose();
         texture.minFilter = THREE.LinearFilter;
         texture.magFilter = THREE.LinearFilter;
         texture.flipY = true;
         texture.needsUpdate = true;
 
-        _scene.background = _glCubeIBL;
-        _scene.environment = _glCubeIBL;
+        this._scene.background = this._glCubeIBL;
+        this._scene.environment = this._glCubeIBL;
 
-        if (_pathTracingUniforms["u_samplerCube_EnvMap"].value)
-          _pathTracingUniforms["u_samplerCube_EnvMap"].value.dispose();
-        _pathTracingUniforms["u_samplerCube_EnvMap"].value = texture;
-        _this.useIBL(true);
-        if(callback) callback();
-      });
+        if (this._pathTracingUniforms["u_samplerCube_EnvMap"].value)
+          this._pathTracingUniforms["u_samplerCube_EnvMap"].value.dispose();
+
+        this._pathTracingUniforms["u_samplerCube_EnvMap"].value = texture;
+        this.useIBL(true);
+        if (callback) callback();
+      }.bind(this));
   }
 
-  this.loadScene = function (scene_path, callback, manager) {
-    _this.cleanup();
-    _this.stopRendering();
+  loadScene(scene_path, callback, manager) {
+    this.cleanup();
+    this.stopRendering();
     THREE.Cache.clear();
 
-    console.log("GL Renderer state before load:\n", _renderer.info);
+    console.log("GL Renderer state before load:\n", this._renderer.info);
 
+    let that = this;
     var loader = new GLTFLoader(manager);
     loader.load(scene_path, function (gltf) {
 
@@ -712,36 +767,37 @@ function PathtracingRenderer(canvas, useControls) {
       const minValue = Math.min(bbox.min.x, Math.min(bbox.min.y, bbox.min.z));
       const maxValue = Math.max(bbox.max.x, Math.max(bbox.max.y, bbox.max.z));
       const deltaValue = maxValue - minValue;
-      _sceneScaleFactor = 1.0 / deltaValue;
+      that._sceneScaleFactor = 1.0 / deltaValue;
       // Normalize scene dimensions (needed for easy rt precision control) 
-      if (_autoScaleOnImport) {
-        scene.scale.set(_sceneScaleFactor, _sceneScaleFactor, _sceneScaleFactor);
+      if (that._autoScaleOnImport) {
+        scene.scale.set(that._sceneScaleFactor, that._sceneScaleFactor, that._sceneScaleFactor);
       }
 
       //scene.matrixAutoUpdate = false;
       scene.updateMatrixWorld()
 
       // we need a clone where we disconnect geometry refs (see below)
-      _content = scene.clone();
+      that._content = scene.clone();
 
-      _scene.add(_content);
+      that._scene.add(that._content);
       //scene.applyMatrix4(y_to_z_up);
 
       // Break reference of geometry nodes in scene copy
       // we need this because the transforms will baked into geo for path-tracing
       // whereas gl renderer is resolving transforms on pre-render
-      _scene.traverse((node) => {
-        if (node.isMesh) {
-          node.geometry = node.geometry.clone();
+      that._scene.traverse((node) => {
+        if ((<THREE.Mesh>node).isMesh) {
+          let meshNode = (<THREE.Mesh>node);
+          meshNode.geometry = meshNode.geometry.clone();
         }
       });
 
-      createPathTracingScene(scene).then(() => {
-        _this.resetAccumulation();
+      that.createPathTracingScene(scene).then(() => {
+        that.resetAccumulation();
 
         scene.traverse((node) => {
-          if (node.isMesh) {
-            node.geometry.dispose();
+          if ((<THREE.Mesh>node).isMesh) {
+            (<THREE.Mesh>node).geometry.dispose();
           }
         });
         callback();
@@ -750,8 +806,8 @@ function PathtracingRenderer(canvas, useControls) {
   };
 
   // Initializes all necessary pathtracing related data structures from three scene
-  async function createPathTracingScene(scene) {
-    _boundingBox = new THREE.Box3().setFromObject(scene);
+  async createPathTracingScene(scene) {
+    this._boundingBox = new THREE.Box3().setFromObject(scene);
 
     console.time("InitializingPT");
 
@@ -769,6 +825,8 @@ function PathtracingRenderer(canvas, useControls) {
     let parent;
 
     matrixStack.push(new THREE.Matrix4());
+
+    let that = this;
     scene.traverse(function (child) {
       if (child.isMesh || child.isLight || child.isCamera) {
         if (parent !== undefined && parent.name !== child.parent.name) {
@@ -785,9 +843,9 @@ function PathtracingRenderer(canvas, useControls) {
           if (child.material.length > 0) {
             //for (let i = 0; i < child.material.length; i++)
             //new MaterialObject(child.material[i], pathTracingMaterialList);
-            parseMaterial(child.material[0], materialBuffer, materialTextureInfoBuffer)
+            that.parseMaterial(child.material[0], materialBuffer, materialTextureInfoBuffer)
           } else {
-            parseMaterial(child.material, materialBuffer, materialTextureInfoBuffer);
+            that.parseMaterial(child.material, materialBuffer, materialTextureInfoBuffer);
           }
 
           if (child.geometry.groups.length > 0) {
@@ -832,19 +890,19 @@ function PathtracingRenderer(canvas, useControls) {
     var flattenedMeshList = [].concat.apply([], meshes);
 
     if (cameras.length > 0) { // just use camera 0 for now
-      if (_camera !== undefined) {
-        _camera.fov = cameras[0].fov;
-        _camera.near = cameras[0].near;
-        //_camera.aspect = cameras[0].aspect;
-        _camera.matrixWorld = cameras[0].matrixWorld;
-        _camera.updateProjectionMatrix();
-        if (_controls) _controls.update();
+      if (this._camera !== undefined) {
+        this._camera.fov = cameras[0].fov;
+        this._camera.near = cameras[0].near;
+        //that._camera.aspect = cameras[0].aspect;
+        this._camera.matrixWorld = cameras[0].matrixWorld;
+        that._camera.updateProjectionMatrix();
+        if (this._controls) this._controls.update();
       }
     }
-    await prepareDataBuffers(flattenedMeshList, lights, materialBuffer, materialTextureInfoBuffer, triangleMaterialMarkers);
+    await this.prepareDataBuffers(flattenedMeshList, lights, materialBuffer, materialTextureInfoBuffer, triangleMaterialMarkers);
   };
 
-  async function prepareDataBuffers(meshList, lightList, materialBuffer, materialTextureInfoBuffer, triangleMaterialMarkers) {
+  async prepareDataBuffers(meshList, lightList, materialBuffer, materialTextureInfoBuffer, triangleMaterialMarkers) {
     // Gather all geometry from the mesh list that now contains loaded models
     let geoList = [];
     for (let i = 0; i < meshList.length; i++) {
@@ -861,13 +919,14 @@ function PathtracingRenderer(canvas, useControls) {
     // Merge geometry from all models into one new mesh
     let modelMesh = new THREE.Mesh(BufferGeometryUtils.mergeBufferGeometries(geoList));
 
-    if (modelMesh.geometry.attributes.tangent === undefined)
-      BufferGeometryUtils.computeTangents(modelMesh.geometry);
-    if (modelMesh.geometry.index)
-      modelMesh.geometry = modelMesh.geometry.toNonIndexed(); // TODO: why do we need NonIndexed geometry?
+    let bufferGeometry = <THREE.BufferGeometry>modelMesh.geometry;
+    if (bufferGeometry.attributes.tangent === undefined)
+      BufferGeometryUtils.computeTangents(bufferGeometry);
+    if (bufferGeometry.index)
+      bufferGeometry = bufferGeometry.toNonIndexed(); // TODO: why do we need NonIndexed geometry?
 
     // 9 floats per triangle
-    let total_number_of_triangles = modelMesh.geometry.attributes.position.array.length / 9;
+    let total_number_of_triangles = bufferGeometry.attributes.position.array.length / 9;
 
     console.log(`Loaded glTF consisting of ${total_number_of_triangles} total triangles.`);
 
@@ -879,14 +938,14 @@ function PathtracingRenderer(canvas, useControls) {
     //modelMesh.geometry.rotateY(Math.PI);
 
     // let totalWork = new Uint32Array(total_number_of_triangles);
-    var vpa = new Float32Array(modelMesh.geometry.attributes.position.array);
-    if (modelMesh.geometry.attributes.normal === undefined)
-      modelMesh.geometry.computeVertexNormals();
+    var vpa = new Float32Array(bufferGeometry.attributes.position.array);
+    if (bufferGeometry.attributes.normal === undefined)
+      bufferGeometry.computeVertexNormals();
 
-    var vna = new Float32Array(modelMesh.geometry.attributes.normal.array);
+    var vna = new Float32Array(bufferGeometry.attributes.normal.array);
     var modelHasUVs = false;
-    if (modelMesh.geometry.attributes.uv !== undefined) {
-      var vuv = new Float32Array(modelMesh.geometry.attributes.uv.array);
+    if (bufferGeometry.attributes.uv !== undefined) {
+      var vuv = new Float32Array(bufferGeometry.attributes.uv.array);
       modelHasUVs = true;
     }
 
@@ -939,8 +998,8 @@ function PathtracingRenderer(canvas, useControls) {
       uv_buffer[12 * i + 8] = vt2.x; uv_buffer[12 * i + 9] = vt2.y; uv_buffer[12 * i + 10] = 0; uv_buffer[12 * i + 11] = 0;
     }
 
-    modelMesh.geometry.dispose();
-    modelMesh.material.dispose();
+    bufferGeometry.dispose();
+    (<THREE.Material>modelMesh.material).dispose();
 
     let rgba_stride = 4;
 
@@ -956,7 +1015,7 @@ function PathtracingRenderer(canvas, useControls) {
     let tangentData;
     let tangent_buffer;
     if (modelHasUVs) { // tangents will only be generated when uvs are available    
-      tangent_buffer = new Float32Array(modelMesh.geometry.attributes.tangent.array);
+      tangent_buffer = new Float32Array(bufferGeometry.attributes.tangent.array);
       tangentData = new Float32Array(tangent_buffer);
     }
 
@@ -980,34 +1039,34 @@ function PathtracingRenderer(canvas, useControls) {
     let valueList = [];
     for (let i = 0; i < flatMaterialTextureInfoBuffer.length; i++) {
       let texInfo = flatMaterialTextureInfoBuffer[i];
-      let values = Object.values(texInfo).flat(Infinity);
+      let values = flattenArray(Object.values<any>(texInfo));
       valueList.push(values);
     }
 
-    valueList = valueList.flat(Infinity);
+    valueList = flattenArray(valueList);
 
-    let bvhTexture = createDataTexture(flatBVHData, THREE.RGBAFormat, THREE.FloatType);
-    let triangleTexture = createDataTexture(triData, THREE.RGBAFormat, THREE.FloatType);
-    let normalTexture = createDataTexture(normalData, THREE.RGBAFormat, THREE.FloatType);
-    let uvTexture = createDataTexture(uvData, THREE.RGBAFormat, THREE.FloatType);
-    let materialTexture = createDataTexture(flatMaterialBuffer, THREE.RGBAFormat, THREE.FloatType);
-    let materialInfoTexture = createDataTexture(valueList.flat(Infinity), THREE.RGBAFormat, THREE.FloatType); // TODO can be byte type
+    let bvhTexture = this.createDataTexture(flatBVHData, THREE.RGBAFormat, THREE.FloatType);
+    let triangleTexture = this.createDataTexture(triData, THREE.RGBAFormat, THREE.FloatType);
+    let normalTexture = this.createDataTexture(normalData, THREE.RGBAFormat, THREE.FloatType);
+    let uvTexture = this.createDataTexture(uvData, THREE.RGBAFormat, THREE.FloatType);
+    let materialTexture = this.createDataTexture(flatMaterialBuffer, THREE.RGBAFormat, THREE.FloatType);
+    let materialInfoTexture = this.createDataTexture(valueList, THREE.RGBAFormat, THREE.FloatType); // TODO can be byte type
 
-    if (_pathTracingUniforms !== undefined) {
-      _pathTracingUniforms["u_sampler2D_PreviousTexture"].value.dispose();
-      _pathTracingUniforms["u_sampler2D_BVHData"].value.dispose();
-      _pathTracingUniforms["u_sampler2D_TriangleData"].value.dispose();
-      _pathTracingUniforms["u_sampler2D_NormalData"].value.dispose();
-      _pathTracingUniforms["u_sampler2D_UVData"].value.dispose();
-      _pathTracingUniforms["u_sampler2D_MaterialData"].value.dispose();
-      _pathTracingUniforms["u_sampler2D_MaterialTexInfoData"].value.dispose();
+    if (this._pathTracingUniforms !== undefined) {
+      this._pathTracingUniforms["u_sampler2D_PreviousTexture"].value.dispose();
+      this._pathTracingUniforms["u_sampler2D_BVHData"].value.dispose();
+      this._pathTracingUniforms["u_sampler2D_TriangleData"].value.dispose();
+      this._pathTracingUniforms["u_sampler2D_NormalData"].value.dispose();
+      this._pathTracingUniforms["u_sampler2D_UVData"].value.dispose();
+      this._pathTracingUniforms["u_sampler2D_MaterialData"].value.dispose();
+      this._pathTracingUniforms["u_sampler2D_MaterialTexInfoData"].value.dispose();
       if (modelHasUVs) {
-        _pathTracingUniforms["u_sampler2D_TangentData"].value.dispose();
+        this._pathTracingUniforms["u_sampler2D_TangentData"].value.dispose();
       }
     }
 
-    _pathTracingUniforms = {
-      u_sampler2D_PreviousTexture: { type: "t", value: _accumRenderTarget.texture },
+    this._pathTracingUniforms = {
+      u_sampler2D_PreviousTexture: { type: "t", value: this._accumRenderTarget.texture },
       u_sampler2D_BVHData: { type: "t", value: bvhTexture },
       u_sampler2D_TriangleData: { type: "t", value: triangleTexture },
       u_sampler2D_NormalData: { type: "t", value: normalTexture },
@@ -1019,7 +1078,7 @@ function PathtracingRenderer(canvas, useControls) {
 
       u_vec2_InverseResolution: { type: "v2", value: new THREE.Vector2(1.0 / window.innerWidth, 1.0 / window.innerHeight) },
       u_int_NumTriangles: { type: "f", value: total_number_of_triangles },
-      u_int_MaxTextureSize: { value: _gl.getParameter(_gl.MAX_TEXTURE_SIZE) },
+      u_int_MaxTextureSize: { value: this._gl.getParameter(this._gl.MAX_TEXTURE_SIZE) },
       u_mat4_ViewMatrix: { type: "m4", value: new THREE.Matrix4() },
       u_vec3_CameraPosition: { type: "v3", value: new THREE.Vector3(0, -1, 0) },
       u_float_FocalLength: { type: "f", value: 0.1 },
@@ -1041,9 +1100,9 @@ function PathtracingRenderer(canvas, useControls) {
 
     let tangentTexture;
     if (modelHasUVs) {
-      tangentTexture = createDataTexture(tangentData, THREE.RGBAFormat, THREE.FloatType);
-      _pathTracingUniforms["u_sampler2D_TangentData"] = { type: "t", value: tangentTexture };
-      _pathTracingUniforms["u_bool_hasTangents"] = { value: true };
+      tangentTexture = this.createDataTexture(tangentData, THREE.RGBAFormat, THREE.FloatType);
+      this._pathTracingUniforms["u_sampler2D_TangentData"] = { type: "t", value: tangentTexture };
+      this._pathTracingUniforms["u_bool_hasTangents"] = { value: true };
       tangentTexture.dispose();
     }
 
@@ -1062,10 +1121,10 @@ function PathtracingRenderer(canvas, useControls) {
       let pos = lightList[0].position;
       let em = lightList[0].emission;
       THREE.ShaderChunk['pathtracing_lights'] = `
-            #define HAS_LIGHTS 1
-            const vec3 cPointLightPosition = vec3(${pos[0]}, ${pos[1]}, ${pos[2]});
-            const vec3 cPointLightEmission = vec3(${em[0]}, ${em[1]}, ${em[2]});            
-            `
+                #define HAS_LIGHTS 1
+                const vec3 cPointLightPosition = vec3(${pos[0]}, ${pos[1]}, ${pos[2]});
+                const vec3 cPointLightEmission = vec3(${em[0]}, ${em[1]}, ${em[2]});            
+                `
     }
 
     // create texture arrays
@@ -1081,8 +1140,8 @@ function PathtracingRenderer(canvas, useControls) {
     }
 
     let tex_array_shader_snippet = "";
-    for (let i = 0; i < texArrayList.length; i++) {
-      const texList = texArrayList[i];
+    for (let i = 0; i < this._texArrayList.length; i++) {
+      const texList = this._texArrayList[i];
       const texSize = texList[0].image.width * texList[0].image.height * 4;
       let data = new Uint8Array(texSize * texList.length);
 
@@ -1091,13 +1150,13 @@ function PathtracingRenderer(canvas, useControls) {
         data.set(getImageData(texList[t].image).data, texSize * t);
       }
 
-      texArray = new THREE.DataTexture2DArray(data, texList[0].image.width, texList[0].image.height, texList.length);
-      texArray.format = THREE.RGBAFormat;
-      texArray.type = THREE.UnsignedByteType;
-      texArray.wrapS = texArray.wrapT = THREE.RepeatWrapping;
-      texArray.needsUpdate = true; //  if texture is already initialized.
-      _pathTracingUniforms[`u_sampler2DArray_MaterialTextures_${i}`] = { value: texArray };
-      texArray.dispose();
+      this._texArray = new (<any>THREE).DataTexture2DArray(data, texList[0].image.width, texList[0].image.height, texList.length);
+      this._texArray.format = THREE.RGBAFormat;
+      this._texArray.type = THREE.UnsignedByteType;
+      this._texArray.wrapS = this._texArray.wrapT = THREE.RepeatWrapping;
+      this._texArray.needsUpdate = true; //  if texture is already initialized.
+      this._pathTracingUniforms[`u_sampler2DArray_MaterialTextures_${i}`] = { value: this._texArray };
+      this._texArray.dispose();
 
       tex_array_shader_snippet += `uniform sampler2DArray u_sampler2DArray_MaterialTextures_${i};\n`
     }
@@ -1105,7 +1164,7 @@ function PathtracingRenderer(canvas, useControls) {
     tex_array_shader_snippet += "\n";
     tex_array_shader_snippet += "vec4 evaluateMaterialTextureValue(const in TexInfo texInfo, const in vec2 texCoord) { \n";
 
-    for (let i = 0; i < texArrayList.length; i++) {
+    for (let i = 0; i < this._texArrayList.length; i++) {
       tex_array_shader_snippet += `   if(texInfo.texArrayIdx == ${i}) {\n`
       tex_array_shader_snippet += `       vec2 tuv = texCoord * texInfo.texScale +  texInfo.texOffset;`
       tex_array_shader_snippet += `       return texture(u_sampler2DArray_MaterialTextures_${i}, vec3(tuv, texInfo.texIdx));\n`
@@ -1121,8 +1180,7 @@ function PathtracingRenderer(canvas, useControls) {
     THREE.ShaderChunk['pathtracing_tex_array_lookup'] = tex_array_shader_snippet;
 
 
-    let pathTracingDefines = {
-    };
+    let pathTracingDefines = {};
 
     // load vertex and fragment shader files that are used in the pathTracing material, mesh and scene
     let vertexShader = await filePromiseLoader('./shader/pt.vert');
@@ -1135,7 +1193,7 @@ function PathtracingRenderer(canvas, useControls) {
     THREE.ShaderChunk['pathtracing_rt_kernel'] = await filePromiseLoader('./shader/rt_kernel.glsl');
 
     let pathTracingMaterial = new THREE.RawShaderMaterial({
-      uniforms: _pathTracingUniforms,
+      uniforms: this._pathTracingUniforms,
       defines: pathTracingDefines,
       vertexShader: vertexShader,
       fragmentShader: fragmentShader,
@@ -1144,24 +1202,24 @@ function PathtracingRenderer(canvas, useControls) {
     });
 
     let pathTracingGeometry = new THREE.PlaneBufferGeometry(2, 2);
-    if (_pathTracingMesh !== undefined) {
-      _pathTracingMesh.material.dispose();
-      _pathtracingScene.remove(_pathTracingMesh); //cleans up all chached uniform data
+    if (this._pathTracingMesh !== undefined) {
+      this._pathTracingMesh.material.dispose();
+      this._pathtracingScene.remove(this._pathTracingMesh); //cleans up all chached uniform data
     }
-    _pathTracingMesh = new THREE.Mesh(pathTracingGeometry, pathTracingMaterial);
-    _pathtracingScene.add(_pathTracingMesh);
+    this._pathTracingMesh = new THREE.Mesh(pathTracingGeometry, pathTracingMaterial);
+    this._pathtracingScene.add(this._pathTracingMesh);
 
     pathTracingGeometry.dispose();
     pathTracingMaterial.dispose();
 
-    _renderer.renderLists.dispose();
+    this._renderer.renderLists.dispose();
     console.timeEnd("BvhGeneration");
 
-    _this.resetAccumulation();
+    this.resetAccumulation();
   }
 
-  function createDataTexture(data, format, type) {
-    let maxTextureSize = _gl.getParameter(_gl.MAX_TEXTURE_SIZE);
+  createDataTexture(data, format, type) {
+    let maxTextureSize = this._gl.getParameter(this._gl.MAX_TEXTURE_SIZE);
 
     let num_components = 4;
     if (format === THREE.RGBFormat)
@@ -1180,7 +1238,7 @@ function PathtracingRenderer(canvas, useControls) {
     else if (type == THREE.ByteType)
       paddedDataBuffer = new Int8Array(sX * sY * num_components);
     else if (type == THREE.UnsignedByteType)
-      paddedDataBuffer = new UInt8Array(sX * sY * num_components);
+      paddedDataBuffer = new Uint8Array(sX * sY * num_components);
 
     for (let i = 0; i < data.length; i++) {
       paddedDataBuffer[i] = data[i];
@@ -1207,7 +1265,7 @@ function PathtracingRenderer(canvas, useControls) {
     return tex;
   }
 
-  var screenTextureShader = {
+  screenTextureShader = {
 
     uniforms: THREE.UniformsUtils.merge([
       {
@@ -1247,7 +1305,7 @@ function PathtracingRenderer(canvas, useControls) {
 
   };
 
-  var screenOutputShader = {
+  screenOutputShader = {
 
     uniforms: THREE.UniformsUtils.merge([
       {
@@ -1289,37 +1347,10 @@ function PathtracingRenderer(canvas, useControls) {
       '}'
 
     ].join('\n')
-
   };
 
-  THREE.ShaderChunk['pathtracing_defines'] = `
-        #define PI               3.14159265358979323
-        #define TWO_PI           6.28318530717958648
-        #define FOUR_PI          12.5663706143591729
-        #define ONE_OVER_PI      0.31830988618379067
-        #define ONE_OVER_TWO_PI  0.15915494309
-        #define ONE_OVER_FOUR_PI 0.07957747154594767
-        #define PI_OVER_TWO      1.57079632679489662
-        #define ONE_OVER_THREE   0.33333333333333333
-        #define E                2.71828182845904524
-        #define INFINITY         1000000.0
-
-        const float EPS_NORMAL = 0.001;
-        const float EPS_COS = 0.001;
-        const float EPS_PDF = 0.001;
-        const float EPSILON  = 1e-6;
-       
-        const float MINIMUM_ROUGHNESS = 0.001;
-        const float TFAR_MAX = 100000.0;
-
-        const float RR_TERMINATION_PROB = 0.9;
-
-        const uint MATERIAL_SIZE = 11u;
-        const uint MATERIAL_TEX_INFO_SIZE = 5u;
-        const uint TEX_INFO_SIZE = 2u;
-    `;
-
-  initRenderer();
 }
 
-export { PathtracingRenderer };
+
+
+// export { PathtracingRenderer };
