@@ -35,7 +35,7 @@ function getFileExtension(filename: string) {
 }
 
 class App {
-  _gui: GUI | null;
+  _gui: any;
   _stats: any | null;
   _renderer: any;
   _container: HTMLElement | null;
@@ -52,6 +52,7 @@ class App {
   disableBackground = false;
   autoRotate = false;
   pixelRatio = 0.5;
+  exposure = 1.0;
 
   constructor() {
     this.Scene = Object.values<string>(scene_index)[0];
@@ -66,7 +67,7 @@ class App {
     this._renderer = new PathtracingRenderer(canvas, true);
     this._renderer.loadScene(this.Scene, function () {
       _this._renderer.loadIBL(_this.IBL, () => {
-        _this._renderer.useIBL(false);
+        _this._renderer.setUseIBL(true);
       });
       _this._renderer.render(-1, () => {
         _this._stats.update();
@@ -116,7 +117,6 @@ class App {
     this.initUI();
   }
 
-  //animate();
 
   initUI() {
     if (this._gui)
@@ -144,6 +144,10 @@ class App {
 
     this._gui.add(this, 'pathtracing').onChange(function (value) {
       _this._renderer.usePathtracing(value);
+    });
+
+    this._gui.add(this, 'exposure').min(0).max(10).step(0.1).onChange(function (value) {
+      _this._renderer.setExposure(value);
     });
 
     this._gui.add(this, 'forceIBLEvalOnLastBounce').onChange(function (value) {

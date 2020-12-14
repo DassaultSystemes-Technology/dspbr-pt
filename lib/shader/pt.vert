@@ -1,6 +1,6 @@
 #version 300 es
 /* @license
- * Copyright 2020  Dassault Systèmes - All Rights Reserved.
+ * Copyright 2020  Dassault Systemes - All Rights Reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-in vec3 position;
-
+layout(location = 0) in vec4 position;
 out vec2 v_uv;
 
 void main() {
   v_uv = position.xy;
-  gl_Position = vec4( position, 1.0 );
+  gl_Position = position;
 }
