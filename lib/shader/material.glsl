@@ -127,8 +127,8 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
 
     unpackMaterialData(matIdx, matData);
     unpackMaterialTexInfo(matIdx, matTexInfo);
-    
-    vec4 albedo = evaluateMaterialTextureValue(matTexInfo.albedoMap, rs.uv0);
+  
+    vec4 albedo = evaluateMaterialTextureValue(matTexInfo.albedoMap, uv);
     c.albedo = matData.albedo * pow(albedo.xyz, vec3(2.2));
 
     c.cutout_opacity = matData.cutoutOpacity * albedo.w;
@@ -146,7 +146,7 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
     float roughness = matData.roughness * occlusionMetallicRoughness.y;
     c.alpha = roughness_conversion(roughness, matData.anisotropy);
 
-    //vec4 specular = evaluateMaterialTextureValue(matTexInfo.specular, uv);
+    vec4 specular = evaluateMaterialTextureValue(matTexInfo.specularMap, rs.uv0);
     c.specular_tint = matData.specularTint;
     c.specular = matData.specular;
 

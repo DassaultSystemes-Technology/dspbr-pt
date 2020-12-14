@@ -53,7 +53,7 @@ uniform int u_int_DebugMode;
 uniform bool u_bool_UseIBL;
 uniform bool u_bool_DisableBackground;
 
-out vec4 out_FragColor;
+layout(location = 0) out vec4 out_FragColor;
 
 struct MaterialData {
     // 0
@@ -185,7 +185,7 @@ void fillRenderState(const in Ray r, const in HitInfo hit, out RenderState rs) {
     rs.geometryNormal = compute_triangle_normal(p0, p1, p2);
     rs.normal = calculateInterpolatedNormal(triIdx, hit.uv);
 
-    fix_normals(rs.normal, rs.geometryNormal, rs.wi);
+   fix_normals(rs.normal, rs.geometryNormal, rs.wi);
 
     if(u_bool_hasTangents) {
         rs.tangent = normalize(calculateInterpolatedTangent(triIdx, hit.uv));
@@ -317,6 +317,9 @@ vec4 traceDebug(const Ray r) {
          if(u_int_DebugMode== 7) {            
             contrib = vec3(rs.closure.transparency);
         }
+         if(u_int_DebugMode== 8) {
+            contrib = vec3(rs.uv0, 0.0);
+        }
         color = vec4(contrib, 1.0);
     }    
     else { // direct background hit
@@ -332,7 +335,7 @@ vec3 sampleIBL(in vec3 dir) {
     if(u_bool_UseIBL) { 
         return texture(u_samplerCube_EnvMap, mapDirToUV(dir)).xyz;
     }
-    return vec3(0);
+   return vec3(0);
 }
 
 vec4 trace(const Ray r) {
@@ -426,6 +429,5 @@ void main() {
     vec4 previousFrameColor = texelFetch(u_sampler2D_PreviousTexture,  ivec2(gl_FragCoord.xy), 0);
     color = (previousFrameColor * float(u_int_FrameCount-1) + color) / float(u_int_FrameCount);
 
-    //color = texelFetch(u_sampler2D_LightData, getStructParameterTexCoord(0u, 0u, LIGHT_SIZE), 0).xyz;
     out_FragColor = color;
 }
