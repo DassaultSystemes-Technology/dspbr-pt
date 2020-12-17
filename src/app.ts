@@ -52,18 +52,10 @@ class App {
   three_renderer: ThreeRenderer;
 
   useControls: true;
-  isRendering = false;
   pathtracing = true;
-  forceIBLEvalOnLastBounce = false;
-  maxBounceDepth = 4;
-  debugMode = "None";
-  autoScaleOnImport = true;
-  useIBL = true;
-  disableBackground = false;
+  autoScaleScene = true;
   autoRotate = false;
-  pixelRatio = 0.5;
-  exposure = 1.0;
-  interactionPixelRatio = 0.2;
+  interactionScale = 0.2;
 
   sceneBoundingBox: THREE.Box3;
 
@@ -108,11 +100,12 @@ class App {
     });
 
     this.controls.addEventListener('start', () => {
-       _this.renderer.setPixelRatio(_this.interactionPixelRatio);
+      this["renderScale"] = _this.renderer.renderScale;
+      _this.renderer.renderScale = _this.interactionScale;
     });
 
     this.controls.addEventListener('end', () => {
-       _this.renderer.setPixelRatio(_this.pixelRatio);
+      _this.renderer.renderScale = this["renderScale"];
     });
 
     this.controls.mouseButtons = {
@@ -121,9 +114,8 @@ class App {
       RIGHT: THREE.MOUSE.DOLLY
     }
 
-    const renderPixelRatio = this.pixelRatio * window.devicePixelRatio;
-    this.renderer = new PathtracingRenderer(this.canvas_pt, renderPixelRatio);
-    this.three_renderer = new ThreeRenderer(this.canvas_three, renderPixelRatio);
+    this.renderer = new PathtracingRenderer(this.canvas_pt, window.devicePixelRatio);
+    this.three_renderer = new ThreeRenderer(this.canvas_three, window.devicePixelRatio);
     _this.loadScene(this.Scene);
 
     window.addEventListener('resize', () => {
@@ -149,7 +141,7 @@ class App {
           _this.three_renderer.setIBL(ibl);
         });
       } else {
-        loader.loadSceneFromBlobs(e.dataTransfer.files, _this.autoScaleOnImport, function (scene) {
+        loader.loadSceneFromBlobs(e.dataTransfer.files, _this.autoScaleScene, function (scene) {
           loader.loadIBL(_this.IBL, (ibl) => {
             _this.sceneBoundingBox = new THREE.Box3().setFromObject(scene);
             _this.renderer.setIBL(ibl);
@@ -216,7 +208,7 @@ class App {
   }
 
   private loadScene(url) {
-    loader.loadScene(url, this.autoScaleOnImport, (scene) => {
+    loader.loadScene(url, this.autoScaleScene, (scene) => {
       loader.loadIBL(this.IBL, (ibl) => {
         this.sceneBoundingBox = new THREE.Box3().setFromObject(scene);
           this.renderer.setIBL(ibl);
@@ -256,7 +248,11 @@ class App {
         _this.three_renderer.setIBL(ibl);
       });
     });
-
+    
+    this._gui.add(_this.renderer, 'exposure').min(0).max(10).step(0.1).onChange(function (value) {
+      _this.three_renderer.setExposure(value);
+    });
+    
     this._gui.add(this, 'pathtracing').onChange((value) => {
       if (value == false) {
         _this.startRasterizer();
@@ -265,46 +261,26 @@ class App {
       }
     });
 
-    this._gui.add(this, 'exposure').min(0).max(10).step(0.1).onChange(function (value) {
-      _this.renderer.setExposure(value);
-      _this.three_renderer.setExposure(value);
-    });
-
-    this._gui.add(this, 'forceIBLEvalOnLastBounce').onChange(function (value) {
-      _this.renderer.setForceIBLEvalOnLastBounce(value);
-    });
-
-    this._gui.add(this, 'maxBounceDepth').min(0).max(16).step(1).onChange(function (value) {
-      _this.renderer.setMaxBounceDepth(value);
-    });
-
-    this._gui.add(this, 'debugMode', this.renderer.debugModes).onChange(function (value) {
-      _this.renderer.setDebugMode(value);
-    });
-
-    this._gui.add(this, 'autoScaleOnImport');
-
-    this._gui.add(this, 'useIBL').onChange(function (value) {
-      _this.renderer.setUseIBL(value);
-      _this.three_renderer.setUseIBL(value);
-    });
-
-    this._gui.add(this, 'disableBackground').onChange(function (value) {
-      _this.renderer.setDisableBackground(value);
-      _this.three_renderer.setDisableBackground(value);
-    });
 
     this._gui.add(this, 'autoRotate').onChange(function (value) {
       _this.controls.autoRotate = value;
       _this.renderer.resetAccumulation();
     });
 
-    this._gui.add(this, 'pixelRatio').min(0.1).max(1.0).onChange(function (value) {
-      _this.renderer.setPixelRatio(value);
-      _this.renderer.resize(window.innerWidth, window.innerHeight);
+    this._gui.add(this, 'autoScaleScene');
+    
+    this._gui.add(_this.renderer, 'forceIBLEval');
+    this._gui.add(_this.renderer, 'maxBounces').min(0).max(16).step(1);
+    this._gui.add(_this.renderer, 'debugMode', this.renderer.debugModes);
+    this._gui.add(_this.renderer, 'tonemapping', this.renderer.tonemappingModes);
+    this._gui.add(_this.renderer, 'enableGamma');
+    this._gui.add(_this.renderer, 'useIBL');
+    this._gui.add(_this.renderer, 'renderScale').min(0.1).max(1.0);
+    this._gui.add(this, 'interactionScale').min(0.1).max(1.0).step(0.1);
+    
+    this._gui.add(_this.renderer, 'disableBackground').onChange((value) => {
+      _this.three_renderer.setDisableBackground(value);
     });
-
-    this._gui.add(this, 'interactionPixelRatio').min(0.1).max(1.0).step(0.1);
 
     let reload_obj = {
       reload: function () {

@@ -149,11 +149,11 @@ vec2 calculateInterpolatedUV(const in uint index, const in vec2 hit_uv, int set)
 }
 
 bool bvh_IntersectRayBox(const in Ray r, const in float tfar, int pn, out int si, out int ei) {
-    int idx_x0 = int(pn*2+0) % int(u_int_MaxTextureSize);
-    int idx_y0 = int(pn*2+0) / int(u_int_MaxTextureSize);
+    int idx_x0 = int(pn*2+0) % int(MAX_TEXTURE_SIZE);
+    int idx_y0 = int(pn*2+0) / int(MAX_TEXTURE_SIZE);
 
-    int idx_x1 = int(pn*2+1) % int(u_int_MaxTextureSize);
-    int idx_y1 = int(pn*2+1) / int(u_int_MaxTextureSize);
+    int idx_x1 = int(pn*2+1) % int(MAX_TEXTURE_SIZE);
+    int idx_y1 = int(pn*2+1) / int(MAX_TEXTURE_SIZE);
 
     vec4 nodeA = texelFetch(u_sampler2D_BVHData, ivec2(idx_x0, idx_y0), 0);
     vec4 nodeB = texelFetch(u_sampler2D_BVHData, ivec2(idx_x1, idx_y1), 0);
@@ -225,7 +225,7 @@ bool intersectSceneTriangles_Bruteforce(const in Ray r, out HitInfo hit) {
     hit.tfar = r.tfar;
     hit.triIndex = -1;
 
-    for (int i = 0; i < int(u_int_NumTriangles); i++) {
+    for (int i = 0; i < int(NUM_TRIANGLES); i++) {
         vec3 p0, p1, p2;
         getSceneTriangle(uint(i), p0, p1, p2);
 

@@ -26,16 +26,14 @@ precision highp sampler2DArray;
 in vec2 v_uv;
 
 uniform int u_int_FrameCount;
-uniform uint u_int_MaxTextureSize; // used to index linear data in 2d textures
 uniform float u_float_FilmHeight;
 uniform float u_float_FocalLength;
 uniform vec3 u_vec3_CameraPosition;
 uniform vec2 u_vec2_InverseResolution;
 uniform mat4 u_mat4_ViewMatrix;
-uniform uint u_int_NumTriangles;
-uniform int u_int_MaxBounceDepth;
+uniform int u_int_maxBounces;
 uniform bool u_bool_hasTangents;
-uniform bool u_bool_forceIBLEvalOnLastBounce;
+uniform bool u_bool_forceIBLEval;
 
 uniform sampler2D u_sampler2D_PreviousTexture;
 
@@ -188,7 +186,7 @@ void fillRenderState(const in Ray r, const in HitInfo hit, out RenderState rs) {
     if(u_bool_hasTangents) {
         rs.tangent = normalize(calculateInterpolatedTangent(triIdx, hit.uv));
     }
-    else {        
+    else {
         rs.tangent = get_onb(rs.normal)[0];
     }
 
@@ -351,10 +349,10 @@ vec4 trace(const Ray r) {
 
         int i = 0;
         bool lastBounceSpecular = false;
-        while(i < u_int_MaxBounceDepth || lastBounceSpecular) { 
+        while(i < u_int_maxBounces || lastBounceSpecular) { 
             // start russion roulette path termination for bounce depth > 2
             if(i>2 && rng_NextFloat() > RR_TERMINATION_PROB) { 
-                if(u_bool_forceIBLEvalOnLastBounce)
+                if(u_bool_forceIBLEval)
                     contrib += sampleIBL(rs.wo) * pathWeight;
                 break;
             }
@@ -375,8 +373,8 @@ vec4 trace(const Ray r) {
 
             lastBounceSpecular = bool(eventType & EVENT_SPECULAR);
 
-            bool isPathEnd = (i == (u_int_MaxBounceDepth-1));
-            bool forcedIBLSampleOnPathEnd = (isPathEnd && u_bool_forceIBLEvalOnLastBounce);
+            bool isPathEnd = (i == (u_int_maxBounces-1));
+            bool forcedIBLSampleOnPathEnd = (isPathEnd && u_bool_forceIBLEval);
             if ( bounceType == 0 || forcedIBLSampleOnPathEnd) { // background sample
                 contrib += sampleIBL(rs.wo) * pathWeight;
                 break;
