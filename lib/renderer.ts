@@ -18,28 +18,6 @@ import * as glu from './gl_utils';
 import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { SimpleTriangleBVH } from './bvh.js';
 
-var fileLoader = new THREE.FileLoader();
-function filePromiseLoader(url, onProgress?) {
-  return new Promise<string>((resolve, reject) => {
-    fileLoader.load(url, resolve, onProgress, reject);
-  });
-}
-
-function flattenArray(arr, result = []) {
-  for (let i = 0, length = arr.length; i < length; i++) {
-    const value = arr[i];
-    if (Array.isArray(value)) {
-      flattenArray(value, result);
-    } else {
-      result.push(value);
-    }
-  }
-  return result;
-};
-
-
-type DebugMode = "None" | "Albedo" | "Metalness" | "Roughness" | "Normals" | "Tangents" | "Bitangents" | "Transparency" | "UV0";
-
 class MaterialData {
   albedo = [1.0, 1.0, 1.0];
   metallic = 0.0;
@@ -100,9 +78,9 @@ class MaterialTextureInfo {
   specularColorTexture = new TexInfo();
   transmissionTexture = new TexInfo();
   clearcoatTexture = new TexInfo();
-  // clearcoatNormalTexture = new TexInfo();
   sheenColorTexture = new TexInfo();
   sheenRoughnessTexture = new TexInfo();
+  // clearcoatNormalTexture = new TexInfo();
 }
 
 class Light {
@@ -112,7 +90,30 @@ class Light {
   pad = 0;
 }
 
-let clock = new THREE.Clock();
+type DebugMode = "None" | "Albedo" | "Metalness" | "Roughness" | "Normals" | "Tangents" | "Bitangents" | "Transparency" | "UV0";
+
+type TonemappingMode = "None" | "Reinhard" | "Uncharted2" | "OptimizedCineon" | "AcesFilm";
+
+var fileLoader = new THREE.FileLoader();
+function filePromiseLoader(url, onProgress?) {
+  return new Promise<string>((resolve, reject) => {
+    fileLoader.load(url, resolve, onProgress, reject);
+  });
+}
+
+function flattenArray(arr, result = []) {
+  for (let i = 0, length = arr.length; i < length; i++) {
+    const value = arr[i];
+    if (Array.isArray(value)) {
+      flattenArray(value, result);
+    } else {
+      result.push(value);
+    }
+  }
+  return result;
+};
+
+// let clock = new THREE.Clock();
 
 export class PathtracingRenderer {
   private gl: any;
@@ -138,18 +139,94 @@ export class PathtracingRenderer {
   private renderRes: [number, number];
   private displayRes: [number, number];
 
-  // settings
-  private exposure = 1.0;
-  private frameCount = 1;
-  private isRendering = false;
-  private debugMode: DebugMode = "None";
-  private maxBounceDepth = 4;
-  private useIBL = false;
-  private disableBackground = false;
-  private pixelRatio;
-  private forceIBLEvalOnLastBounce = false;
 
-  private debugModes = ["None", "Albedo", "Metalness", "Roughness", "Normals", "Tangents", "Bitangents", "Transparency", "UV0"];
+  private _exposure = 1.0;
+  public get exposure() {
+    return this._exposure;
+  }
+  public set exposure(val) {
+    this._exposure = val;
+    this.resetAccumulation();
+  }
+
+  public debugModes = ["None", "Albedo", "Metalness", "Roughness", "Normals", "Tangents", "Bitangents", "Transparency", "UV0"];
+  private _debugMode: DebugMode = "None";
+  public get debugMode() {
+    return this._debugMode;
+  }
+  public set debugMode(val) {
+    this._debugMode = val;
+    this.resetAccumulation();
+  }
+
+  public tonemappingModes = ["None", "Reinhard", "Uncharted2", "OptimizedCineon", "AcesFilm"];
+  private _tonemapping: TonemappingMode = "AcesFilm";
+  public get tonemapping() {
+    return this._tonemapping;
+  }
+  public set tonemapping(val) {
+    this._tonemapping = val;
+    this.resetAccumulation();
+  }
+
+  private _maxBounces = 4;
+  public get maxBounces() {
+    return this._maxBounces;
+  }
+  public set maxBounces(val) {
+    this._maxBounces = val;
+    this.resetAccumulation();
+  }
+
+  private _useIBL = true;
+  public get useIBL() {
+    return this._useIBL;
+  }
+  public set useIBL(val) {
+    this._useIBL = val;
+    this.resetAccumulation();
+  }
+
+  private _disableBackground = false;
+  public get disableBackground() {
+    return this._disableBackground;
+  }
+  public set disableBackground(val) {
+    this._disableBackground = val;
+    this.resetAccumulation();
+  }
+
+  private _renderScale = 0.5;
+  public get renderScale() {
+    return this._renderScale;
+  }
+  public set renderScale(val) {
+    this._renderScale = val;
+    this.resize(this.canvas.width, this.canvas.height);
+    this.resetAccumulation();
+  }
+
+  private _forceIBLEval = false;
+  public get forceIBLEval() {
+    return this._forceIBLEval;
+  }
+  public set forceIBLEval(val) {
+    this._forceIBLEval = val;
+    this.resetAccumulation();
+  }
+
+  private _enableGamma = true;
+  public get enableGamma() {
+    return this._enableGamma;
+  }
+  public set enableGamma(val) {
+    this._enableGamma = val;
+    this.resetAccumulation();
+  }
+
+  private _pixelRatio = 1.0;
+  private _frameCount = 1;
+  private _isRendering = false;
 
   //var y_to_z_up = new THREE.Matrix4().makeRotationX(-Math.PI *0.5);
 
@@ -161,61 +238,28 @@ export class PathtracingRenderer {
     this.gl.getExtension('OES_texture_float_linear');
 
     if (pixelRatio !== undefined)
-      this.pixelRatio = pixelRatio;
+      this._pixelRatio = pixelRatio;
     this.initRenderer();
   }
 
   resetAccumulation() {
-    this.frameCount = 1;
-  }
-
-  setPixelRatio(ratio) {
-    this.pixelRatio = ratio;
-    this.resize(this.displayRes[0], this.displayRes[1]);
-  }
-
-  setExposure(value) {
-    this.exposure = value;
-  }
-
-  setMaxBounceDepth(value) {
-    this.maxBounceDepth = value;
-    this.resetAccumulation();
-  }
-
-  setForceIBLEvalOnLastBounce(flag) {
-    this.forceIBLEvalOnLastBounce = flag;
-    this.resetAccumulation();
-  }
-
-  setDisableBackground(flag) {
-    this.disableBackground = flag
-    this.resetAccumulation();
-  }
-
-  setDebugMode(mode) {
-    this.debugMode = mode;
-    this.resetAccumulation();
-  }
-
-  setUseIBL(flag) {
-    this.useIBL = flag;
-    this.resetAccumulation();
+    this._frameCount = 1;
   }
 
   resize(width, height) {
-    this.isRendering = false;
+    this._isRendering = false;
     this.displayRes = [width, height];
-    this.renderRes = [Math.ceil(this.displayRes[0] * this.pixelRatio),
-    Math.ceil(this.displayRes[1] * this.pixelRatio)];
+    let scale = this._pixelRatio * this._renderScale;
+    this.renderRes = [Math.ceil(this.displayRes[0] * scale),
+      Math.ceil(this.displayRes[1] * scale)];
 
     this.initFramebuffers(this.renderRes[0], this.renderRes[1]);
     this.resetAccumulation();
-    this.isRendering = true;
+    this._isRendering = true;
   }
 
   stopRendering() {
-    this.isRendering = false;
+    this._isRendering = false;
   };
 
   render(camera: THREE.PerspectiveCamera, num_samples, frameFinishedCB, renderingFinishedCB) {
@@ -224,12 +268,12 @@ export class PathtracingRenderer {
       return;
     }
 
-    this.isRendering = true;
+    this._isRendering = true;
     this.resetAccumulation();
 
     let _this = this;
     let renderFrame = () => {
-      if (!this.isRendering) {
+      if (!this._isRendering) {
         return;
       }
 
@@ -241,44 +285,43 @@ export class PathtracingRenderer {
         gl.activeTexture(gl.TEXTURE0 + numTextureSlots++);
         gl.bindTexture(gl.TEXTURE_2D, this.pathtracingDataTextures[t]);
       }
+
       for (let t in this.pathtracingTexturesArrays) {
         gl.activeTexture(gl.TEXTURE0 + numTextureSlots++);
         gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.pathtracingTexturesArrays[t]);
       }
+
       gl.activeTexture(gl.TEXTURE0 + numTextureSlots)
       gl.bindTexture(gl.TEXTURE_2D, this.ibl);
-      let loc = gl.getUniformLocation(this.ptProgram, "u_samplerCube_EnvMap");
-      gl.uniform1i(loc, numTextureSlots++);
+      gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_samplerCube_EnvMap"),
+        numTextureSlots++);
 
-      loc = gl.getUniformLocation(this.ptProgram, "u_mat4_ViewMatrix");
-      gl.uniformMatrix4fv(loc, false, new Float32Array(camera.matrixWorld.elements));
-      loc = gl.getUniformLocation(this.ptProgram, "u_vec3_CameraPosition");
-      gl.uniform3f(loc, camera.position.x, camera.position.y, camera.position.z);
-      loc = gl.getUniformLocation(this.ptProgram, "u_int_FrameCount");
-      gl.uniform1i(loc, this.frameCount);
-      loc = gl.getUniformLocation(this.ptProgram, "u_int_MaxTextureSize");
-      gl.uniform1ui(loc, glu.getMaxTextureSize(gl));
-      loc = gl.getUniformLocation(this.ptProgram, "u_int_DebugMode");
-      gl.uniform1i(loc, this.debugModes.indexOf(this.debugMode));
-      loc = gl.getUniformLocation(this.ptProgram, "u_bool_UseIBL");
-      gl.uniform1i(loc, this.useIBL);
-      loc = gl.getUniformLocation(this.ptProgram, "u_bool_DisableBackground");
-      gl.uniform1i(loc, this.disableBackground);
-      loc = gl.getUniformLocation(this.ptProgram, "u_int_MaxBounceDepth");
-      gl.uniform1i(loc, this.maxBounceDepth);
-      loc = gl.getUniformLocation(this.ptProgram, "u_vec2_InverseResolution");
-      gl.uniform2f(loc, 1.0 / this.renderRes[0], 1.0 / this.renderRes[1]);
       let filmHeight = Math.tan(camera.fov * 0.5 * Math.PI / 180.0) * camera.near;
-      loc = gl.getUniformLocation(this.ptProgram, "u_float_FilmHeight");
-      gl.uniform1f(loc, filmHeight);
-      loc = gl.getUniformLocation(this.ptProgram, "u_float_FocalLength");
-      gl.uniform1f(loc, camera.near);
-      loc = gl.getUniformLocation(this.ptProgram, "u_bool_forceIBLEvalOnLastBounce");
-      gl.uniform1i(loc, this.forceIBLEvalOnLastBounce);
-
-      gl.viewport(0, 0, this.renderRes[0], this.renderRes[1]);
+      gl.uniform1f(gl.getUniformLocation(this.ptProgram, "u_float_FilmHeight"),
+        filmHeight);
+      gl.uniformMatrix4fv(gl.getUniformLocation(this.ptProgram, "u_mat4_ViewMatrix"), false,
+        new Float32Array(camera.matrixWorld.elements));
+      gl.uniform3f(gl.getUniformLocation(this.ptProgram, "u_vec3_CameraPosition"),
+        camera.position.x, camera.position.y, camera.position.z);
+      gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_int_FrameCount"),
+        this._frameCount);
+      gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_int_DebugMode"),
+        this.debugModes.indexOf(this._debugMode));
+      gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_bool_UseIBL"),
+        this._useIBL);
+      gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_bool_DisableBackground"),
+        this._disableBackground);
+      gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_int_maxBounces"),
+        this._maxBounces);
+      gl.uniform2f(gl.getUniformLocation(this.ptProgram, "u_vec2_InverseResolution"),
+        1.0 / this.renderRes[0], 1.0 / this.renderRes[1]);
+      gl.uniform1f(gl.getUniformLocation(this.ptProgram, "u_float_FocalLength"),
+        camera.near);
+      gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_bool_forceIBLEval"),
+        this._forceIBLEval);
 
       gl.bindVertexArray(this.quadVao);
+      gl.viewport(0, 0, this.renderRes[0], this.renderRes[1]);
 
       // pathtracing render pass
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
@@ -299,26 +342,28 @@ export class PathtracingRenderer {
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
-
       // display render pass
       gl.useProgram(this.displayProgram);
       gl.viewport(0, 0, this.displayRes[0], this.displayRes[1]);
       gl.uniform1i(gl.getUniformLocation(this.displayProgram, "tex"), numTextureSlots);
-      gl.uniform1f(gl.getUniformLocation(this.displayProgram, "exposure"), this.exposure);
+      gl.uniform1f(gl.getUniformLocation(this.displayProgram, "exposure"), this._exposure);
+      gl.uniform1i(gl.getUniformLocation(this.displayProgram, "gamma"), this._enableGamma);
+      gl.uniform1i(gl.getUniformLocation(this.displayProgram, "tonemappingMode"),
+        this.tonemappingModes.indexOf(this._tonemapping)));
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       gl.bindTexture(gl.TEXTURE_2D, null);
 
       gl.useProgram(null);
       gl.bindVertexArray(null);
 
-      this.frameCount++;
+      this._frameCount++;
 
-      if (num_samples !== -1 && this.frameCount >= num_samples) {
+      if (num_samples !== -1 && this._frameCount >= num_samples) {
         renderingFinishedCB(); // finished rendering num_samples
-        this.isRendering = false;
+        this._isRendering = false;
       }
 
-      frameFinishedCB(this.frameCount);
+      frameFinishedCB(this._frameCount);
       requestAnimationFrame(renderFrame);
     };
 
@@ -394,7 +439,9 @@ export class PathtracingRenderer {
 
       uniform sampler2D tex;
       uniform float exposure;
-      // uniform vec3 whitePoint;
+      uniform bool gamma;
+      uniform int tonemappingMode;
+      const vec3 whitePoint = vec3(1.0);
 
       in vec2 uv;
       out vec4 out_FragColor;
@@ -413,13 +460,13 @@ export class PathtracingRenderer {
         return saturate( color / ( vec3( 1.0 ) + color ) );
       }
 
-      // #define Uncharted2Helper( x ) max( ( ( x * ( 0.15 * x + 0.10 * 0.50 ) + 0.20 * 0.02 ) / ( x * ( 0.15 * x + 0.50 ) + 0.20 * 0.30 ) ) - 0.02 / 0.30, vec3( 0.0 ) )
-      // vec3 Uncharted2ToneMapping( vec3 color ) {
-      //   // John Hable's filmic operator from Uncharted 2 video game
-      //   color *= exposure;
-      //   return saturate( Uncharted2Helper( color ) / Uncharted2Helper( vec3( whitePoint ) ) );
+      #define Uncharted2Helper( x ) max( ( ( x * ( 0.15 * x + 0.10 * 0.50 ) + 0.20 * 0.02 ) / ( x * ( 0.15 * x + 0.50 ) + 0.20 * 0.30 ) ) - 0.02 / 0.30, vec3( 0.0 ) )
+      vec3 Uncharted2ToneMapping( vec3 color ) {
+        // John Hable's filmic operator from Uncharted 2 video game
+        color *= exposure;
+        return saturate( Uncharted2Helper( color ) / Uncharted2Helper( vec3( whitePoint ) ) );
 
-      // }
+      }
 
       vec3 OptimizedCineonToneMapping( vec3 color ) {
         // optimized filmic operator by Jim Hejl and Richard Burgess-Dawson
@@ -435,10 +482,22 @@ export class PathtracingRenderer {
 
       void main()
       {
-        //vec3 color = texture(tex, uv).xyz;
         vec3 color = texture(tex, uv).xyz;
-        color = AcesFilm(color);
-        color = pow(color, vec3(1.0/2.2));
+        
+        if(tonemappingMode == 0) 
+          color = LinearToneMapping(color);
+        if(tonemappingMode == 1) 
+          color = ReinhardToneMapping(color);
+        if(tonemappingMode == 2) 
+          color = Uncharted2ToneMapping(color);
+        if(tonemappingMode == 3) 
+          color = OptimizedCineonToneMapping(color);
+        if(tonemappingMode == 4) 
+          color = AcesFilm(color);
+
+        if(gamma) 
+          color = pow(color, vec3(1.0/2.2));
+
         out_FragColor = vec4(color, 1.0);
       }`;
 
@@ -521,8 +580,8 @@ export class PathtracingRenderer {
       matTexInfo.metallicRoughnessTexture = this.parseTexture(mat.metalnessMap);
     }
 
-    if (mat.normalTexture) {
-      matTexInfo.normalTexture = this.parseTexture(mat.normalTexture);
+    if (mat.normalMap) {
+      matTexInfo.normalTexture = this.parseTexture(mat.normalMap);
       matInfo.normalScale = mat.normalScale.x;
     }
 
@@ -532,22 +591,22 @@ export class PathtracingRenderer {
     }
 
 
-    matInfo.clearcoat = mat.clearcoat || 0;
-    if (mat.clearcoatMap) {
-      matTexInfo.clearcoatTexture = this.parseTexture(mat.clearcoatMap);
-    }
+    // matInfo.clearcoat = mat.clearcoat || 0;
+    // if (mat.clearcoatMap) {
+    //   matTexInfo.clearcoatTexture = this.parseTexture(mat.clearcoatMap);
+    // }
 
-    matInfo.clearcoatRoughness = mat.clearcoatRoughness || 0;
-    if (mat.clearcoatRoughnessMap) {
-      matTexInfo.clearcoatRoughnessTexture = this.parseTexture(mat.clearcoatRoughnessMap);
-    }
+    // matInfo.clearcoatRoughness = mat.clearcoatRoughness || 0;
+    // if (mat.clearcoatRoughnessMap) {
+    //   matTexInfo.clearcoatRoughnessTexture = this.parseTexture(mat.clearcoatRoughnessMap);
+    // }
 
-    matInfo.sheen = mat.sheen || 0;
+    //matInfo.sheen = mat.sheen || 0;
 
-    matInfo.transmission = mat.transmission || 0;
-    if (mat.transmissionMap) {
-      matTexInfo.transmissionTexture = this.parseTexture(mat.transmissionMap);
-    }
+    // matInfo.transmission = mat.transmission || 0;
+    // if (mat.transmissionMap) {
+    //   matTexInfo.transmissionTexture = this.parseTexture(mat.transmissionMap);
+    // }
 
     if ("gltfExtensions" in mat.userData) {
 
@@ -634,8 +693,6 @@ export class PathtracingRenderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.bindTexture(gl.TEXTURE_2D, null);
-
-    this.setUseIBL(true);
   }
 
   setScene(scene, callback?) {
@@ -828,10 +885,10 @@ export class PathtracingRenderer {
     let numAttributes = 4;
     let floatsPerSrcTriangle = 3 * numChannels;
     let floatsPerDstTriangle = 3 * numChannels * numAttributes;
-    for (let i = 0; i < total_number_of_triangles; i++) { 
+    for (let i = 0; i < total_number_of_triangles; i++) {
       let srcTriangleIdx = bvh.m_pTriIndices[i];
-      for (let vertIdx = 0; vertIdx < 3; vertIdx++) { 
-        for (let channelIdx = 0; channelIdx < numChannels; channelIdx++) { 
+      for (let vertIdx = 0; vertIdx < 3; vertIdx++) {
+        for (let channelIdx = 0; channelIdx < numChannels; channelIdx++) {
           let srcIdx = srcTriangleIdx * floatsPerSrcTriangle + vertIdx * numChannels + channelIdx;
           let dstIdx = i * floatsPerDstTriangle + vertIdx * numChannels * numAttributes + channelIdx;
           combinedMeshBuffer[dstIdx] = position_buffer[srcIdx];
@@ -976,16 +1033,16 @@ export class PathtracingRenderer {
     shaderChunks['pathtracing_rt_kernel'] = await filePromiseLoader('./shader/rt_kernel.glsl');
 
     shaderChunks['pathtracing_defines'] = `
-          #define PI               3.14159265358979323
-          #define TWO_PI           6.28318530717958648
-          #define FOUR_PI          12.5663706143591729
-          #define ONE_OVER_PI      0.31830988618379067
-          #define ONE_OVER_TWO_PI  0.15915494309
-          #define ONE_OVER_FOUR_PI 0.07957747154594767
-          #define PI_OVER_TWO      1.57079632679489662
-          #define ONE_OVER_THREE   0.33333333333333333
-          #define E                2.71828182845904524
-          #define INFINITY         1000000.0
+          const float PI =               3.14159265358979323;
+          const float TWO_PI =           6.28318530717958648;
+          const float FOUR_PI =          12.5663706143591729;
+          const float ONE_OVER_PI =      0.31830988618379067;
+          const float ONE_OVER_TWO_PI =  0.15915494309;
+          const float ONE_OVER_FOUR_PI = 0.07957747154594767;
+          const float PI_OVER_TWO =      1.57079632679489662;
+          const float ONE_OVER_THREE =   0.33333333333333333;
+          const float E =                2.71828182845904524;
+          const float INFINITY =         1000000.0;
 
           const float EPS_NORMAL = 0.001;
           const float EPS_COS = 0.001;
@@ -1000,6 +1057,9 @@ export class PathtracingRenderer {
           const uint MATERIAL_SIZE = 11u;
           const uint MATERIAL_TEX_INFO_SIZE = 10u;
           const uint TEX_INFO_SIZE = 2u;
+
+          const uint NUM_TRIANGLES = ${total_number_of_triangles}u;
+          const uint MAX_TEXTURE_SIZE = ${glu.getMaxTextureSize(gl)}u;
       `;
 
     if (this.ptProgram !== undefined) {
@@ -1010,8 +1070,6 @@ export class PathtracingRenderer {
     this.ptProgram = glu.createProgramFromSource(gl, vertexShader, fragmentShader, shaderChunks);
 
     gl.useProgram(this.ptProgram);
-    let loc = gl.getUniformLocation(this.ptProgram, "u_int_NumTriangles");
-    gl.uniform1ui(loc, total_number_of_triangles);
 
     let numTextureSlots = 0;
     for (let t in this.pathtracingDataTextures) {

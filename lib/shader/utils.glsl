@@ -119,7 +119,7 @@ vec3 rotation_to_tangent(float anisotropy_rotation_angle, vec3 normal, vec3 tang
 
 ivec2 getStructParameterTexCoord(uint structIdx, uint paramIdx, uint structStride) {
     return ivec2(
-        (structIdx*structStride + paramIdx) % u_int_MaxTextureSize,
-        (structIdx*structStride + paramIdx) / u_int_MaxTextureSize
+        (structIdx*structStride + paramIdx) % MAX_TEXTURE_SIZE,
+        (structIdx*structStride + paramIdx) / MAX_TEXTURE_SIZE
     );
 }
