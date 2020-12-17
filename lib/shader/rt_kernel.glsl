@@ -88,16 +88,14 @@ bool intersectTriangle(const in Ray r, in vec3 p0, in vec3 p1, in vec3 p2, const
 }
 
 uint getMaterialIndex(const in uint triIndex) {
-     uint idx_x0 = (triIndex*3u + 0u) % u_int_MaxTextureSize;
-     uint idx_y0 = (triIndex*3u + 0u) / u_int_MaxTextureSize;
-
-     return uint(texelFetch(u_sampler2D_TriangleData, ivec2(idx_x0, idx_y0), 0).w);
+    ivec2 idx = getStructParameterTexCoord(triIndex, 0u, 12u);
+    return uint(texelFetch(u_sampler2D_TriangleData, idx, 0).w);
 }
 
 void getSceneTriangle(const in uint index, out vec3 p0, out vec3 p1, out vec3 p2) {
-    ivec2 idx0 = getStructParameterTexCoord(index, 0u, 3u);
-    ivec2 idx1 = getStructParameterTexCoord(index, 1u, 3u);
-    ivec2 idx2 = getStructParameterTexCoord(index, 2u, 3u);
+    ivec2 idx0 = getStructParameterTexCoord(index, 0u, 12u);
+    ivec2 idx1 = getStructParameterTexCoord(index, 4u, 12u);
+    ivec2 idx2 = getStructParameterTexCoord(index, 8u, 12u);
 
     p0 = texelFetch(u_sampler2D_TriangleData, idx0, 0).xyz;
     p1 = texelFetch(u_sampler2D_TriangleData, idx1, 0).xyz;
@@ -105,46 +103,46 @@ void getSceneTriangle(const in uint index, out vec3 p0, out vec3 p1, out vec3 p2
 }
 
 vec3 calculateInterpolatedTangent(const in uint index, const in vec2 uv) {
-    ivec2 idx0 = getStructParameterTexCoord(index, 0u, 3u);
-    ivec2 idx1 = getStructParameterTexCoord(index, 1u, 3u);
-    ivec2 idx2 = getStructParameterTexCoord(index, 2u, 3u);
+    ivec2 idx0 = getStructParameterTexCoord(index, 3u, 12u);
+    ivec2 idx1 = getStructParameterTexCoord(index, 7u, 12u);
+    ivec2 idx2 = getStructParameterTexCoord(index, 11u, 12u);
 
     mat3 tangents;
-    tangents[0] = texelFetch(u_sampler2D_TangentData, idx0, 0).xyz;
-    tangents[1] = texelFetch(u_sampler2D_TangentData, idx1, 0).xyz;
-    tangents[2] = texelFetch(u_sampler2D_TangentData, idx2, 0).xyz;
+    tangents[0] = texelFetch(u_sampler2D_TriangleData, idx0, 0).xyz;
+    tangents[1] = texelFetch(u_sampler2D_TriangleData, idx1, 0).xyz;
+    tangents[2] = texelFetch(u_sampler2D_TriangleData, idx2, 0).xyz;
 
     return normalize((1.0 - uv.x - uv.y) * tangents[0] + uv.x * tangents[1] + uv.y * tangents[2]);
 }
 
 
 vec3 calculateInterpolatedNormal(const in uint index, const in vec2 uv) {
-    ivec2 idx0 = getStructParameterTexCoord(index, 0u, 3u);
-    ivec2 idx1 = getStructParameterTexCoord(index, 1u, 3u);
-    ivec2 idx2 = getStructParameterTexCoord(index, 2u, 3u);
+    ivec2 idx0 = getStructParameterTexCoord(index, 1u, 12u);
+    ivec2 idx1 = getStructParameterTexCoord(index, 5u, 12u);
+    ivec2 idx2 = getStructParameterTexCoord(index, 9u, 12u);
 
     mat3 normals;
-    normals[0] = texelFetch(u_sampler2D_NormalData, idx0, 0).xyz;
-    normals[1] = texelFetch(u_sampler2D_NormalData, idx1, 0).xyz;
-    normals[2] = texelFetch(u_sampler2D_NormalData, idx2, 0).xyz;
+    normals[0] = texelFetch(u_sampler2D_TriangleData, idx0, 0).xyz;
+    normals[1] = texelFetch(u_sampler2D_TriangleData, idx1, 0).xyz;
+    normals[2] = texelFetch(u_sampler2D_TriangleData, idx2, 0).xyz;
 
     return normalize((1.0 - uv.x - uv.y) * normals[0] + uv.x * normals[1] + uv.y * normals[2]);
 }
 
 vec2 calculateInterpolatedUV(const in uint index, const in vec2 hit_uv, int set) {
-    ivec2 idx0 = getStructParameterTexCoord(index, 0u, 3u);
-    ivec2 idx1 = getStructParameterTexCoord(index, 1u, 3u);
-    ivec2 idx2 = getStructParameterTexCoord(index, 2u, 3u);
+    ivec2 idx0 = getStructParameterTexCoord(index, 2u, 12u);
+    ivec2 idx1 = getStructParameterTexCoord(index, 6u, 12u);
+    ivec2 idx2 = getStructParameterTexCoord(index, 10u, 12u);
 
     vec2 uv0, uv1, uv2;
     if(set == 0) {
-        uv0 = texelFetch(u_sampler2D_UVData, idx0, 0).xy;
-        uv1 = texelFetch(u_sampler2D_UVData, idx1, 0).xy;
-        uv2 = texelFetch(u_sampler2D_UVData, idx2, 0).xy;
+        uv0 = texelFetch(u_sampler2D_TriangleData, idx0, 0).xy;
+        uv1 = texelFetch(u_sampler2D_TriangleData, idx1, 0).xy;
+        uv2 = texelFetch(u_sampler2D_TriangleData, idx2, 0).xy;
     } else {
-        uv0 = texelFetch(u_sampler2D_UVData, idx0, 0).zw;
-        uv1 = texelFetch(u_sampler2D_UVData, idx1, 0).zw;
-        uv2 = texelFetch(u_sampler2D_UVData, idx2, 0).zw;
+        uv0 = texelFetch(u_sampler2D_TriangleData, idx0, 0).zw;
+        uv1 = texelFetch(u_sampler2D_TriangleData, idx1, 0).zw;
+        uv2 = texelFetch(u_sampler2D_TriangleData, idx2, 0).zw;
     }
 
     return (1.0 - hit_uv.x - hit_uv.y) * uv0 + hit_uv.x * uv1 + hit_uv.y * uv2;
@@ -245,7 +243,7 @@ bool intersectSceneTriangles_Bruteforce(const in Ray r, out HitInfo hit) {
 }
 
 bool intersectScene_Nearest(const in Ray r, out HitInfo hit) {
-    //return intersectSceneTriangles_Bruteforce(r, hit);
+    // return intersectSceneTriangles_Bruteforce(r, hit);
     return intersectSceneTriangles_BVH(r, hit);
 }
 

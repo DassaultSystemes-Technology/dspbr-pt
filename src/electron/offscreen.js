@@ -27,7 +27,7 @@ const parsedArgs = parseArguments(args);
 global.sharedObject = { args: parsedArgs };
 
 // app.disableHardwareAcceleration();
-
+app.commandLine.appendSwitch("use-angle", "gl");
 app.on('ready', () => createWindow(parsedArgs.res[0], parsedArgs.res[1]));
 
 const outputFile = "output.png";
@@ -97,7 +97,7 @@ function createWindow(width, height) {
         frame: false 
     });
 
-      //mainWindow.webContents.openDevTools();
+      // mainWindow.webContents.openDevTools();
 
     mainWindow.loadURL(url.format({
         pathname: path.join(__dirname, "../../dist/headless.html"),
