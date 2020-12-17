@@ -14,11 +14,17 @@
  */
 
 struct MaterialTextureInfo {
-    TexInfo albedoMap;
-    TexInfo metallicRoughnessMap;
-    TexInfo normalMap;
-    TexInfo emissionMap;
-    TexInfo specularMap;
+    TexInfo albedoTexture;
+    TexInfo metallicRoughnessTexture;
+    TexInfo normalTexture;
+    TexInfo emissionTexture;
+    TexInfo specularTexture;
+    TexInfo specularColorTexture;
+    TexInfo transmissionTexture;
+    TexInfo clearcoatTexture;
+    // TexInfo clearcoatNormalTexture;
+    TexInfo sheenColorTexture;
+    TexInfo sheenRoughnessTexture;
 };
 
 
@@ -92,23 +98,47 @@ TexInfo getTextureInfo(ivec2 texInfoIdx, ivec2 transformInfoIdx) {
 void unpackMaterialTexInfo(in uint idx, out MaterialTextureInfo matTexInfo) {
     ivec2 albedoTexInfoIdx = getStructParameterTexCoord(idx, 0u, MATERIAL_TEX_INFO_SIZE*TEX_INFO_SIZE);
     ivec2 albedoTexTransformsIdx = getStructParameterTexCoord(idx, 1u, MATERIAL_TEX_INFO_SIZE*TEX_INFO_SIZE);
-    matTexInfo.albedoMap = getTextureInfo(albedoTexInfoIdx, albedoTexTransformsIdx);
+    matTexInfo.albedoTexture = getTextureInfo(albedoTexInfoIdx, albedoTexTransformsIdx);
     
     ivec2 metallicRoughnessTexInfoIdx = getStructParameterTexCoord(idx, 2u, MATERIAL_TEX_INFO_SIZE*TEX_INFO_SIZE);
     ivec2 metallicRoughnessTexTransformsIdx = getStructParameterTexCoord(idx, 3u, MATERIAL_TEX_INFO_SIZE*TEX_INFO_SIZE);
-    matTexInfo.metallicRoughnessMap = getTextureInfo(metallicRoughnessTexInfoIdx, metallicRoughnessTexTransformsIdx);
+    matTexInfo.metallicRoughnessTexture = getTextureInfo(metallicRoughnessTexInfoIdx, metallicRoughnessTexTransformsIdx);
     
     ivec2 normalTexInfoIdx = getStructParameterTexCoord(idx, 4u, MATERIAL_TEX_INFO_SIZE*TEX_INFO_SIZE);
     ivec2 normalTexTexTransformsIdx = getStructParameterTexCoord(idx, 5u, MATERIAL_TEX_INFO_SIZE*TEX_INFO_SIZE);
-    matTexInfo.normalMap = getTextureInfo(normalTexInfoIdx, normalTexTexTransformsIdx);
+    matTexInfo.normalTexture = getTextureInfo(normalTexInfoIdx, normalTexTexTransformsIdx);
     
     ivec2 emissionTexInfoIdx = getStructParameterTexCoord(idx, 6u, MATERIAL_TEX_INFO_SIZE*TEX_INFO_SIZE);
     ivec2 emissionTexTransformsIdx = getStructParameterTexCoord(idx, 7u, MATERIAL_TEX_INFO_SIZE*TEX_INFO_SIZE);
-    matTexInfo.emissionMap = getTextureInfo(emissionTexInfoIdx, emissionTexTransformsIdx);
+    matTexInfo.emissionTexture = getTextureInfo(emissionTexInfoIdx, emissionTexTransformsIdx);
     
     ivec2 specularTexInfoIdx = getStructParameterTexCoord(idx, 8u, MATERIAL_TEX_INFO_SIZE*TEX_INFO_SIZE);
     ivec2 specularTexTransformsIdx = getStructParameterTexCoord(idx, 9u, MATERIAL_TEX_INFO_SIZE*TEX_INFO_SIZE);
-    matTexInfo.specularMap = getTextureInfo(specularTexInfoIdx, specularTexTransformsIdx);
+    matTexInfo.specularTexture = getTextureInfo(specularTexInfoIdx, specularTexTransformsIdx);
+
+    ivec2 specularColorTexInfoIdx = getStructParameterTexCoord(idx, 8u, MATERIAL_TEX_INFO_SIZE*TEX_INFO_SIZE);
+    ivec2 specularColorTexTransformsIdx = getStructParameterTexCoord(idx, 9u, MATERIAL_TEX_INFO_SIZE*TEX_INFO_SIZE);
+    matTexInfo.specularColorTexture = getTextureInfo(specularColorTexInfoIdx, specularColorTexTransformsIdx);
+
+    ivec2 transmissionTexInfoIdx = getStructParameterTexCoord(idx, 8u, MATERIAL_TEX_INFO_SIZE*TEX_INFO_SIZE);
+    ivec2 transmissionTexTransformsIdx = getStructParameterTexCoord(idx, 9u, MATERIAL_TEX_INFO_SIZE*TEX_INFO_SIZE);
+    matTexInfo.transmissionTexture = getTextureInfo(transmissionTexInfoIdx, transmissionTexTransformsIdx);
+
+    ivec2 clearcoatTexInfoIdx = getStructParameterTexCoord(idx, 8u, MATERIAL_TEX_INFO_SIZE*TEX_INFO_SIZE);
+    ivec2 clearcoatTexTransformsIdx = getStructParameterTexCoord(idx, 9u, MATERIAL_TEX_INFO_SIZE*TEX_INFO_SIZE);
+    matTexInfo.clearcoatTexture = getTextureInfo(clearcoatTexInfoIdx, clearcoatTexTransformsIdx);
+
+    // ivec2 clearcoatNormalTexInfoIdx = getStructParameterTexCoord(idx, 8u, MATERIAL_TEX_INFO_SIZE*TEX_INFO_SIZE);
+    // ivec2 clearcoatNormalTexTransformsIdx = getStructParameterTexCoord(idx, 9u, MATERIAL_TEX_INFO_SIZE*TEX_INFO_SIZE);
+    // matTexInfo.clearcoatNormalTexture = getTextureInfo(clearcoatNormalTexInfoIdx, clearcoatNormalTexTransformsIdx);
+
+    ivec2 sheenColorTexInfoIdx = getStructParameterTexCoord(idx, 8u, MATERIAL_TEX_INFO_SIZE*TEX_INFO_SIZE);
+    ivec2 sheenColorTexTransformsIdx = getStructParameterTexCoord(idx, 9u, MATERIAL_TEX_INFO_SIZE*TEX_INFO_SIZE);
+    matTexInfo.sheenColorTexture = getTextureInfo(sheenColorTexInfoIdx, sheenColorTexTransformsIdx);
+
+    ivec2 sheenRoughnessTexInfoIdx = getStructParameterTexCoord(idx, 8u, MATERIAL_TEX_INFO_SIZE*TEX_INFO_SIZE);
+    ivec2 sheenRoughnessTexTransformsIdx = getStructParameterTexCoord(idx, 9u, MATERIAL_TEX_INFO_SIZE*TEX_INFO_SIZE);
+    matTexInfo.sheenRoughnessTexture = getTextureInfo(sheenRoughnessTexInfoIdx, sheenRoughnessTexTransformsIdx);
 }
 
 // Convert from roughness and anisotropy to 2d anisotropy.
@@ -128,7 +158,7 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
     unpackMaterialData(matIdx, matData);
     unpackMaterialTexInfo(matIdx, matTexInfo);
   
-    vec4 albedo = evaluateMaterialTextureValue(matTexInfo.albedoMap, uv);
+    vec4 albedo = evaluateMaterialTextureValue(matTexInfo.albedoTexture, uv);
     c.albedo = matData.albedo * pow(albedo.xyz, vec3(2.2));
 
     c.cutout_opacity = matData.cutoutOpacity * albedo.w;
@@ -138,34 +168,38 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
     if(matData.alphaCutoff == 1.0) { // OPAQUE
       c.cutout_opacity = 1.0;
     }
-    
-    c.transparency = matData.transparency;
-    
-    vec4 occlusionMetallicRoughness = evaluateMaterialTextureValue(matTexInfo.metallicRoughnessMap, uv);
+
+    vec4 transmission = evaluateMaterialTextureValue(matTexInfo.transmissionTexture, uv);
+    c.transparency = matData.transparency * transmission.x;
+
+    vec4 occlusionMetallicRoughness = evaluateMaterialTextureValue(matTexInfo.metallicRoughnessTexture, uv);
     c.metallic = matData.metallic * occlusionMetallicRoughness.z;
     float roughness = matData.roughness * occlusionMetallicRoughness.y;
     c.alpha = roughness_conversion(roughness, matData.anisotropy);
 
-    vec4 specular = evaluateMaterialTextureValue(matTexInfo.specularMap, rs.uv0);
-    c.specular_tint = matData.specularTint;
-    c.specular = matData.specular;
+    vec4 specularColor = evaluateMaterialTextureValue(matTexInfo.specularColorTexture, rs.uv0);
+    c.specular_tint = matData.specularTint * specularColor.x;
+    vec4 specular = evaluateMaterialTextureValue(matTexInfo.specularTexture, rs.uv0);
+    c.specular = matData.specular * specular.x;
 
     c.f0 = ((1.0 - matData.ior)/(1.0 + matData.ior))*((1.0 - matData.ior)/(1.0 + matData.ior));
 
     c.specular_f0 = (1.0 - c.metallic) * c.f0 * c.specular * c.specular_tint + c.metallic * c.albedo;
     c.specular_f90 = vec3((1.0 - c.metallic) * c.specular + c.metallic);
 
+    vec4 sheenColor = evaluateMaterialTextureValue(matTexInfo.sheenColorTexture, rs.uv0);
+    vec4 sheenRoughness = evaluateMaterialTextureValue(matTexInfo.sheenRoughnessTexture, rs.uv0);
     c.sheen = matData.sheen;
-    c.sheen_roughness = matData.sheenRoughness;
-    c.sheen_color = matData.sheenColor;
+    c.sheen_roughness = matData.sheenRoughness * sheenRoughness.x;
+    c.sheen_color = matData.sheenColor * sheenColor.xyz;
 
     c.n = y_to_z_up * rs.normal;
     c.ng = y_to_z_up * rs.geometryNormal;
     c.t = y_to_z_up * rs.tangent;
 
-    if(matTexInfo.normalMap.texIdx >= 0) {
+    if(matTexInfo.normalTexture.texIdx >= 0) {
         mat3 to_world = get_onb(c.n, c.t);
-        vec3 n = normalize(evaluateMaterialTextureValue(matTexInfo.normalMap, uv).xyz * 2.0 - vec3(1.0));
+        vec3 n = normalize(evaluateMaterialTextureValue(matTexInfo.normalTexture, uv).xyz * 2.0 - vec3(1.0));
         c.n = to_world * n;
         vec3 wi = y_to_z_up*rs.wi;
 
@@ -179,9 +213,10 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
     // apply aniso rotation
     c.t = rotation_to_tangent(matData.anisotropyRotation, c.n, c.t);
 
-    c.emission = pow(evaluateMaterialTextureValue(matTexInfo.emissionMap, uv).xyz, vec3(2.2)) * matData.emission;
+    c.emission = pow(evaluateMaterialTextureValue(matTexInfo.emissionTexture, uv).xyz, vec3(2.2)) * matData.emission;
 
-    c.clearcoat = matData.clearcoat;
+    vec4 clearcoat = evaluateMaterialTextureValue(matTexInfo.clearcoatTexture, uv);
+    c.clearcoat = matData.clearcoat * clearcoat.x;
     c.clearcoat_alpha = max(matData.clearcoatRoughness*matData.clearcoatRoughness, MINIMUM_ROUGHNESS);
 }
 

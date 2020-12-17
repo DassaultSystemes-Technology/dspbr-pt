@@ -1,5 +1,5 @@
 /* @license
- * Copyright 2020  Dassault Systèmes - All Rights Reserved.
+ * Copyright 2020  Dassault Systemes - All Rights Reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -48,6 +48,8 @@ function createWindow () {
     win = null;
   });
 }
+
+app.commandLine.appendSwitch("use-angle", "gl");
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.

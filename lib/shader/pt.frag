@@ -14,18 +14,19 @@
  * limitations under the License.
  */
  
-precision highp float;
+
 precision highp int;
+precision highp float;
 precision highp sampler2D;
-// precision lowp isampler2D;
 precision highp sampler2DArray;
+// precision lowp isampler2D;
 
 #include <pathtracing_defines>
 
 in vec2 v_uv;
 
 uniform int u_int_FrameCount;
-uniform uint u_int_MaxTextureSize; // used for data acessing of linear data in 2d textures
+uniform uint u_int_MaxTextureSize; // used to index linear data in 2d textures
 uniform float u_float_FilmHeight;
 uniform float u_float_FocalLength;
 uniform vec3 u_vec3_CameraPosition;
@@ -40,9 +41,6 @@ uniform sampler2D u_sampler2D_PreviousTexture;
 
 uniform sampler2D u_sampler2D_TriangleData;
 uniform sampler2D u_sampler2D_BVHData;
-uniform sampler2D u_sampler2D_NormalData;
-uniform sampler2D u_sampler2D_TangentData;
-uniform sampler2D u_sampler2D_UVData;
 uniform sampler2D u_sampler2D_MaterialData;
 uniform sampler2D u_sampler2D_MaterialTexInfoData;
 uniform sampler2D u_samplerCube_EnvMap;
@@ -284,7 +282,7 @@ float computePhi(vec3 dir) {
 vec2 mapDirToUV(vec3 dir) {
     float theta = computeTheta(dir);
     float u = computePhi(dir) / (2.0 * PI);
-    float v = (theta) / PI;
+    float v = (PI-theta) / PI;
     //pdf = 1.0 / (2.0 * PI * PI * max(EPS_COS, sin(theta)));
     return vec2(u, v);
 }
@@ -308,13 +306,13 @@ vec4 traceDebug(const Ray r) {
         if(u_int_DebugMode== 4) 
             contrib = rs.closure.n;
         if(u_int_DebugMode== 5) {
-            contrib = rs.closure.t;           
+            contrib = rs.closure.t;
         }
         if(u_int_DebugMode== 6) {
             mat3 onb = get_onb(rs.closure.n, rs.closure.t);
             contrib = onb[1];
         }
-         if(u_int_DebugMode== 7) {            
+         if(u_int_DebugMode== 7) {
             contrib = vec3(rs.closure.transparency);
         }
          if(u_int_DebugMode== 8) {
@@ -345,6 +343,7 @@ vec4 trace(const Ray r) {
     vec4 color = vec4(0);
 
     if (intersectScene_Nearest(r, hit)) { // primary camera ray
+        // return vec4(1,0,0,1);
         vec3 contrib = vec3(0);
 
         RenderState rs;

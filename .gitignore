@@ -5,3 +5,5 @@ dist
 package 
 EnterprisePBRShadingModel
 validation
+debug.log
+.vscode/settings.json

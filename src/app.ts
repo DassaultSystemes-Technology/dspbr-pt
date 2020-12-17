@@ -105,22 +105,14 @@ class App {
     this.controls.addEventListener('change', () => {
       _this.camera.updateMatrixWorld();
       _this.renderer.resetAccumulation();
-
-      if (!_this.pathtracing) {
-        this.renderThreeFrame();
-      }
     });
 
     this.controls.addEventListener('start', () => {
-      if (_this.pathtracing) {
-        _this.renderer.setPixelRatio(_this.interactionPixelRatio);
-      }
+       _this.renderer.setPixelRatio(_this.interactionPixelRatio);
     });
 
     this.controls.addEventListener('end', () => {
-      if (_this.pathtracing) {
-        _this.renderer.setPixelRatio(_this.pixelRatio);
-      }
+       _this.renderer.setPixelRatio(_this.pixelRatio);
     });
 
     this.controls.mouseButtons = {
@@ -132,7 +124,6 @@ class App {
     const renderPixelRatio = this.pixelRatio * window.devicePixelRatio;
     this.renderer = new PathtracingRenderer(this.canvas_pt, renderPixelRatio);
     this.three_renderer = new ThreeRenderer(this.canvas_three, renderPixelRatio);
-    _this.renderer.setUseIBL(this.useIBL);
     _this.loadScene(this.Scene);
 
     window.addEventListener('resize', () => {
@@ -156,7 +147,6 @@ class App {
         loader.loadIBL(URL.createObjectURL(e.dataTransfer.items[0].getAsFile()), (ibl) => {
           _this.renderer.setIBL(ibl);
           _this.three_renderer.setIBL(ibl);
-          _this.renderThreeFrame();
         });
       } else {
         loader.loadSceneFromBlobs(e.dataTransfer.files, _this.autoScaleOnImport, function (scene) {
@@ -164,11 +154,10 @@ class App {
             _this.sceneBoundingBox = new THREE.Box3().setFromObject(scene);
             _this.renderer.setIBL(ibl);
             _this.renderer.setScene(scene, () => {
-              _this.startProgressivePathtracing();
+              _this.startPathtracing();
             })
             _this.three_renderer.setScene(scene, () => {
               _this.three_renderer.setIBL(ibl);
-              _this.renderThreeFrame();
             });
           });
         });
@@ -178,19 +167,26 @@ class App {
     this.initUI();
   }
 
-  private renderThreeFrame() {
-    if (!this.pathtracing) {
-      this.three_renderer.render(this.camera);
-      var destCtx = this.canvas.getContext("2d");
-      destCtx.drawImage(this.canvas_three, 0, 0);
-    }
+  private startRasterizer() {
+    let _this = this;
+    this.stopPathtracing();
+    this.three_renderer.render(this.camera, ()=>{
+      var destCtx = _this.canvas.getContext("2d");
+      destCtx.drawImage(_this.canvas_three, 0, 0);
+    });
+  }
+  
+  private stopRasterizer() {
+    this.three_renderer.stopRendering();
   }
 
-  private stopProgressivePathtracing() {
+  private stopPathtracing() {
     this.renderer.stopRendering();
   }
 
-  private startProgressivePathtracing() {
+  private startPathtracing() {
+    this.stopRasterizer();
+
     let _this = this;
     _this.renderer.render(_this.camera, -1, () => {
       _this.controls.update();
@@ -214,32 +210,30 @@ class App {
 
     this.renderer.resize(window.innerWidth, window.innerHeight);
     this.three_renderer.resize(window.innerWidth, window.innerHeight);
-    this.renderThreeFrame();
 
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
   }
 
   private loadScene(url) {
-    let _this = this
     loader.loadScene(url, this.autoScaleOnImport, (scene) => {
-      loader.loadIBL(_this.IBL, (ibl) => {
-        _this.sceneBoundingBox = new THREE.Box3().setFromObject(scene);
-        _this.renderer.setIBL(ibl);
-        _this.renderer.setScene(scene, () => {
-          this.startProgressivePathtracing();
+      loader.loadIBL(this.IBL, (ibl) => {
+        this.sceneBoundingBox = new THREE.Box3().setFromObject(scene);
+          this.renderer.setIBL(ibl);
+        this.renderer.setScene(scene, () => {
+          if(this.pathtracing)
+            this.startPathtracing();
         })
 
-        _this.three_renderer.setScene(scene, () => {
-          _this.three_renderer.setIBL(ibl);
+        this.three_renderer.setScene(scene, () => {
+            this.three_renderer.setIBL(ibl);
         });
 
-        if (!_this.pathtracing)
-          this.renderThreeFrame();
+        if (!this.pathtracing)
+          this.startRasterizer();
       });
     });
   }
-
 
   initUI() {
     if (this._gui)
@@ -260,21 +254,20 @@ class App {
       loader.loadIBL(_this.IBL, (ibl) => {
         _this.renderer.setIBL(ibl);
         _this.three_renderer.setIBL(ibl);
-        _this.renderThreeFrame();
       });
     });
 
     this._gui.add(this, 'pathtracing').onChange((value) => {
       if (value == false) {
-        _this.renderThreeFrame();
-        _this.stopProgressivePathtracing;
+        _this.startRasterizer();
       } else {
-        _this.startProgressivePathtracing();
+        _this.startPathtracing();
       }
     });
 
     this._gui.add(this, 'exposure').min(0).max(10).step(0.1).onChange(function (value) {
       _this.renderer.setExposure(value);
+      _this.three_renderer.setExposure(value);
     });
 
     this._gui.add(this, 'forceIBLEvalOnLastBounce').onChange(function (value) {
@@ -284,18 +277,21 @@ class App {
     this._gui.add(this, 'maxBounceDepth').min(0).max(16).step(1).onChange(function (value) {
       _this.renderer.setMaxBounceDepth(value);
     });
+
     this._gui.add(this, 'debugMode', this.renderer.debugModes).onChange(function (value) {
       _this.renderer.setDebugMode(value);
     });
 
-    this._gui.add(this, 'autoScaleOnImport');//.onChange(function (value) {});
+    this._gui.add(this, 'autoScaleOnImport');
 
     this._gui.add(this, 'useIBL').onChange(function (value) {
       _this.renderer.setUseIBL(value);
+      _this.three_renderer.setUseIBL(value);
     });
 
     this._gui.add(this, 'disableBackground').onChange(function (value) {
       _this.renderer.setDisableBackground(value);
+      _this.three_renderer.setDisableBackground(value);
     });
 
     this._gui.add(this, 'autoRotate').onChange(function (value) {

@@ -1,5 +1,5 @@
 /* @license
- * Copyright 2020  Dassault Syst�mes - All Rights Reserved.
+ * Copyright 2020  Dassault Systemes - All Rights Reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -15,7 +15,9 @@
 
 import "core-js/stable";
 import 'regenerator-runtime/runtime'
-import { PathtracingRenderer } from '../../lib/renderer.js';
+import * as THREE from 'three'
+import { PathtracingRenderer } from '../../lib/renderer';
+import * as loader from '../scene_loader';
 
 const { ipcRenderer } = window.require('electron');
 var path = window.require('path');
@@ -25,25 +27,45 @@ let remote = window.require('electron').remote,
 
 function startRenderer() {
   let canvas = document.getElementById("canvas");
-  let renderer = new PathtracingRenderer(canvas, true);
-  renderer.setPixelRatio(1.0);
-  renderer.autoScaleOnImport(false);
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
 
-  renderer.loadScene(args.gltf_path, function () {
-    if (args.ibl === "None") {
-      renderer.render(args.samples, () => { }, function (result) {
-        console.log("icpRenderer Ready");
-        ipcRenderer.send('rendererReady');
-      });      
+  let renderer = new PathtracingRenderer(canvas, 1.0);
+
+  loader.loadScene(args.gltf_path, false, (scene) => {
+    let cameras = [];
+    scene.traverse((child) => {
+      if (child.isCamera) {
+        child.position.applyMatrix4(child.matrixWorld);
+        cameras.push(child);
+      }
+    });
+
+    if(cameras.length > 0) {
+      var camera = cameras[0];
     } else {
-      renderer.loadIBL(args.ibl, () => {
-        console.log("loaded ibl" + args.ibl);
-        renderer.render(args.samples, () => { }, (result) => {
+      var camera = new THREE.PerspectiveCamera(45, 
+        window.innerWidth / window.innerHeight, 0.1, 1000);
+      this.camera.position.set(0, 0, 3);
+    }
+
+    renderer.setScene(scene, () => {
+     if (args.ibl === "None") {
+        renderer.render(camera, args.samples, () => { }, (result) => {
           console.log("icpRenderer Ready");
           ipcRenderer.send('rendererReady');
         });
-      });
-    }
+      } else {
+        loader.loadIBL(args.ibl, (ibl) => {
+          console.log("loaded ibl" + args.ibl);
+          renderer.setIBL(ibl );
+          renderer.render(camera, args.samples, () => { }, (result) => {
+            console.log("icpRenderer Ready");
+            ipcRenderer.send('rendererReady');
+          });
+        });
+      }
+    });
   });
 }
 

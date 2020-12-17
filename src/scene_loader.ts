@@ -93,7 +93,7 @@ export function loadScene(url, autoscale, callback, manager?) {
       throw new Error(
         'This model contains no scene, and cannot be viewed here. However,'
         + ' it may contain individual 3D resources.'
-      );
+      ); 
     }
 
     var bbox = new THREE.Box3().setFromObject(scene);
@@ -107,7 +107,7 @@ export function loadScene(url, autoscale, callback, manager?) {
     }
 
     // scene.matrixAutoUpdate = false;
-    scene.updateMatrixWorld()
+    scene.updateMatrixWorld();
     callback(scene);
   });
 }
