@@ -169,8 +169,8 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
       c.cutout_opacity = 1.0;
     }
 
-    // vec4 transmission = evaluateMaterialTextureValue(matTexInfo.transmissionTexture, uv);
-    //c.transparency = matData.transparency;// * transmission.x;
+    vec4 transmission = evaluateMaterialTextureValue(matTexInfo.transmissionTexture, uv);
+    c.transparency = matData.transparency;// * transmission.x;
 
     vec4 occlusionMetallicRoughness = evaluateMaterialTextureValue(matTexInfo.metallicRoughnessTexture, uv);
     c.metallic = matData.metallic * occlusionMetallicRoughness.z;
@@ -178,8 +178,8 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
     c.alpha = roughness_conversion(roughness, matData.anisotropy);
 
     // //vec4 specularColor = evaluateMaterialTextureValue(matTexInfo.specularColorTexture, rs.uv0);
-    // c.specular_tint = matData.specularTint;// * specularColor.x;
-    // vec4 specular = evaluateMaterialTextureValue(matTexInfo.specularTexture, rs.uv0);
+    c.specular_tint = matData.specularTint;// * specularColor.x;
+    vec4 specular = evaluateMaterialTextureValue(matTexInfo.specularTexture, rs.uv0);
     c.specular = matData.specular;// * specular.x;
 
     c.f0 = ((1.0 - matData.ior)/(1.0 + matData.ior))*((1.0 - matData.ior)/(1.0 + matData.ior));
@@ -189,9 +189,9 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
 
     // vec4 sheenColor = evaluateMaterialTextureValue(matTexInfo.sheenColorTexture, rs.uv0);
     // vec4 sheenRoughness = evaluateMaterialTextureValue(matTexInfo.sheenRoughnessTexture, rs.uv0);
-    // c.sheen = matData.sheen;
-    // c.sheen_roughness = matData.sheenRoughness;// * sheenRoughness.x;
-    // c.sheen_color = matData.sheenColor;// * sheenColor.xyz;
+    c.sheen = matData.sheen;
+    c.sheen_roughness = matData.sheenRoughness;// * sheenRoughness.x;
+    c.sheen_color = matData.sheenColor;// * sheenColor.xyz;
 
     c.n = y_to_z_up * rs.normal;
     c.ng = y_to_z_up * rs.geometryNormal;
@@ -215,9 +215,9 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
 
     c.emission = pow(evaluateMaterialTextureValue(matTexInfo.emissionTexture, uv).xyz, vec3(2.2)) * matData.emission;
 
-    // vec4 clearcoat = evaluateMaterialTextureValue(matTexInfo.clearcoatTexture, uv);
-    // c.clearcoat = matData.clearcoat;// * clearcoat.x;
-    // c.clearcoat_alpha = max(matData.clearcoatRoughness*matData.clearcoatRoughness, MINIMUM_ROUGHNESS);
+    vec4 clearcoat = evaluateMaterialTextureValue(matTexInfo.clearcoatTexture, uv);
+    c.clearcoat = matData.clearcoat;// * clearcoat.x;
+    c.clearcoat_alpha = max(matData.clearcoatRoughness*matData.clearcoatRoughness, MINIMUM_ROUGHNESS);
 }
 
 
