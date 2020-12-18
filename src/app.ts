@@ -118,6 +118,8 @@ class App {
     this.three_renderer = new ThreeRenderer(this.canvas_three, window.devicePixelRatio);
     _this.loadScene(this.Scene);
 
+    this.renderer.renderScale = 0.5;
+
     window.addEventListener('resize', () => {
       _this.resize();
     }, false);
@@ -162,12 +164,12 @@ class App {
   private startRasterizer() {
     let _this = this;
     this.stopPathtracing();
-    this.three_renderer.render(this.camera, ()=>{
+    this.three_renderer.render(this.camera, () => {
       var destCtx = _this.canvas.getContext("2d");
       destCtx.drawImage(_this.canvas_three, 0, 0);
     });
   }
-  
+
   private stopRasterizer() {
     this.three_renderer.stopRendering();
   }
@@ -211,14 +213,14 @@ class App {
     loader.loadScene(url, this.autoScaleScene, (scene) => {
       loader.loadIBL(this.IBL, (ibl) => {
         this.sceneBoundingBox = new THREE.Box3().setFromObject(scene);
-          this.renderer.setIBL(ibl);
+        this.renderer.setIBL(ibl);
         this.renderer.setScene(scene, () => {
-          if(this.pathtracing)
+          if (this.pathtracing)
             this.startPathtracing();
         })
 
         this.three_renderer.setScene(scene, () => {
-            this.three_renderer.setIBL(ibl);
+          this.three_renderer.setIBL(ibl);
         });
 
         if (!this.pathtracing)
@@ -235,11 +237,12 @@ class App {
 
     this._gui = new GUI();
     this._gui.domElement.classList.add("hidden");
-
+    this._gui.width = 300;
     this._gui.add(this, "Scene", scene_index).onChange(function (value) {
       console.log(`Loading ${value}`);
       _this.loadScene(value);
     });
+    this._gui.add(this, 'autoScaleScene').name('Autoscale Scene');
 
     this._gui.add(this, "IBL", ibl_index).onChange(function (value) {
       console.log(`Loading ${value}`);
@@ -248,12 +251,29 @@ class App {
         _this.three_renderer.setIBL(ibl);
       });
     });
-    
-    this._gui.add(_this.renderer, 'exposure').min(0).max(10).step(0.1).onChange(function (value) {
+
+    this._gui.add(_this.renderer, 'exposure').name('Display Exposure').min(0).max(10).step(0.1).onChange(function (value) {
       _this.three_renderer.setExposure(value);
     });
-    
-    this._gui.add(this, 'pathtracing').onChange((value) => {
+
+    this._gui.add(this, 'autoRotate').name('Auto Rotate').onChange(function (value) {
+      _this.controls.autoRotate = value;
+      _this.renderer.resetAccumulation();
+    });
+
+    this._gui.add(_this.renderer, 'debugMode', this.renderer.debugModes).name('Debug Mode');
+    this._gui.add(_this.renderer, 'tonemapping', this.renderer.tonemappingModes).name('Tonemapping');
+    this._gui.add(_this.renderer, 'enableGamma').name('Gamma');
+
+    this._gui.add(_this.renderer, 'renderScale').name('Render Res X').min(0.1).max(1.0);
+    this._gui.add(this, 'interactionScale').name('Interaction Res X').min(0.1).max(1.0).step(0.1);
+
+    this._gui.add(_this.renderer, 'useIBL').name('Use IBL');
+    this._gui.add(_this.renderer, 'disableBackground').name('Disable Background').onChange((value) => {
+      _this.three_renderer.setDisableBackground(value);
+    });
+
+    this._gui.add(this, 'pathtracing').name('Use Pathtracing').onChange((value) => {
       if (value == false) {
         _this.startRasterizer();
       } else {
@@ -261,50 +281,39 @@ class App {
       }
     });
 
-
-    this._gui.add(this, 'autoRotate').onChange(function (value) {
-      _this.controls.autoRotate = value;
-      _this.renderer.resetAccumulation();
-    });
-
-    this._gui.add(this, 'autoScaleScene');
-    
-    this._gui.add(_this.renderer, 'forceIBLEval');
-    this._gui.add(_this.renderer, 'maxBounces').min(0).max(16).step(1);
-    this._gui.add(_this.renderer, 'debugMode', this.renderer.debugModes);
-    this._gui.add(_this.renderer, 'tonemapping', this.renderer.tonemappingModes);
-    this._gui.add(_this.renderer, 'enableGamma');
-    this._gui.add(_this.renderer, 'useIBL');
-    this._gui.add(_this.renderer, 'renderScale').min(0.1).max(1.0);
-    this._gui.add(this, 'interactionScale').min(0.1).max(1.0).step(0.1);
-    
-    this._gui.add(_this.renderer, 'disableBackground').onChange((value) => {
-      _this.three_renderer.setDisableBackground(value);
-    });
+    this._gui.add(_this.renderer, 'forceIBLEval').name('Force IBL Eval');
+    this._gui.add(_this.renderer, 'maxBounces').name('Bounce Depth').min(0).max(16).step(1);
 
     let reload_obj = {
-      reload: function () {
-        console.log("Reload")
-        _this.loadScene(_this.Scene);
+      reload: () => {
+        console.log("Reload");
+        this.loadScene(this.Scene);
       }
     };
-    this._gui.add(reload_obj, 'reload');
+    this._gui.add(reload_obj, 'reload').name('Reload');
 
     const center_obj = {
-      centerView: function () {
+      centerView: () => {
         console.log("center view");
-        if (_this.controls) {
+        if (this.controls) {
           let center = new THREE.Vector3();
-          _this.sceneBoundingBox.getCenter(center);
-          _this.controls.target = center;
-          _this.controls.update();
-          _this.renderer.resetAccumulation();
+          this.sceneBoundingBox.getCenter(center);
+          this.controls.target = center;
+          this.controls.update();
+          this.renderer.resetAccumulation();
         }
       }
     };
-    this._gui.add(center_obj, 'centerView');
-  }
+    this._gui.add(center_obj, 'centerView').name('Center View');
 
+    // const save_img = {
+    //   save_img: () => {
+    //     console.log("Reload");
+    //     var dataURL = this.canvas.toDataURL('image/png');
+    //   }
+    // };
+    // this._gui.add(save_img, 'save_img').name('Save PNG');
+  }
   // setLookAt(from, at, up) {
   //   this.camera.position.set(from[0] * this.sceneScaleFactor, from[1] * this.sceneScaleFactor, from[2] * this.sceneScaleFactor);
   //   this.camera.up.set(up[0], up[1], up[2]);

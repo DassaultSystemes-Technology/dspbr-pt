@@ -31,6 +31,7 @@ function startRenderer() {
   canvas.height = window.innerHeight;
 
   let renderer = new PathtracingRenderer(canvas, 1.0);
+  renderer.tonemapping = "None";
 
   loader.loadScene(args.gltf_path, false, (scene) => {
     let cameras = [];
