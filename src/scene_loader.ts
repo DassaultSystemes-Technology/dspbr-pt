@@ -2,38 +2,38 @@
 import * as THREE from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { ThreeRenderer } from '../lib/three_renderer';
 
-function cleanupScene(scene) {
-  console.log('Cleaning up scene data...!')
+// function cleanupScene(scene) {
+//   console.log('Cleaning up scene data...!')
 
-  const cleanMaterial = material => {
-    console.log('dispose material!')
-    material.dispose()
+//   const cleanMaterial = material => {
+//     console.log('dispose material!')
+//     material.dispose()
 
-    // dispose textures
-    for (const key of Object.keys(material)) {
-      const value = material[key]
-      if (value && typeof value === 'object' && 'minFilter' in value) {
-        console.log('dispose texture!')
-        value.dispose()
-      }
-    }
-  };
-  scene.traverse(object => {
-    if (!object.isMesh) return
+//     // dispose textures
+//     for (const key of Object.keys(material)) {
+//       const value = material[key]
+//       if (value && typeof value === 'object' && 'minFilter' in value) {
+//         console.log('dispose texture!')
+//         value.dispose()
+//       }
+//     }
+//   };
+//   scene.traverse(object => {
+//     if (!object.isMesh) return
 
-    console.log('dispose geometry!')
-    object.geometry.dispose()
+//     console.log('dispose geometry!')
+//     object.geometry.dispose()
 
-    if (object.material.isMaterial) {
-      cleanMaterial(object.material)
-    } else {
-      // an array of materials
-      for (const material of object.material) cleanMaterial(material)
-    }
-  });
-}
-
+//     if (object.material.isMaterial) {
+//       cleanMaterial(object.material)
+//     } else {
+//       // an array of materials
+//       for (const material of object.material) cleanMaterial(material)
+//     }
+//   });
+// }
 
 export function loadSceneFromBlobs(urlList, autoscale, callback) {
   var manager = new THREE.LoadingManager();
@@ -93,7 +93,7 @@ export function loadScene(url, autoscale, callback, manager?) {
       throw new Error(
         'This model contains no scene, and cannot be viewed here. However,'
         + ' it may contain individual 3D resources.'
-      ); 
+      );
     }
 
     var bbox = new THREE.Box3().setFromObject(scene);
@@ -108,6 +108,10 @@ export function loadScene(url, autoscale, callback, manager?) {
 
     // scene.matrixAutoUpdate = false;
     scene.updateMatrixWorld();
-    callback(scene);
+    callback(gltf);
+  }, (xhr) => {
+    console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+  }, (error) => {
+    console.log('Error loading glTF scene: ' + error);
   });
 }

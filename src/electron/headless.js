@@ -32,10 +32,12 @@ function startRenderer() {
 
   let renderer = new PathtracingRenderer(canvas, 1.0);
   renderer.tonemapping = "None";
+  renderer.iblRotation = args.ibl_rotation;
+  renderer.maxBounces = args.bounces;
 
-  loader.loadScene(args.gltf_path, false, (scene) => {
+  loader.loadScene(args.gltf_path, false, (gltf) => {
     let cameras = [];
-    scene.traverse((child) => {
+    gltf.scene.traverse((child) => {
       if (child.isCamera) {
         child.position.applyMatrix4(child.matrixWorld);
         cameras.push(child);
@@ -50,7 +52,7 @@ function startRenderer() {
       this.camera.position.set(0, 0, 3);
     }
 
-    renderer.setScene(scene, () => {
+    renderer.setScene(gltf, () => {
      if (args.ibl === "None") {
         renderer.render(camera, args.samples, () => { }, (result) => {
           console.log("icpRenderer Ready");

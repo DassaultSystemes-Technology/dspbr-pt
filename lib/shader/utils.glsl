@@ -68,6 +68,10 @@ mat3 get_onb(vec3 n, vec3 t) {
     return mat3(tt, b, n);
 }
 
+vec3 flip(vec3 wi, vec3 n) {
+  return wi + 2.0*n*dot(-wi,n);
+}
+
 // (float3, float3) get_onb(float3 n, float3 t) {
 //   b = normalize(cross(n, t));
 //   t = cross(b, n);

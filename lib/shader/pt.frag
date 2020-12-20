@@ -32,8 +32,8 @@ uniform vec3 u_vec3_CameraPosition;
 uniform vec2 u_vec2_InverseResolution;
 uniform mat4 u_mat4_ViewMatrix;
 uniform int u_int_maxBounces;
-uniform bool u_bool_hasTangents;
 uniform bool u_bool_forceIBLEval;
+uniform float u_float_iblRotation;
 
 uniform sampler2D u_sampler2D_PreviousTexture;
 
@@ -47,7 +47,7 @@ uniform sampler2D u_samplerCube_EnvMap;
 
 uniform int u_int_DebugMode;
 uniform bool u_bool_UseIBL;
-uniform bool u_bool_DisableBackground;
+uniform bool u_bool_ShowBackground;
 
 layout(location = 0) out vec4 out_FragColor;
 
@@ -183,7 +183,7 @@ void fillRenderState(const in Ray r, const in HitInfo hit, out RenderState rs) {
 
    fix_normals(rs.normal, rs.geometryNormal, rs.wi);
 
-    if(u_bool_hasTangents) {
+    if(hasTangent(triIdx)) {
         rs.tangent = normalize(calculateInterpolatedTangent(triIdx, hit.uv));
     }
     else {
@@ -210,7 +210,8 @@ int sampleBSDFBounce(inout RenderState rs, inout vec3 pathWeight, out uint event
         vec3 sample_weight = vec3(0);
 
         vec3 wi = y_to_z_up * rs.wi;
-        vec3 wo = dspbr_sample(rs.closure, wi, vec3(rng_NextFloat(), rng_NextFloat(), rng_NextFloat()), sample_weight, sample_pdf, eventType);
+        vec3 wo = dspbr_sample(rs.closure, wi, vec3(rng_NextFloat(), rng_NextFloat(), rng_NextFloat()), 
+          sample_weight, sample_pdf, eventType);
         rs.wo = transpose(y_to_z_up) * wo;
 
         if(sample_pdf > EPS_PDF) {
@@ -279,7 +280,7 @@ float computePhi(vec3 dir) {
 
 vec2 mapDirToUV(vec3 dir) {
     float theta = computeTheta(dir);
-    float u = computePhi(dir) / (2.0 * PI);
+    float u = (computePhi(dir)+ u_float_iblRotation) / (2.0 * PI);
     float v = (PI-theta) / PI;
     //pdf = 1.0 / (2.0 * PI * PI * max(EPS_COS, sin(theta)));
     return vec2(u, v);
@@ -319,7 +320,7 @@ vec4 traceDebug(const Ray r) {
         color = vec4(contrib, 1.0);
     }    
     else { // direct background hit
-        if(!u_bool_DisableBackground) {
+        if(u_bool_ShowBackground) {
             color = vec4(texture(u_samplerCube_EnvMap, mapDirToUV(r.dir)).xyz, 1.0);
         } 
     }
@@ -379,18 +380,18 @@ vec4 trace(const Ray r) {
                 contrib += sampleIBL(rs.wo) * pathWeight;
                 break;
             }
-
-//             // all clear - next sample has properly been generated and intersection was found. Render state contains new intersection info.
+            // All clear. next sample has properly been generated and intersection was found. 
+            // Render state contains new intersection info.
             i++;
         }
 
         color = vec4(contrib, 1.0);
     } 
     else { // direct background hit
-        if(u_bool_DisableBackground) {
-            color = vec4(0,0,0,0);
+        if(u_bool_ShowBackground) {
+          color = vec4(sampleIBL(r.dir), 1.0);
         } else {
-            color = vec4(sampleIBL(r.dir), 1.0);
+          color = vec4(0, 0, 0, 0);
         }
     }
 
@@ -398,7 +399,7 @@ vec4 trace(const Ray r) {
 }
 
 
-Ray calcuateRay(float r0, float r1) {
+Ray calcuateViewRay(float r0, float r1) {
     // box filter
     vec2 pixelOffset = (vec2(r0, r1) * 2.0) * u_vec2_InverseResolution;
 
@@ -416,7 +417,7 @@ Ray calcuateRay(float r0, float r1) {
 void main() {
     init_RNG(u_int_FrameCount);
 
-    Ray r = calcuateRay(rng_NextFloat(), rng_NextFloat());
+    Ray r = calcuateViewRay(rng_NextFloat(), rng_NextFloat());
     
     vec4 color = trace(r);
 

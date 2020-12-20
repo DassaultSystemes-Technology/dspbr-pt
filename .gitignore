@@ -1,9 +1,10 @@
-node_modules
-dist
-.cache
+node_modules/
+dist/
+.cache/
 *.png
 package 
-EnterprisePBRShadingModel
-validation
+EnterprisePBRShadingModel/
+validation/
 debug.log
 .vscode/settings.json
+tmp/

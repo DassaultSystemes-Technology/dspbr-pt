@@ -12,38 +12,42 @@ export class ThreeRenderer {
 
   private isRendering = false;
 
-  setExposure(val) {
+  public set exposure(val) {
     this.renderer.toneMappingExposure = val;
   }
+  public get exposure() {
+    return this.renderer.toneMappingExposure;
+  }
 
-  setDisableBackground(flag) {
-    if (flag) {
+  showBackground(flag) {
+    if (!flag) {
       this.scene.background = new THREE.Color(0, 0, 0);
     } else {
       this.scene.background = this.ibl;
     }
   }
 
-  setUseIBL(flag) {
-    if (flag) {
+  public useIBL(val) {
+    if (val) {
       this.scene.environment = this.ibl;
     } else {
       this.scene.environment = null;
     }
   }
-
-
-  constructor(canvas: HTMLCanvasElement | undefined, renderPixelRatio: number = 1.0) {
+ 
+  constructor(canvas: HTMLCanvasElement | undefined, pixelRatio: number = 1.0) {
     this.canvas = canvas !== undefined ? canvas : document.createElementNS('http://www.w3.org/1999/xhtml', 'canvas');
     this.gl = this.canvas.getContext('webgl2');
 
     //THREE.Object3D.DefaultUp = new THREE.Vector3(0,0,1);
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, context: this.gl, powerPreference: "high-performance", alpha: true });
-    this.renderer.setPixelRatio(1.0);
+    this.renderer.setPixelRatio(pixelRatio);
     this.renderer.setSize(canvas.width, canvas.height);
     this.renderer.extensions.get('EXT_color_buffer_float');
     this.renderer.extensions.get('EXT_color_buffer_half_float');
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping; //THREE.NoToneMapping
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping; 
+    // this.renderer.toneMapping = THREE.NoToneMapping
+    // this.renderer.outputEncoding = THREE.sRGBEncoding;
     this.renderer.outputEncoding = THREE.GammaEncoding;
     this.renderer.physicallyCorrectLights = true;
 
@@ -68,7 +72,7 @@ export class ThreeRenderer {
         return;
       }
 
-      this.renderer.render(this.scene, camera);
+      this.renderer.render(_this.scene, camera);
 
       if (frameFinishedCB !== undefined)
         frameFinishedCB();
@@ -79,7 +83,7 @@ export class ThreeRenderer {
   }
 
   resize(width: number, height: number) {
-    this.renderer.setPixelRatio(1.0);
+    // this.renderer.setPixelRatio(1.0);
     this.renderer.setSize(width, height);
   }
 
@@ -91,12 +95,13 @@ export class ThreeRenderer {
     this.ibl = this.pmremGenerator.fromEquirectangular(texture).texture;
 
     this.scene.background = this.ibl;
-    this.scene.environment = this.ibl;
+    this.scene.environment  = this.ibl;
   }
 
   setScene(scene, callback?) {
     // console.log("GL Renderer state before load:\n", this.renderer.info);
     this.scene = scene;
+
     if (callback !== undefined) {
       callback()
     }
