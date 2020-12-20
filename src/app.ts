@@ -133,7 +133,7 @@ class App {
     this.canvas.addEventListener('drop', function (e) {
       e.preventDefault();
       e.stopPropagation();
-
+   
       if (e.dataTransfer.files.length == 1 &&
         getFileExtension(e.dataTransfer.files[0].name) == "hdr") {
         console.log("loading HDR...");
@@ -143,14 +143,14 @@ class App {
           _this.three_renderer.setIBL(ibl);
         });
       } else {
-        loader.loadSceneFromBlobs(e.dataTransfer.files, _this.autoScaleScene, function (scene) {
+        loader.loadSceneFromBlobs(e.dataTransfer.files, _this.autoScaleScene, function (gltf) {
           loader.loadIBL(_this.IBL, (ibl) => {
-            _this.sceneBoundingBox = new THREE.Box3().setFromObject(scene);
+            _this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
             _this.renderer.setIBL(ibl);
-            _this.renderer.setScene(scene, () => {
+            _this.renderer.setScene(gltf, () => {
               _this.startPathtracing();
             })
-            _this.three_renderer.setScene(scene, () => {
+            _this.three_renderer.setScene(gltf.scene, () => {
               _this.three_renderer.setIBL(ibl);
             });
           });
@@ -210,16 +210,16 @@ class App {
   }
 
   private loadScene(url) {
-    loader.loadScene(url, this.autoScaleScene, (scene) => {
+    loader.loadScene(url, this.autoScaleScene, (gltf) => {
       loader.loadIBL(this.IBL, (ibl) => {
-        this.sceneBoundingBox = new THREE.Box3().setFromObject(scene);
+        this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
         this.renderer.setIBL(ibl);
-        this.renderer.setScene(scene, () => {
+        this.renderer.setScene(gltf, () => {
           if (this.pathtracing)
             this.startPathtracing();
         })
 
-        this.three_renderer.setScene(scene, () => {
+        this.three_renderer.setScene(gltf.scene, () => {
           this.three_renderer.setIBL(ibl);
         });
 
@@ -238,6 +238,15 @@ class App {
     this._gui = new GUI();
     this._gui.domElement.classList.add("hidden");
     this._gui.width = 300;
+    
+    this._gui.add(this, 'pathtracing').name('Use Pathtracing').onChange((value) => {
+      if (value == false) {
+        _this.startRasterizer();
+      } else {
+        _this.startPathtracing();
+      }
+    });
+
     this._gui.add(this, "Scene", scene_index).onChange(function (value) {
       console.log(`Loading ${value}`);
       _this.loadScene(value);
@@ -251,9 +260,10 @@ class App {
         _this.three_renderer.setIBL(ibl);
       });
     });
+    this._gui.add(_this.renderer, 'iblRotation').name('IBL Rotation').min(-180.0).max(180.0).step(0.1);
 
-    this._gui.add(_this.renderer, 'exposure').name('Display Exposure').min(0).max(10).step(0.1).onChange(function (value) {
-      _this.three_renderer.setExposure(value);
+    this._gui.add(_this.renderer, 'exposure').name('Display Exposure').min(0).max(3).step(0.01).onChange(function (value) {
+      _this.three_renderer.exposure  = value;
     });
 
     this._gui.add(this, 'autoRotate').name('Auto Rotate').onChange(function (value) {
@@ -268,21 +278,16 @@ class App {
     this._gui.add(_this.renderer, 'renderScale').name('Render Res X').min(0.1).max(1.0);
     this._gui.add(this, 'interactionScale').name('Interaction Res X').min(0.1).max(1.0).step(0.1);
 
-    this._gui.add(_this.renderer, 'useIBL').name('Use IBL');
-    this._gui.add(_this.renderer, 'disableBackground').name('Disable Background').onChange((value) => {
-      _this.three_renderer.setDisableBackground(value);
+    this._gui.add(_this.renderer, 'useIBL').name('Use IBL').onChange((value) => {
+      _this.three_renderer.useIBL(value);
     });
-
-    this._gui.add(this, 'pathtracing').name('Use Pathtracing').onChange((value) => {
-      if (value == false) {
-        _this.startRasterizer();
-      } else {
-        _this.startPathtracing();
-      }
+    this._gui.add(_this.renderer, 'showBackground').name('Show Background').onChange((value) => {
+      _this.three_renderer.showBackground(value);
     });
 
     this._gui.add(_this.renderer, 'forceIBLEval').name('Force IBL Eval');
-    this._gui.add(_this.renderer, 'maxBounces').name('Bounce Depth').min(0).max(16).step(1);
+    this._gui.add(_this.renderer, 'maxBounces').name('Bounce Depth').min(0).max(32).step(1);
+    this._gui.add(_this.renderer, 'sheenG', this.renderer.sheenGModes).name('Sheen G');
 
     let reload_obj = {
       reload: () => {

@@ -88,38 +88,24 @@ bool intersectTriangle(const in Ray r, in vec3 p0, in vec3 p1, in vec3 p2, const
 }
 
 uint getMaterialIndex(const in uint triIndex) {
-    ivec2 idx = getStructParameterTexCoord(triIndex, 0u, 12u);
+    ivec2 idx = getStructParameterTexCoord(triIndex, 0u, TRIANGLE_STRIDE);
     return uint(texelFetch(u_sampler2D_TriangleData, idx, 0).w);
 }
 
 void getSceneTriangle(const in uint index, out vec3 p0, out vec3 p1, out vec3 p2) {
-    ivec2 idx0 = getStructParameterTexCoord(index, 0u, 12u);
-    ivec2 idx1 = getStructParameterTexCoord(index, 4u, 12u);
-    ivec2 idx2 = getStructParameterTexCoord(index, 8u, 12u);
+    ivec2 idx0 = getStructParameterTexCoord(index, POSITION_OFFSET, TRIANGLE_STRIDE);
+    ivec2 idx1 = getStructParameterTexCoord(index, POSITION_OFFSET + VERTEX_STRIDE, TRIANGLE_STRIDE);
+    ivec2 idx2 = getStructParameterTexCoord(index, POSITION_OFFSET + 2u*VERTEX_STRIDE, TRIANGLE_STRIDE);
 
     p0 = texelFetch(u_sampler2D_TriangleData, idx0, 0).xyz;
     p1 = texelFetch(u_sampler2D_TriangleData, idx1, 0).xyz;
     p2 = texelFetch(u_sampler2D_TriangleData, idx2, 0).xyz;
 }
 
-vec3 calculateInterpolatedTangent(const in uint index, const in vec2 uv) {
-    ivec2 idx0 = getStructParameterTexCoord(index, 3u, 12u);
-    ivec2 idx1 = getStructParameterTexCoord(index, 7u, 12u);
-    ivec2 idx2 = getStructParameterTexCoord(index, 11u, 12u);
-
-    mat3 tangents;
-    tangents[0] = texelFetch(u_sampler2D_TriangleData, idx0, 0).xyz;
-    tangents[1] = texelFetch(u_sampler2D_TriangleData, idx1, 0).xyz;
-    tangents[2] = texelFetch(u_sampler2D_TriangleData, idx2, 0).xyz;
-
-    return normalize((1.0 - uv.x - uv.y) * tangents[0] + uv.x * tangents[1] + uv.y * tangents[2]);
-}
-
-
 vec3 calculateInterpolatedNormal(const in uint index, const in vec2 uv) {
-    ivec2 idx0 = getStructParameterTexCoord(index, 1u, 12u);
-    ivec2 idx1 = getStructParameterTexCoord(index, 5u, 12u);
-    ivec2 idx2 = getStructParameterTexCoord(index, 9u, 12u);
+    ivec2 idx0 = getStructParameterTexCoord(index, NORMAL_OFFSET, TRIANGLE_STRIDE);
+    ivec2 idx1 = getStructParameterTexCoord(index, NORMAL_OFFSET + VERTEX_STRIDE, TRIANGLE_STRIDE);
+    ivec2 idx2 = getStructParameterTexCoord(index, NORMAL_OFFSET + 2u*VERTEX_STRIDE, TRIANGLE_STRIDE);
 
     mat3 normals;
     normals[0] = texelFetch(u_sampler2D_TriangleData, idx0, 0).xyz;
@@ -130,23 +116,40 @@ vec3 calculateInterpolatedNormal(const in uint index, const in vec2 uv) {
 }
 
 vec2 calculateInterpolatedUV(const in uint index, const in vec2 hit_uv, int set) {
-    ivec2 idx0 = getStructParameterTexCoord(index, 2u, 12u);
-    ivec2 idx1 = getStructParameterTexCoord(index, 6u, 12u);
-    ivec2 idx2 = getStructParameterTexCoord(index, 10u, 12u);
+    ivec2 idx0 = getStructParameterTexCoord(index, UV_OFFSET, TRIANGLE_STRIDE);
+    ivec2 idx1 = getStructParameterTexCoord(index, UV_OFFSET + VERTEX_STRIDE, TRIANGLE_STRIDE);
+    ivec2 idx2 = getStructParameterTexCoord(index, UV_OFFSET + 2u*VERTEX_STRIDE, TRIANGLE_STRIDE);
 
-    vec2 uv0, uv1, uv2;
+    vec4 uv0 = texelFetch(u_sampler2D_TriangleData, idx0, 0);
+    vec4 uv1 = texelFetch(u_sampler2D_TriangleData, idx1, 0);
+    vec4 uv2 = texelFetch(u_sampler2D_TriangleData, idx2, 0);
+    
     if(set == 0) {
-        uv0 = texelFetch(u_sampler2D_TriangleData, idx0, 0).xy;
-        uv1 = texelFetch(u_sampler2D_TriangleData, idx1, 0).xy;
-        uv2 = texelFetch(u_sampler2D_TriangleData, idx2, 0).xy;
+        return (1.0 - hit_uv.x - hit_uv.y) * uv0.xy + hit_uv.x * uv1.xy + hit_uv.y * uv2.xy;
     } else {
-        uv0 = texelFetch(u_sampler2D_TriangleData, idx0, 0).zw;
-        uv1 = texelFetch(u_sampler2D_TriangleData, idx1, 0).zw;
-        uv2 = texelFetch(u_sampler2D_TriangleData, idx2, 0).zw;
+        return (1.0 - hit_uv.x - hit_uv.y) * uv0.zw + hit_uv.x * uv1.zw + hit_uv.y * uv2.zw;
     }
-
-    return (1.0 - hit_uv.x - hit_uv.y) * uv0 + hit_uv.x * uv1 + hit_uv.y * uv2;
 }
+
+bool hasTangent(const in uint triIdx) {
+  ivec2 idx0 = getStructParameterTexCoord(triIdx, TANGENT_OFFSET, TRIANGLE_STRIDE);
+  return bool(texelFetch(u_sampler2D_TriangleData, idx0, 0).w);
+}
+
+vec3 calculateInterpolatedTangent(const in uint index, const in vec2 uv) {
+    ivec2 idx0 = getStructParameterTexCoord(index, TANGENT_OFFSET, TRIANGLE_STRIDE);
+    ivec2 idx1 = getStructParameterTexCoord(index, TANGENT_OFFSET + VERTEX_STRIDE, TRIANGLE_STRIDE);
+    ivec2 idx2 = getStructParameterTexCoord(index, TANGENT_OFFSET + 2u*VERTEX_STRIDE, TRIANGLE_STRIDE);
+
+    mat3 tangents;
+    tangents[0] = texelFetch(u_sampler2D_TriangleData, idx0, 0).xyz;
+    tangents[1] = texelFetch(u_sampler2D_TriangleData, idx1, 0).xyz;
+    tangents[2] = texelFetch(u_sampler2D_TriangleData, idx2, 0).xyz;
+
+    return normalize((1.0 - uv.x - uv.y) * tangents[0] + uv.x * tangents[1] + uv.y * tangents[2]);
+}
+
+
 
 bool bvh_IntersectRayBox(const in Ray r, const in float tfar, int pn, out int si, out int ei) {
     int idx_x0 = int(pn*2+0) % int(MAX_TEXTURE_SIZE);

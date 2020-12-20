@@ -17,7 +17,6 @@ import os, glob
 import json
 
 path = "./assets/scenes/"
-
 files = {}
 
 glbs = glob.glob(path + "**/*.glb", recursive=True)
@@ -34,7 +33,7 @@ data_str = json.dumps(files, indent=4)
 data_str = data_str.replace('\\\\', '/')
 print(data_str)
 
-with open(path + 'scene_index.js', 'w') as outfile:
+with open(os.path.join(path,'scene_index.js'), 'w') as outfile:
     outfile.write("var scene_index = ");
     outfile.write(data_str)
     outfile.write(";\n\n")

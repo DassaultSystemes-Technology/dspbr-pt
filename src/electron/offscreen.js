@@ -33,89 +33,107 @@ app.on('ready', () => createWindow(parsedArgs.res[0], parsedArgs.res[1]));
 const outputFile = "output.png";
 
 function parseArguments(args) {
-    const parser = new ArgumentParser();
+  const parser = new ArgumentParser();
 
-    parser.addArgument(
-        'gltf_path',
-        {
-            nargs: "?",
-            help: "The path of the glTF file"
-        }
-    );
+  parser.addArgument(
+    'gltf_path',
+    {
+      nargs: "?",
+      help: "The path of the glTF file"
+    }
+  );
 
-    parser.addArgument(
-        ["-r", "--res"],
-        {
-            defaultValue: [1024, 1024],
-            metavar: ["WIDTH", "HEIGHT"],
-            nargs: 2,
-            type: "int",
-            help: "Dimensions of the output image"
-        }
-    );
+  parser.addArgument(
+    ["-r", "--res"],
+    {
+      defaultValue: [1024, 1024],
+      metavar: ["WIDTH", "HEIGHT"],
+      nargs: 2,
+      type: "int",
+      help: "Dimensions of the output image"
+    }
+  );
 
-    parser.addArgument(
-        ["-s", "--samples"],
-        {
-            defaultValue: 32,
-            type: 'int',
-            help: "Number of samples per pixel."
-        }
-    );
+  parser.addArgument(
+    ["-s", "--samples"],
+    {
+      defaultValue: 32,
+      type: 'int',
+      help: "Number of samples per pixel."
+    }
+  );
 
-    parser.addArgument(
-        '--ibl',
-        {
-            defaultValue: "None",
-            type: 'string',
-            help: 'The environment map path to use for image based lighting',
-        }
-    );
+  parser.addArgument(
+    ["-b", "--bounces"],
+    {
+      defaultValue: 32,
+      type: 'int',
+      help: "Maximum bounce depth. Hard maximum path length for probabilitic path termination."
+    }
+  );
 
-    const parsedArgs = parser.parseArgs(args);
+  parser.addArgument(
+    '--ibl',
+    {
+      defaultValue: "None",
+      type: 'string',
+      help: 'The environment map path to use for image based lighting',
+    }
+  );
 
-    if (parsedArgs.gltf_path === null) {
-        console.log("%s\n", parser.description);
-        console.info("IMPORTANT NOTICE: \n\
+  parser.addArgument(
+    '--ibl-rotation',
+    {
+      defaultValue: 0.0,
+      type: 'float',
+      help: 'The environment map rotation for image based lighting',
+    }
+  );
+
+  const parsedArgs = parser.parseArgs(args);
+
+  if (parsedArgs.gltf_path === null) {
+    console.log("%s\n", parser.description);
+    console.info("IMPORTANT NOTICE: \n\
             Add '-- --' to get your arguments through to the tool. \n\
             Example: 'npm run render -- -- --help'");
-        console.error("\nNo gltf_path was given, doing nothing...");
-    }
+    console.error("\nNo gltf_path was given, doing nothing...");
+  }
 
-    return parsedArgs;
+  return parsedArgs;
 }
 
 
 function createWindow(width, height) {
-    const mainWindow = new BrowserWindow({
-        width: width, height: height,
-        webPreferences: {
-            offscreen: true,
-            nodeIntegration: true,
-            webSecurity: false
-        },
-        frame: false 
+  const mainWindow = new BrowserWindow({
+    width: width, height: height,
+    webPreferences: {
+      offscreen: true,
+      nodeIntegration: true,
+      webSecurity: false
+    },
+    frame: false
+  });
+
+  // mainWindow.webContents.openDevTools();
+
+  mainWindow.loadURL(url.format({
+    pathname: path.join(__dirname, "../../dist/headless.html"),
+    protocol: 'file',
+    slashes: true
+  }));
+
+  // In main process.
+  const { ipcMain } = require('electron');
+  ipcMain.on('rendererReady', function () {
+    mainWindow.webContents.capturePage().then(function (img) {
+      fs.writeFile(outputFile, img.toPNG(), (err) => {
+        console.log("Write image");
+        if (err) throw err;
+        console.log("The file has been saved to '%s'", outputFile);
+
+        app.quit();
+      });
     });
-
-      // mainWindow.webContents.openDevTools();
-
-    mainWindow.loadURL(url.format({
-        pathname: path.join(__dirname, "../../dist/headless.html"),
-        protocol: 'file',
-        slashes: true
-    }));
-
-    // In main process.
-    const { ipcMain } = require('electron');
-    ipcMain.on('rendererReady', function () {
-        mainWindow.webContents.capturePage().then(function(img) {
-            fs.writeFile(outputFile, img.toPNG(), (err) => {
-                console.log("Write image");
-                if (err) throw err;
-                console.log("The file has been saved to '%s'", outputFile);
-
-                app.quit();
-            });
-        });
-    });
+  });
 }
