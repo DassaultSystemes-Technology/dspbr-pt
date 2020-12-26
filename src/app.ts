@@ -119,6 +119,7 @@ class App {
     _this.loadScene(this.Scene);
 
     this.renderer.renderScale = 0.5;
+    // this.renderer.iblRotation = 180.0;
 
     window.addEventListener('resize', () => {
       _this.resize();
@@ -261,6 +262,7 @@ class App {
       });
     });
     this._gui.add(_this.renderer, 'iblRotation').name('IBL Rotation').min(-180.0).max(180.0).step(0.1);
+    this._gui.add(_this.renderer, 'iblSampling').name('IBL Sampling');
 
     this._gui.add(_this.renderer, 'exposure').name('Display Exposure').min(0).max(3).step(0.01).onChange(function (value) {
       _this.three_renderer.exposure  = value;
@@ -275,8 +277,8 @@ class App {
     this._gui.add(_this.renderer, 'tonemapping', this.renderer.tonemappingModes).name('Tonemapping');
     this._gui.add(_this.renderer, 'enableGamma').name('Gamma');
 
-    this._gui.add(_this.renderer, 'renderScale').name('Render Res X').min(0.1).max(1.0);
-    this._gui.add(this, 'interactionScale').name('Interaction Res X').min(0.1).max(1.0).step(0.1);
+    this._gui.add(_this.renderer, 'renderScale').name('Render Res').min(0.1).max(1.0);
+    this._gui.add(this, 'interactionScale').name('Interaction Res').min(0.1).max(1.0).step(0.1);
 
     this._gui.add(_this.renderer, 'useIBL').name('Use IBL').onChange((value) => {
       _this.three_renderer.useIBL(value);

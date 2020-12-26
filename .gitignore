@@ -4,7 +4,7 @@ dist/
 *.png
 package 
 EnterprisePBRShadingModel/
-validation/
+validation*/
 debug.log
 .vscode/settings.json
 tmp/

@@ -53,7 +53,7 @@ class MaterialData {
   attenuationColor = [1.0, 1.0, 1.0];
 
   subsurfaceColor = [1.0, 1.0, 1.0];
-  thinWalled = 0;
+  thinWalled = 1;
 
   translucency = 0.0;
   alphaCutoff = 0.0;
@@ -161,7 +161,7 @@ export class PathtracingRenderer {
   }
 
   public tonemappingModes = ["None", "Reinhard", "Uncharted2", "OptimizedCineon", "AcesFilm"];
-  private _tonemapping: TonemappingMode = "AcesFilm";
+  private _tonemapping: TonemappingMode = "None";
   public get tonemapping() {
     return this._tonemapping;
   }
@@ -244,6 +244,14 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
+  private _iblSampling = false;
+  public get iblSampling() {
+    return this._iblSampling;
+  }
+  public set iblSampling(val) {
+    this._iblSampling = val;
+    this.resetAccumulation();
+  }
 
   private _pixelRatio = 1.0;
   private _frameCount = 1;
@@ -335,6 +343,8 @@ export class PathtracingRenderer {
         this._useIBL);
       gl.uniform1f(gl.getUniformLocation(this.ptProgram, "u_float_iblRotation"),
         this._iblRotation);
+      gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_bool_iblSampling"),
+        this._iblSampling);
       gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_bool_ShowBackground"),
         this._showBackground);
       gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_int_maxBounces"),
@@ -661,7 +671,7 @@ export class PathtracingRenderer {
       }
       if ('KHR_materials_volume' in extensions) {
         let ext = extensions["KHR_materials_volume"];
-        matInfo.thinWalled = 0;
+        matInfo.thinWalled = get_param("thickness", ext, 0.0) > 0.0 ? 0 : 1;
         matInfo.attenuationColor = get_param("attenuationColor", ext, matInfo.attenuationColor);
         matInfo.attenuationDistance = get_param("attenuationDistance", ext, matInfo.attenuationDistance);
         matInfo.subsurfaceColor = get_param("subsurfaceColor", ext, matInfo.subsurfaceColor);
@@ -1022,6 +1032,8 @@ export class PathtracingRenderer {
         data
       );
       gl.bindTexture(gl.TEXTURE_2D_ARRAY, null);
+
+      console.log("Create texture array: ${ texList[0].image.width} x ${ texList[0].image.height} x ${ texList.length}")
 
       this.pathtracingTexturesArrays[`u_sampler2DArray_MaterialTextures_${i}`] = texArray;
       tex_array_shader_snippet += `uniform sampler2DArray u_sampler2DArray_MaterialTextures_${i};\n`
