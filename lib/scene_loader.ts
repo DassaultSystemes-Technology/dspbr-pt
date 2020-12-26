@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { ThreeRenderer } from '../lib/three_renderer';
+import { LoadingManager } from 'three';
 
 // function cleanupScene(scene) {
 //   console.log('Cleaning up scene data...!')
@@ -35,10 +35,10 @@ import { ThreeRenderer } from '../lib/three_renderer';
 //   });
 // }
 
-export function loadSceneFromBlobs(urlList, autoscale, callback) {
+export function loadSceneFromBlobs(urlList: any, autoscale: boolean, callback: (gltf: any) => void) {
   var manager = new THREE.LoadingManager();
 
-  let blobs = {};
+  let blobs: any = {};
   for (var i = 0; i < urlList.length; i++) {
     let name = urlList[i].name;
     if (getFileExtension(urlList[i].name) !== "gltf" &&
@@ -51,7 +51,7 @@ export function loadSceneFromBlobs(urlList, autoscale, callback) {
 
   // Initialize loading manager with URL callback.
   var objectURLs = [];
-  manager.setURLModifier((url) => {
+  manager.setURLModifier((url: string) => {
     if (url.startsWith("blob"))
       return url;
 
@@ -61,7 +61,7 @@ export function loadSceneFromBlobs(urlList, autoscale, callback) {
     return url;
   });
 
-  function getFileExtension(filename) {
+  function getFileExtension(filename: string) {
     return filename.split('.').pop();
   }
 
@@ -72,7 +72,7 @@ export function loadSceneFromBlobs(urlList, autoscale, callback) {
   }
 }
 
-export function loadIBL(ibl, callback) {
+export function loadIBL(ibl: string, callback: (ibl: any) => void) {
   new RGBELoader()
     .setDataType(THREE.FloatType)
     .load(ibl, function (texture) {
@@ -82,7 +82,7 @@ export function loadIBL(ibl, callback) {
     });
 }
 
-export function loadScene(url, autoscale, callback, manager?) {
+export function loadScene(url: string, autoscale: boolean, callback: (gltf: any) => void, manager?: LoadingManager) {
   var loader = new GLTFLoader(manager);
   loader.load(url, function (gltf) {
 

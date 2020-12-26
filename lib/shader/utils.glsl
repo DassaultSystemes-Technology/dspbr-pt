@@ -23,6 +23,10 @@ float saturate(float val) {
   return clamp(val, 0.0, 1.0);
 }
 
+float saturate_cos(float val) {
+  return clamp(val, EPS_COS, 1.0);
+}
+
 vec3 saturate(vec3 v) {
   return vec3(saturate(v.x), saturate(v.y), saturate(v.z));
 }
@@ -56,7 +60,7 @@ bool refractIt(vec3 i, vec3 n, float inv_eta, out vec3 wo) {
   float cost2 = 1.0 - inv_eta * inv_eta * (1.0 - cosi * cosi);
   vec3 t = inv_eta * i + ((inv_eta * cosi - sqrt(abs(cost2))) * n);
   if (cost2 <= 0.0) {
-    return false; 
+    return false;
   }
   wo = t;
   return true;
@@ -64,7 +68,7 @@ bool refractIt(vec3 i, vec3 n, float inv_eta, out vec3 wo) {
 
 // Bends shading normal n into the direction of the geometry normal ng
 // such that incident direction wi reflected at n does not change
-// hemisphere 
+// hemisphere
 vec3 clamp_normal(vec3 n, vec3 ng, vec3 wi) {
   vec3 ns_new = n;
   vec3 r = reflect(-wi, n); // TODO CHECK
@@ -136,7 +140,7 @@ vec3 fromThetaPhi(float theta, float phi) {
 
 vec2 mapDirToUV(vec3 dir) {
   float theta = computeTheta(dir);
-  float u = (computePhi(dir) + u_float_iblRotation) / (2.0 * PI);
+  float u = (computePhi(dir)) / (2.0 * PI);
   float v = (PI - theta) / PI;
   // pdf = 1.0 / (2.0 * PI * PI * max(EPS_COS, sin(theta)));
   return vec2(u, v);
@@ -144,16 +148,27 @@ vec2 mapDirToUV(vec3 dir) {
 
 vec3 mapUVToDir(vec2 uv, out float pdf) {
   float theta = (uv.y * PI) - PI;
-  float phi = (uv.x * (2.0f * PI)) - u_float_iblRotation;
+  float phi = (uv.x * (2.0f * PI));
   pdf = 1.0 / (2.0 * PI * PI * max(EPS_COS, sin(theta)));
   return fromThetaPhi(theta, phi);
 }
 
 vec3 sampleIBL(in vec3 dir) {
+  vec3 sampleDir = mat3(cos(u_float_iblRotation), 0.0, sin(u_float_iblRotation), 0.0, 1.0, 0.0,
+                        -sin(u_float_iblRotation), 0.0, cos(u_float_iblRotation)) *
+                   dir;
   if (u_bool_UseIBL) {
-    return texture(u_samplerCube_EnvMap, mapDirToUV(dir)).xyz;
+    return texture(u_samplerCube_EnvMap, mapDirToUV(sampleDir)).xyz;
   }
   return vec3(0);
+}
+
+vec3 sampleHemisphereCosine(vec2 uv, out float pdf) {
+  float phi = uv.y * 2.0 * PI;
+  float cos_theta = sqrt(1.0 - uv.x);
+  float sin_theta = sqrt(1.0 - cos_theta * cos_theta);
+  pdf = cos_theta * ONE_OVER_PI;
+  return vec3(cos(phi) * sin_theta, sin(phi) * sin_theta, cos_theta);
 }
 
 // mat3 get_onb2(vec3 n) {
