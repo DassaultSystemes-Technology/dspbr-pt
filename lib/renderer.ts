@@ -16,7 +16,8 @@
 import * as THREE from 'three';
 import * as glu from './gl_utils';
 import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { SimpleTriangleBVH } from './bvh.js';
+import { SimpleTriangleBVH } from './bvh';
+export { PerspectiveCamera} from 'three';
 
 class MaterialData {
   albedo = [1.0, 1.0, 1.0];
@@ -96,19 +97,19 @@ type TonemappingMode = "None" | "Reinhard" | "Uncharted2" | "OptimizedCineon" | 
 type SheenMode = "Charlie" | "Ashikhmin";
 
 var fileLoader = new THREE.FileLoader();
-function filePromiseLoader(url, onProgress?) {
-  return new Promise<string>((resolve, reject) => {
+function filePromiseLoader(url: string, onProgress?: () => void) {
+  return new Promise<string | ArrayBuffer>((resolve, reject) => {
     fileLoader.load(url, resolve, onProgress, reject);
   });
 }
 
-function flattenArray(arr, result = []) {
+function flattenArray(arr: any, result: number[] = []) {
   for (let i = 0, length = arr.length; i < length; i++) {
-    const value = arr[i];
+    const value: any = arr[i];
     if (Array.isArray(value)) {
       flattenArray(value, result);
     } else {
-      result.push(value);
+      result.push(<number>value);
     }
   }
   return result;
@@ -123,23 +124,22 @@ export class PathtracingRenderer {
   private texArrayList: any[] = [];
   private texArrayDict: { [idx: string]: any; } = {};
 
-  private ibl: WebGLTexture;
-  private renderBuffer: WebGLTexture;
-  private copyBuffer: WebGLTexture;
-  private copyFbo: WebGLFramebuffer;
-  private fbo: WebGLFramebuffer;
-  private quadVao: WebGLVertexArrayObject;
-  private ptProgram: WebGLProgram;
-  private copyProgram: WebGLProgram;
-  private displayProgram: WebGLProgram;
-  private quadVertexBuffer: WebGLBuffer;
+  private ibl: WebGLTexture | null = null;
+  private renderBuffer: WebGLTexture | null = null;
+  private copyBuffer: WebGLTexture | null = null;
+  private copyFbo: WebGLFramebuffer | null = null;
+  private fbo: WebGLFramebuffer | null = null;
+  private quadVao: WebGLVertexArrayObject | null = null;
+  private ptProgram: WebGLProgram | null = null;
+  private copyProgram: WebGLProgram | null = null;
+  private displayProgram: WebGLProgram | null = null;
+  private quadVertexBuffer: WebGLBuffer | null = null;
 
-  private pathtracingDataTextures = {};
-  private pathtracingTexturesArrays = {};
+  private pathtracingDataTextures: { [k: string]: WebGLTexture | null } = {};
+  private pathtracingTexturesArrays: { [k: string]: WebGLTexture | null } = {};
 
-  private renderRes: [number, number];
-  private displayRes: [number, number];
-
+  private renderRes: [number, number] = [0, 0];
+  private displayRes: [number, number] = [0, 0];
 
   private _exposure = 1.0;
   public get exposure() {
@@ -276,7 +276,7 @@ export class PathtracingRenderer {
     this._frameCount = 1;
   }
 
-  resize(width, height) {
+  resize(width: number, height: number) {
     this._isRendering = false;
     this.displayRes = [width, height];
     let scale = this._pixelRatio * this._renderScale;
@@ -292,7 +292,7 @@ export class PathtracingRenderer {
     this._isRendering = false;
   };
 
-  render(camera: THREE.PerspectiveCamera, num_samples, frameFinishedCB, renderingFinishedCB) {
+  render(camera: THREE.PerspectiveCamera, num_samples: number, frameFinishedCB: (frameCount: number) => void, renderingFinishedCB: () => void) {
     if (camera instanceof THREE.Camera === false) {
       console.error('PathtracingRenderer.render: camera is not an instance of THREE.Camera.');
       return;
@@ -301,7 +301,6 @@ export class PathtracingRenderer {
     this._isRendering = true;
     this.resetAccumulation();
 
-    let _this = this;
     let renderFrame = () => {
       if (!this._isRendering) {
         return;
@@ -385,7 +384,7 @@ export class PathtracingRenderer {
       gl.uniform1f(gl.getUniformLocation(this.displayProgram, "exposure"), this._exposure);
       gl.uniform1i(gl.getUniformLocation(this.displayProgram, "gamma"), this._enableGamma);
       gl.uniform1i(gl.getUniformLocation(this.displayProgram, "tonemappingMode"),
-        this.tonemappingModes.indexOf(this._tonemapping)));
+        this.tonemappingModes.indexOf(this._tonemapping));
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       gl.bindTexture(gl.TEXTURE_2D, null);
 
@@ -438,7 +437,7 @@ export class PathtracingRenderer {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
 
-  async private initRenderer() {
+  private async initRenderer() {
     this.resize(Math.floor(this.canvas.width), Math.floor(this.canvas.height));
     let gl = this.gl;
     // glu.printGLInfo(gl);
@@ -468,7 +467,7 @@ export class PathtracingRenderer {
         out_FragColor = texture(tex, uv);
       }`;
 
-    let displayFragmentShader = await filePromiseLoader('./shader/display.frag');
+    let displayFragmentShader = await <Promise<string>>filePromiseLoader('./shader/display.frag');
     this.copyProgram = glu.createProgramFromSource(gl, vertexShader, copyFragmentShader);
     this.displayProgram = glu.createProgramFromSource(gl, vertexShader, displayFragmentShader);
 
@@ -489,10 +488,10 @@ export class PathtracingRenderer {
     gl.bindVertexArray(null);
   }
 
-  private parseTexture(tex) {
+  private parseTexture(tex: THREE.Texture) {
     let texInfo = new TexInfo();
 
-    let findTextureInList = (tex, texList) => {
+    let findTextureInList = (tex: THREE.Texture, texList: THREE.Texture[]) => {
       for (let i = 0; i < texList.length; i++) {
         if (tex.uuid === texList[i].uuid)
           return i;
@@ -526,7 +525,7 @@ export class PathtracingRenderer {
   }
 
 
-  private async parseMaterial(mat: THREE.MeshPhysicalMaterial, materialBuffer: any[], materialTextureInfoBuffer: any[]) {
+  private async parseMaterial(mat: THREE.MeshPhysicalMaterial) {
     let matInfo = new MaterialData();
     let matTexInfo = new MaterialTextureInfo();
 
@@ -573,7 +572,7 @@ export class PathtracingRenderer {
       matTexInfo.transmissionTexture = this.parseTexture(mat.transmissionMap);
     }
 
-    let setTextureTransformFromExt = (texInfo, ext) => {
+    let setTextureTransformFromExt = (texInfo: TexInfo, ext: any) => {
       if ("KHR_texture_transform" in ext.extensions) {
         let transform = ext.extensions["KHR_texture_transform"];
         if ("offset" in transform)
@@ -585,7 +584,7 @@ export class PathtracingRenderer {
 
     if ("gltfExtensions" in mat.userData) {
 
-      let get_param = function (name, obj, default_value) {
+      let get_param = function (name: string, obj: any, default_value: any) {
         return (name in obj) ? obj[name] : default_value;
       };
 
@@ -639,14 +638,14 @@ export class PathtracingRenderer {
 
         if ("sheenColorTexture" in ext) {
           await this._gltf.parser.getDependency('texture', ext.sheenColorTexture.index)
-            .then((tex) => {
+            .then((tex: THREE.Texture) => {
               matTexInfo.sheenColorTexture = this.parseTexture(tex);
               setTextureTransformFromExt(matTexInfo.sheenColorTexture, ext.sheenColorTexture);
             });
         }
         if ("sheenRoughnessTexture" in ext) {
           await this._gltf.parser.getDependency('texture', ext.sheenRoughnessTexture.index)
-            .then((tex) => {
+            .then((tex: THREE.Texture) => {
               matTexInfo.sheenRoughnessTexture = this.parseTexture(tex);
               setTextureTransformFromExt(matTexInfo.sheenRoughnessTexture, ext.sheenRoughnessTexture);
             });
@@ -685,11 +684,10 @@ export class PathtracingRenderer {
       }
     }
 
-    materialBuffer.push(Object.values(matInfo));
-    materialTextureInfoBuffer.push(Object.values(matTexInfo));
+    return [matInfo, matTexInfo];
   }
 
-  setIBL(texture) {
+  setIBL(texture: any) {
     let gl = this.gl;
     if (this.ibl !== undefined)
       this.gl.deleteTexture(this.ibl);
@@ -708,7 +706,7 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
-  async setScene(gltf, callback?) {
+  async setScene(gltf: any, callback?: () => void) {
     this.stopRendering();
 
     if (!gltf.scene) {
@@ -729,7 +727,7 @@ export class PathtracingRenderer {
   }
 
   // Initializes all necessary pathtracing related data structures from three scene
-  private async createPathTracingScene(scene) {
+  private async createPathTracingScene(scene: any) {
     console.time("Inititialized path-tracer");
 
     this.texArrayDict = {};
@@ -740,21 +738,21 @@ export class PathtracingRenderer {
     }
     this.texArrayList = [];
 
-    let lights = [];
-    let meshes = [];
-    let materialBuffer = [];
-    let materialTextureInfoBuffer = [];
-    let triangleMaterialMarkers = [];
-    let materials = [];
+    let lights: Light[] = [];
+    let meshes: THREE.Mesh[] = [];
+    let materialBuffer: MaterialData[] = [];
+    let materialTextureInfoBuffer: MaterialTextureInfo[] = [];
+    let triangleMaterialMarkers: number[] = [];
+    let materials: THREE.MeshPhysicalMaterial[] = [];
 
-    scene.traverse((child) => {
+    scene.traverse((child: any) => {
       if (child.isMesh || child.isLight) {
 
         if (child.isMesh) {
           if (child.material.length > 0) {
             materials.push(child.material[0]);
           } else {
-            materials.push(child.material;
+            materials.push(child.material);
           }
 
           if (child.geometry.groups.length > 0) {
@@ -783,21 +781,23 @@ export class PathtracingRenderer {
     });
 
     for (let m in materials) {
-      await this.parseMaterial(materials[m], materialBuffer, materialTextureInfoBuffer);
+      const [matInfo, matTexInfo] = await this.parseMaterial(materials[m]);
+      materialBuffer.push(<MaterialData>matInfo);
+      materialTextureInfoBuffer.push(<MaterialTextureInfo>matTexInfo);
     }
 
-    var flattenedMeshList = [].concat.apply([], meshes);
-    await this.prepareDataBuffers(flattenedMeshList, lights, materialBuffer, materialTextureInfoBuffer, triangleMaterialMarkers);
+    //var flattenedMeshList = [].concat.apply([], meshes);
+    await this.prepareDataBuffers(meshes, lights, materialBuffer, materialTextureInfoBuffer, triangleMaterialMarkers);
 
     console.timeEnd("Inititialized path-tracer");
   };
 
-  private async prepareDataBuffers(meshList, lightList, materialBuffer, materialTextureInfoBuffer, triangleMaterialMarkers) {
+  private async prepareDataBuffers(meshList: THREE.Mesh[], lightList: Light[], materialBuffer: MaterialData[], materialTextureInfoBuffer: MaterialTextureInfo[], triangleMaterialMarkers: number[]) {
     let gl = this.gl;
 
-    let geoList = [];
+    let geoList: THREE.BufferGeometry[] = [];
     for (let i = 0; i < meshList.length; i++) {
-      let geo = meshList[i].geometry.clone();
+      let geo: THREE.BufferGeometry = <THREE.BufferGeometry>meshList[i].geometry.clone();
       geo.applyMatrix4(meshList[i].matrixWorld);
 
       // mergeBufferGeometries expect consitent attributes throughout all geometries, otherwise it fails
@@ -873,8 +873,8 @@ export class PathtracingRenderer {
       vpa[i * 12 + 6] = pos[i * 9 + 5];
       vpa[i * 12 + 7] = materialIdx;
 
-      vpa[i * 12 + 8]  = pos[i * 9 + 6];
-      vpa[i * 12 + 9]  = pos[i * 9 + 7];
+      vpa[i * 12 + 8] = pos[i * 9 + 6];
+      vpa[i * 12 + 9] = pos[i * 9 + 7];
       vpa[i * 12 + 10] = pos[i * 9 + 8];
       vpa[i * 12 + 11] = materialIdx;
     }
@@ -886,10 +886,10 @@ export class PathtracingRenderer {
     var combinedMeshBuffer = new Float32Array(total_number_of_triangles * 3 * numFloatsPerVertex);
     for (let i = 0; i < total_number_of_triangles; i++) {
       let srcTriangleIdx = bvh.m_pTriIndices[i];
-      
+
       for (let vertIdx = 0; vertIdx < 3; vertIdx++) {
         let dstIdx = i * numFloatsPerVertex * 3 + vertIdx * numFloatsPerVertex;
-        
+
         // position
         let srcIdx = srcTriangleIdx * 12 + vertIdx * 4;
         combinedMeshBuffer[dstIdx + 0] = vpa[srcIdx];
@@ -933,16 +933,16 @@ export class PathtracingRenderer {
 
     let flatBVHData = bvh.createAndCopyToFlattenedArray_StandardFormat();
 
-    let flatMaterialBuffer = new Float32Array(materialBuffer.flat(Infinity));
-    let flatMaterialTextureInfoBuffer = materialTextureInfoBuffer.flat(Infinity);
-    let valueList = [];
-    for (let i = 0; i < flatMaterialTextureInfoBuffer.length; i++) {
-      let texInfo = flatMaterialTextureInfoBuffer[i];
-      let values = flattenArray(Object.values<any>(texInfo));
-      valueList.push(values);
-    }
+    let flatMaterialParamList = materialBuffer.map((matInfo) => {
+      return Object.values(matInfo);
+    });
 
-    valueList = flattenArray(valueList);
+    let flatTextureParamList = materialTextureInfoBuffer.map(matTexInfo => {
+      let texInfos = Object.values(matTexInfo);
+      return texInfos.map(texInfo => {
+        return flattenArray(Object.values(texInfo));
+      });
+    });
 
     // clear data textures and texture arrays
     for (let t in this.pathtracingTexturesArrays) {
@@ -956,14 +956,14 @@ export class PathtracingRenderer {
         gl.deleteTexture(this.pathtracingDataTextures[t]);
       }
     }
-    this.pathtracingDataTextures = {};
+    this.pathtracingDataTextures = {} as { [k: string]: WebGLTexture | null };
 
     this.pathtracingDataTextures["u_sampler2D_BVHData"] = glu.createDataTexture(gl, flatBVHData);
     this.pathtracingDataTextures["u_sampler2D_TriangleData"] = glu.createDataTexture(gl, combinedMeshBuffer);
-    this.pathtracingDataTextures["u_sampler2D_MaterialData"] = glu.createDataTexture(gl, flatMaterialBuffer);
-    this.pathtracingDataTextures["u_sampler2D_MaterialTexInfoData"] = glu.createDataTexture(gl, new Float32Array(valueList)); // TODO can be byte type
+    this.pathtracingDataTextures["u_sampler2D_MaterialData"] = glu.createDataTexture(gl, new Float32Array(flattenArray(flatMaterialParamList)));
+    this.pathtracingDataTextures["u_sampler2D_MaterialTexInfoData"] = glu.createDataTexture(gl, new Float32Array(flattenArray(flatTextureParamList))); // TODO can be byte type
 
-    let shaderChunks = {};
+    let shaderChunks: { [k: string]: string } = {};
     // single pointlight as static define sufficient for now, need to reduce texture usage :/
     shaderChunks['pathtracing_lights'] = ` `
     if (lightList.length > 0) {
@@ -986,15 +986,19 @@ export class PathtracingRenderer {
     }
 
     // create texture arrays
-    function getImageData(image) {
-      var canvas = document.createElement('canvas');
+    function getImageData(image: ImageBitmap) {
+      const canvas = document.createElement('canvas');
       canvas.width = image.width;
       canvas.height = image.height;
 
-      var context = canvas.getContext('2d');
-      context.drawImage(image, 0, 0);
+      const context = canvas.getContext('2d');
 
-      return context.getImageData(0, 0, image.width, image.height);
+      if (context) {
+        context.drawImage(image, 0, 0);
+        return context.getImageData(0, 0, image.width, image.height);
+      } else {
+        throw Error("Couldn't parse image data from texture");
+      }
     }
 
     // create texture arrays for current scene and
@@ -1033,7 +1037,7 @@ export class PathtracingRenderer {
       );
       gl.bindTexture(gl.TEXTURE_2D_ARRAY, null);
 
-      console.log("Create texture array: ${ texList[0].image.width} x ${ texList[0].image.height} x ${ texList.length}")
+      console.log(`Create texture array: ${texList[0].image.width} x ${texList[0].image.height} x ${texList.length}`)
 
       this.pathtracingTexturesArrays[`u_sampler2DArray_MaterialTextures_${i}`] = texArray;
       tex_array_shader_snippet += `uniform sampler2DArray u_sampler2DArray_MaterialTextures_${i};\n`
@@ -1054,14 +1058,14 @@ export class PathtracingRenderer {
 
     shaderChunks['pathtracing_tex_array_lookup'] = tex_array_shader_snippet;
 
-    let vertexShader = await filePromiseLoader('./shader/pt.vert');
-    let fragmentShader = await filePromiseLoader('./shader/pt.frag');
+    let vertexShader = await <Promise<string>>filePromiseLoader('./shader/pt.vert');
+    let fragmentShader = await <Promise<string>>filePromiseLoader('./shader/pt.frag');
 
-    shaderChunks['pathtracing_rng'] = await filePromiseLoader('./shader/rng.glsl');
-    shaderChunks['pathtracing_utils'] = await filePromiseLoader('./shader/utils.glsl');
-    shaderChunks['pathtracing_material'] = await filePromiseLoader('./shader/material.glsl');
-    shaderChunks['pathtracing_dspbr'] = await filePromiseLoader('./shader/dspbr.glsl');
-    shaderChunks['pathtracing_rt_kernel'] = await filePromiseLoader('./shader/rt_kernel.glsl');
+    shaderChunks['pathtracing_rng'] = await <Promise<string>>filePromiseLoader('./shader/rng.glsl');
+    shaderChunks['pathtracing_utils'] = await <Promise<string>>filePromiseLoader('./shader/utils.glsl');
+    shaderChunks['pathtracing_material'] = await <Promise<string>>filePromiseLoader('./shader/material.glsl');
+    shaderChunks['pathtracing_dspbr'] = await <Promise<string>>filePromiseLoader('./shader/dspbr.glsl');
+    shaderChunks['pathtracing_rt_kernel'] = await <Promise<string>>filePromiseLoader('./shader/rt_kernel.glsl');
 
     shaderChunks['pathtracing_defines'] = `
           const float PI =               3.14159265358979323;

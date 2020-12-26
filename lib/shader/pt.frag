@@ -173,7 +173,6 @@ void fillRenderState(const in Ray r, const in HitInfo hit, out RenderState rs) {
 
   uint triIdx = uint(hit.triIndex);
 
-  rs.uv0 = calculateInterpolatedUV(triIdx, hit.uv, 0);
   // rs.uv1 = calculateInterpolatedUV(hit.triIndex, hit.uv, 1);
   rs.wi = -r.dir;
 
@@ -183,8 +182,10 @@ void fillRenderState(const in Ray r, const in HitInfo hit, out RenderState rs) {
   rs.normal = calculateInterpolatedNormal(triIdx, hit.uv);
 
   if (hasTangent(triIdx)) {
+    rs.uv0 = calculateInterpolatedUV(triIdx, hit.uv, 0);
     rs.tangent = normalize(calculateInterpolatedTangent(triIdx, hit.uv));
   } else {
+    rs.uv0 = vec2(0.0);
     rs.tangent = get_onb(rs.normal)[0];
   }
 
@@ -260,17 +261,18 @@ vec3 sampleAndEvaluateDirectLight(const in RenderState rs) {
         eval_dspbr(rs.closure, y_to_z_up * rs.wi, y_to_z_up * light_dir) * (cPointLightEmission / dist2) * cosNL;
   }
 
-  if (u_bool_iblSampling) {
-    float pdf = 0.0;
-    vec3 iblDir = mapUVToDir(vec2(rng_NextFloat(), rng_NextFloat()), pdf);
-    isVisible = isEnvVisible(rs.hitPos + n * EPS_NORMAL, iblDir);
+  // if (u_bool_iblSampling) {
+  //   float pdf = 0.0;
+  //   vec3 iblDir = transpose(y_to_z_up)*sampleHemisphereCosine(vec2(rng_NextFloat(), rng_NextFloat()), pdf);
+  //   //vec3 iblDir = mapUVToDir(vec2(rng_NextFloat(), rng_NextFloat()), pdf);
+  //   isVisible = isEnvVisible(rs.hitPos + n * EPS_NORMAL, iblDir);
 
-    cosNL = dot(iblDir, n);
-    if ((cosNL > 0.0) && isVisible) {
-      allLightContrib +=
-          eval_dspbr(rs.closure, y_to_z_up * rs.wi, y_to_z_up * iblDir) * sampleIBL(iblDir) * cosNL / pdf;
-    }
-  }
+  //   cosNL = dot(iblDir, n);
+  //   if ((cosNL > 0.0) && isVisible) {
+  //     allLightContrib +=
+  //         eval_dspbr(rs.closure, y_to_z_up * rs.wi, y_to_z_up * iblDir) * sampleIBL(iblDir) * cosNL / pdf;
+  //   }
+  // }
   return allLightContrib;
 }
 #endif

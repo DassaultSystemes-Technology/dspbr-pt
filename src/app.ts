@@ -19,7 +19,7 @@ import Stats from 'three/examples/jsm/libs/stats.module.js';
 import { GUI } from 'dat.GUI';
 import scene_index from '../assets/scenes/scene_index.js';
 import ibl_index from '../assets/env/ibl_index.js';
-import * as loader from './scene_loader';
+import * as loader from '../lib/scene_loader';
 import { ThreeRenderer } from '../lib/three_renderer';
 import { PathtracingRenderer } from '../lib/renderer';
 import * as THREE from 'three';
@@ -42,6 +42,7 @@ class App {
   canvas: HTMLCanvasElement;
   canvas_three: HTMLCanvasElement;
   canvas_pt: HTMLCanvasElement;
+  spinner: HTMLElement;
   container: HTMLElement | null;
   Scene: string;
   IBL: string;
@@ -68,6 +69,8 @@ class App {
     this.canvas = document.createElement('canvas');
     this.container.appendChild(this.canvas);
 
+    this.spinner = document.getElementsByClassName('spinner')[0]; 
+
     this.canvas_pt = document.createElement('canvas');
     this.canvas_three = document.createElement('canvas');
 
@@ -93,19 +96,18 @@ class App {
     this.controls = new OrbitControls(this.camera, this.canvas);
     this.controls.screenSpacePanning = true;
 
-    let _this = this;
     this.controls.addEventListener('change', () => {
-      _this.camera.updateMatrixWorld();
-      _this.renderer.resetAccumulation();
+      this.camera.updateMatrixWorld();
+      this.renderer.resetAccumulation();
     });
 
     this.controls.addEventListener('start', () => {
-      this["renderScale"] = _this.renderer.renderScale;
-      _this.renderer.renderScale = _this.interactionScale;
+      this["renderScale"] = this.renderer.renderScale;
+      this.renderer.renderScale = this.interactionScale;
     });
 
     this.controls.addEventListener('end', () => {
-      _this.renderer.renderScale = this["renderScale"];
+      this.renderer.renderScale = this["renderScale"];
     });
 
     this.controls.mouseButtons = {
@@ -116,13 +118,13 @@ class App {
 
     this.renderer = new PathtracingRenderer(this.canvas_pt, window.devicePixelRatio);
     this.three_renderer = new ThreeRenderer(this.canvas_three, window.devicePixelRatio);
-    _this.loadScene(this.Scene);
+    this.loadScene(this.Scene);
 
     this.renderer.renderScale = 0.5;
     // this.renderer.iblRotation = 180.0;
 
     window.addEventListener('resize', () => {
-      _this.resize();
+      this.resize();
     }, false);
 
     this.container.addEventListener('dragover', function (e) {
@@ -131,7 +133,7 @@ class App {
       e.dataTransfer.dropEffect = 'copy';
     });
 
-    this.canvas.addEventListener('drop', function (e) {
+    this.canvas.addEventListener('drop', (e) => {
       e.preventDefault();
       e.stopPropagation();
    
@@ -140,19 +142,21 @@ class App {
         console.log("loading HDR...");
         // const url = URL.createObjectURL(e.dataTransfer.getData('text/html'));
         loader.loadIBL(URL.createObjectURL(e.dataTransfer.items[0].getAsFile()), (ibl) => {
-          _this.renderer.setIBL(ibl);
-          _this.three_renderer.setIBL(ibl);
+          this.renderer.setIBL(ibl);
+          this.three_renderer.setIBL(ibl);
         });
       } else {
-        loader.loadSceneFromBlobs(e.dataTransfer.files, _this.autoScaleScene, function (gltf) {
-          loader.loadIBL(_this.IBL, (ibl) => {
-            _this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
-            _this.renderer.setIBL(ibl);
-            _this.renderer.setScene(gltf, () => {
-              _this.startPathtracing();
+        this.showSpinner();
+        loader.loadSceneFromBlobs(e.dataTransfer.files, this.autoScaleScene, (gltf) => {
+          loader.loadIBL(this.IBL, (ibl) => {
+            this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
+            this.renderer.setIBL(ibl);
+            this.renderer.setScene(gltf, () => {
+              this.startPathtracing();
+              this.hideSpinner();
             })
-            _this.three_renderer.setScene(gltf.scene, () => {
-              _this.three_renderer.setIBL(ibl);
+            this.three_renderer.setScene(gltf.scene, () => {
+              this.three_renderer.setIBL(ibl);
             });
           });
         });
@@ -160,14 +164,14 @@ class App {
     });
 
     this.initUI();
+    this.hideSpinner();
   }
 
   private startRasterizer() {
-    let _this = this;
     this.stopPathtracing();
     this.three_renderer.render(this.camera, () => {
-      var destCtx = _this.canvas.getContext("2d");
-      destCtx.drawImage(_this.canvas_three, 0, 0);
+      var destCtx = this.canvas.getContext("2d");
+      destCtx.drawImage(this.canvas_three, 0, 0);
     });
   }
 
@@ -182,13 +186,12 @@ class App {
   private startPathtracing() {
     this.stopRasterizer();
 
-    let _this = this;
-    _this.renderer.render(_this.camera, -1, () => {
-      _this.controls.update();
-      _this._stats.update();
-      if (_this.pathtracing) {
-        var destCtx = _this.canvas.getContext("2d");
-        destCtx.drawImage(_this.canvas_pt, 0, 0);
+    this.renderer.render(this.camera, -1, () => {
+      this.controls.update();
+      this._stats.update();
+      if (this.pathtracing) {
+        var destCtx = this.canvas.getContext("2d");
+        destCtx.drawImage(this.canvas_pt, 0, 0);
       }
     })
   }
@@ -262,7 +265,7 @@ class App {
       });
     });
     this._gui.add(_this.renderer, 'iblRotation').name('IBL Rotation').min(-180.0).max(180.0).step(0.1);
-    this._gui.add(_this.renderer, 'iblSampling').name('IBL Sampling');
+    // this._gui.add(_this.renderer, 'iblSampling').name('IBL Sampling');
 
     this._gui.add(_this.renderer, 'exposure').name('Display Exposure').min(0).max(3).step(0.01).onChange(function (value) {
       _this.three_renderer.exposure  = value;
@@ -321,20 +324,14 @@ class App {
     // };
     // this._gui.add(save_img, 'save_img').name('Save PNG');
   }
-  // setLookAt(from, at, up) {
-  //   this.camera.position.set(from[0] * this.sceneScaleFactor, from[1] * this.sceneScaleFactor, from[2] * this.sceneScaleFactor);
-  //   this.camera.up.set(up[0], up[1], up[2]);
-  //   this.camera.lookAt(at[0] * this.sceneScaleFactor, at[1] * this.sceneScaleFactor, at[2] * this.sceneScaleFactor);
-  //   this.camera.updateMatrixWorld();
-  //   if (this.controls) this.controls.update();
-  // }
 
-  // setPerspective(vFov, near, far) {
-  //   this.camera.fov = vFov;
-  //   this.camera.near = near;
-  //   this.camera.far = far;
-  //   this.camera.updateProjectionMatrix();
-  // }
+  showSpinner() {
+    this.spinner.style.display = '';
+  }
+
+  hideSpinner() {
+    this.spinner.style.display = 'none';
+  }
 }
 
 let app = new App();

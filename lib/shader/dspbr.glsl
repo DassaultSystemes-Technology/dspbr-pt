@@ -476,8 +476,8 @@ vec3 sheen_layer(out float base_weight, float sheen_intensity, vec3 sheen_color,
   float alpha = max(sheen_roughness, 0.07);
   float inv_alpha = 1.0 / alpha;
 
-  float cos_theta_i = dot(wi, g.n);
-  float cos_theta_o = dot(wo, g.n);
+  float cos_theta_i = saturate_cos(dot(wi, g.n));
+  float cos_theta_o = saturate_cos(dot(wo, g.n));
   float cos_theta_h_2 = sqr(dot(wh, g.n));
   float sin_theta_h_2 = max(1.0 - cos_theta_h_2, 0.001);
   float D = (2.0 + inv_alpha) * pow(abs(sin_theta_h_2), 0.5 * inv_alpha) / (2.0 * PI);
