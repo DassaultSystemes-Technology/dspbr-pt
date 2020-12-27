@@ -17,7 +17,7 @@ import * as THREE from 'three';
 import * as glu from './gl_utils';
 import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { SimpleTriangleBVH } from './bvh';
-import { MaterialData, TexInfo, MaterialTextureInfo} from './material';
+import { MaterialData, TexInfo, MaterialTextureInfo } from './material';
 export { PerspectiveCamera } from 'three';
 
 
@@ -642,9 +642,8 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
-  async setScene(gltf: any, callback?: () => void) {
+  setScene(gltf: any) {
     this.stopRendering();
-
     if (!gltf.scene) {
       throw new Error(
         'This model contains no scene, and cannot be viewed here. However,'
@@ -654,11 +653,12 @@ export class PathtracingRenderer {
     //scene.applyMatrix4(y_to_z_up);
 
     this._gltf = gltf;
-    await this.createPathTracingScene(gltf.scene).then(() => {
-      this.resetAccumulation();
 
-      if (callback !== undefined)
-        callback();
+    return new Promise<void>((resolve, rejecct) => {
+      this.createPathTracingScene(gltf.scene).then(() => {
+        this.resetAccumulation();
+        resolve();
+      });
     });
   }
 
