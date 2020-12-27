@@ -64,13 +64,13 @@ void unpackMaterialData(in uint idx, out MaterialData matData) {
   matData.translucency = val.z;
   matData.alphaCutoff = val.w;
 
-  val = texelFetch(u_sampler2D_MaterialData, getStructParameterTexCoord(idx, 8u, MATERIAL_SIZE), 0);
+  val = texelFetch(u_sampler2D_MaterialData, getStructParameterTexCoord(idx, 7u, MATERIAL_SIZE), 0);
   matData.attenuationDistance = val.x;
   matData.attenuationColor = val.yzw;
 
-  val = texelFetch(u_sampler2D_MaterialData, getStructParameterTexCoord(idx, 9u, MATERIAL_SIZE), 0);
+  val = texelFetch(u_sampler2D_MaterialData, getStructParameterTexCoord(idx, 8u, MATERIAL_SIZE), 0);
   matData.subsurfaceColor = val.xyz;
-  matData.thinWalled = int(val.w);
+  matData.thinWalled = bool(val.w);
 }
 
 TexInfo getTextureInfo(ivec2 texInfoIdx, ivec2 transformInfoIdx) {
@@ -167,9 +167,11 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
   }
 
   vec4 transmission = evaluateMaterialTextureValue(matTexInfo.transmissionTexture, uv);
-  c.transparency = matData.transparency;// * transmission.x;
+  c.transparency = matData.transparency * transmission.x;
 
-  c.thin_walled = bool(matData.thinWalled);
+  c.translucency = matData.translucency;
+
+  c.thin_walled = matData.thinWalled;
   c.ior = matData.ior;
 
   vec4 occlusionRoughnessMetallic = evaluateMaterialTextureValue(matTexInfo.metallicRoughnessTexture, uv);
@@ -187,8 +189,6 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
   c.sheen = matData.sheen;
   c.sheen_roughness = matData.sheenRoughness * sheenRoughness.x;
   c.sheen_color = matData.sheenColor * sheenColor.xyz;
-
-  // c.albedo = matData.sheenColor * sheenColor.xyz;
 
   c.n = y_to_z_up * rs.normal;
   c.ng = y_to_z_up * rs.geometryNormal;

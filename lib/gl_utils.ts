@@ -41,8 +41,8 @@ function createShader(gl: WebGL2RenderingContext, type: number, source: string) 
     if (gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
       return shader;
     } else {
-      gl.deleteShader(shader);
       throw Error("shader compile error: " + gl.getShaderInfoLog(shader));
+      gl.deleteShader(shader);
     }
   }
   else {

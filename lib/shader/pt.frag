@@ -92,13 +92,14 @@ struct MaterialData {
 
   // 9
   vec3 subsurfaceColor;
-  int thinWalled;
+  bool thinWalled;
 
 };
 
 struct MaterialClosure {
   vec3 albedo;
   float transparency;
+  float translucency;
   float cutout_opacity;
   float metallic;
   float specular;
