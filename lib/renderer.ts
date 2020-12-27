@@ -17,73 +17,9 @@ import * as THREE from 'three';
 import * as glu from './gl_utils';
 import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { SimpleTriangleBVH } from './bvh';
-export { PerspectiveCamera} from 'three';
+import { MaterialData, TexInfo, MaterialTextureInfo} from './material';
+export { PerspectiveCamera } from 'three';
 
-class MaterialData {
-  albedo = [1.0, 1.0, 1.0];
-  metallic = 0.0;
-
-  roughness = 0.0;
-  anisotropy = 0.0;
-  anisotropyRotation = 0.0;
-  transparency = 0.0;
-
-  cutoutOpacity = 1.0;
-  sheen = 0.0; // deprecated
-  normalScale = 1.0;
-  ior = 1.5;
-
-  specular = 1.0;
-  specularTint = [1.0, 1.0, 1.0];
-
-  sheenRoughness = 0.0;
-  sheenColor = [1.0, 1.0, 1.0];
-
-  normalScaleClearcoat = 1.0;
-  emission = [0.0, 0.0, 0.0];
-
-  clearcoat = 0.0;
-  clearcoatRoughness = 0.0;
-  flakeCoverage = 0.0;
-  flakeSize = 0.02;
-
-  flakeRoughness = 0.2;
-  flakeColor = [1.0, 1.0, 1.0];
-
-  attenuationDistance = 100000.0;
-  attenuationColor = [1.0, 1.0, 1.0];
-
-  subsurfaceColor = [1.0, 1.0, 1.0];
-  thinWalled = 1;
-
-  translucency = 0.0;
-  alphaCutoff = 0.0;
-  padding = [0.0, 0.0];
-}
-
-class TexInfo {
-  texArrayIdx = -1;
-  texIdx = -1;
-  texCoordSet = -1;
-  pad = -1;
-  texOffset = [0, 0]; // TODO: Where to put these? Removing them here allows to use byte type for texInfoArray.
-  texScale = [1, 1];
-}
-
-class MaterialTextureInfo {
-  albedoTexture = new TexInfo;
-  metallicRoughnessTexture = new TexInfo();
-  normalTexture = new TexInfo();
-  emissionTexture = new TexInfo();
-  specularTexture = new TexInfo();
-  specularColorTexture = new TexInfo();
-  transmissionTexture = new TexInfo();
-  clearcoatTexture = new TexInfo();
-  clearcoatRoughnessTexture = new TexInfo();
-  // clearcoatNormalTexture = new TexInfo();
-  sheenColorTexture = new TexInfo();
-  sheenRoughnessTexture = new TexInfo();
-}
 
 class Light {
   position = [1, 1, 1];
@@ -657,17 +593,17 @@ export class PathtracingRenderer {
         matInfo.sheenColor = get_param("sheenColorFactor", ext, matInfo.sheenColor);
         matInfo.sheenRoughness = get_param("sheenRoughnessFactor", ext, matInfo.sheenRoughness);
       }
-      if ('KHR_materials_translucency' in extensions) {
-        let ext = extensions["KHR_materials_translucency"];
-        matInfo.transparency = get_param("translucencyFactor", ext, matInfo.transparency);
-        // if ("translucencyTexture" in ext) {
-        //   await this._gltf.parser.getDependency('texture', ext.translucencyTexture.index)
-        //     .then((tex) => {
-        //       matTexInfo.translucencyTexture = this.parseTexture(tex);
-        //       setTextureTransformFromExt(matTexInfo.translucencyTexture, ext.translucencyTexture);
-        //     });
-        // }
-      }
+      // if ('KHR_materials_translucency' in extensions) {
+      //   let ext = extensions["KHR_materials_translucency"];
+      //   matInfo.transparency = get_param("translucencyFactor", ext, matInfo.transparency);
+      //   // if ("translucencyTexture" in ext) {
+      //   //   await this._gltf.parser.getDependency('texture', ext.translucencyTexture.index)
+      //   //     .then((tex) => {
+      //   //       matTexInfo.translucencyTexture = this.parseTexture(tex);
+      //   //       setTextureTransformFromExt(matTexInfo.translucencyTexture, ext.translucencyTexture);
+      //   //     });
+      //   // }
+      // }
       if ('KHR_materials_volume' in extensions) {
         let ext = extensions["KHR_materials_volume"];
         matInfo.thinWalled = get_param("thickness", ext, 0.0) > 0.0 ? 0 : 1;
@@ -934,13 +870,13 @@ export class PathtracingRenderer {
     let flatBVHData = bvh.createAndCopyToFlattenedArray_StandardFormat();
 
     let flatMaterialParamList = materialBuffer.map((matInfo) => {
-      return Object.values(matInfo);
+      return Object.values(matInfo.data);
     });
 
     let flatTextureParamList = materialTextureInfoBuffer.map(matTexInfo => {
       let texInfos = Object.values(matTexInfo);
       return texInfos.map(texInfo => {
-        return flattenArray(Object.values(texInfo));
+        return flattenArray(texInfo.data);
       });
     });
 

@@ -83,12 +83,8 @@ struct MaterialData {
   // 6
   float clearcoat;
   float clearcoatRoughness;
-  float flakeCoverage;
-  float flakeSize;
-
-  // 7
-  float flakeRoughness;
-  vec3 flakeColor;
+  float translucency;
+  float alphaCutoff;
 
   // 8
   float attenuationDistance;
@@ -98,10 +94,6 @@ struct MaterialData {
   vec3 subsurfaceColor;
   int thinWalled;
 
-  // 10
-  float translucency;
-  float alphaCutoff;
-  vec2 padding;
 };
 
 struct MaterialClosure {
