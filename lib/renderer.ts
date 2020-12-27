@@ -593,17 +593,17 @@ export class PathtracingRenderer {
         matInfo.sheenColor = get_param("sheenColorFactor", ext, matInfo.sheenColor);
         matInfo.sheenRoughness = get_param("sheenRoughnessFactor", ext, matInfo.sheenRoughness);
       }
-      // if ('KHR_materials_translucency' in extensions) {
-      //   let ext = extensions["KHR_materials_translucency"];
-      //   matInfo.transparency = get_param("translucencyFactor", ext, matInfo.transparency);
-      //   // if ("translucencyTexture" in ext) {
-      //   //   await this._gltf.parser.getDependency('texture', ext.translucencyTexture.index)
-      //   //     .then((tex) => {
-      //   //       matTexInfo.translucencyTexture = this.parseTexture(tex);
-      //   //       setTextureTransformFromExt(matTexInfo.translucencyTexture, ext.translucencyTexture);
-      //   //     });
-      //   // }
-      // }
+      if ('KHR_materials_translucency' in extensions) {
+        let ext = extensions["KHR_materials_translucency"];
+        matInfo.translucency = get_param("translucencyFactor", ext, matInfo.transparency);
+        // if ("translucencyTexture" in ext) {
+        //   await this._gltf.parser.getDependency('texture', ext.translucencyTexture.index)
+        //     .then((tex) => {
+        //       matTexInfo.translucencyTexture = this.parseTexture(tex);
+        //       setTextureTransformFromExt(matTexInfo.translucencyTexture, ext.translucencyTexture);
+        //     });
+        // }
+      }
       if ('KHR_materials_volume' in extensions) {
         let ext = extensions["KHR_materials_volume"];
         matInfo.thinWalled = get_param("thickness", ext, 0.0) > 0.0 ? 0 : 1;
@@ -1025,7 +1025,7 @@ export class PathtracingRenderer {
 
           const float RR_TERMINATION_PROB = 0.9;
 
-          const uint MATERIAL_SIZE = 11u;
+          const uint MATERIAL_SIZE = 9u;
           const uint MATERIAL_TEX_INFO_SIZE = 11u;
           const uint TEX_INFO_SIZE = 2u;
           
