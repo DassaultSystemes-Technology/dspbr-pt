@@ -98,13 +98,9 @@ export class ThreeRenderer {
     this.scene.environment  = this.ibl;
   }
 
-  setScene(scene, callback?) {
+  setScene(scene) {
     // console.log("GL Renderer state before load:\n", this.renderer.info);
     this.scene = scene;
-
-    if (callback !== undefined) {
-      callback()
-    }
     //scene.applyMatrix4(y_to_z_up);
   }
 

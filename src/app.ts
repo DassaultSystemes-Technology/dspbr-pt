@@ -69,7 +69,7 @@ class App {
     this.canvas = document.createElement('canvas');
     this.container.appendChild(this.canvas);
 
-    this.spinner = document.getElementsByClassName('spinner')[0]; 
+    this.spinner = document.getElementsByClassName('spinner')[0];
 
     this.canvas_pt = document.createElement('canvas');
     this.canvas_three = document.createElement('canvas');
@@ -136,29 +136,29 @@ class App {
     this.canvas.addEventListener('drop', (e) => {
       e.preventDefault();
       e.stopPropagation();
-   
+
       if (e.dataTransfer.files.length == 1 &&
         getFileExtension(e.dataTransfer.files[0].name) == "hdr") {
         console.log("loading HDR...");
         // const url = URL.createObjectURL(e.dataTransfer.getData('text/html'));
-        loader.loadIBL(URL.createObjectURL(e.dataTransfer.items[0].getAsFile()), (ibl) => {
+        loader.loadIBL(URL.createObjectURL(e.dataTransfer.items[0].getAsFile())).then((ibl) => {
           this.renderer.setIBL(ibl);
           this.three_renderer.setIBL(ibl);
         });
       } else {
         this.showSpinner();
-        loader.loadSceneFromBlobs(e.dataTransfer.files, this.autoScaleScene, (gltf) => {
-          loader.loadIBL(this.IBL, (ibl) => {
-            this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
-            this.renderer.setIBL(ibl);
-            this.renderer.setScene(gltf, () => {
-              this.startPathtracing();
-              this.hideSpinner();
-            })
-            this.three_renderer.setScene(gltf.scene, () => {
-              this.three_renderer.setIBL(ibl);
-            });
+        const scenePromise = loader.loadSceneFromBlobs(e.dataTransfer.files, this.autoScaleScene);
+        const iblPromise = loader.loadIBL(this.IBL);
+        Promise.all([scenePromise, iblPromise]).then(([gltf, ibl]) => {
+          this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
+          this.renderer.setIBL(ibl);
+          this.renderer.setScene(gltf).then(() => {
+            this.startPathtracing();
+            this.hideSpinner();
           });
+
+          this.three_renderer.setScene(gltf.scene);
+          this.three_renderer.setIBL(ibl);
         });
       }
     });
@@ -214,24 +214,25 @@ class App {
   }
 
   private loadScene(url) {
-    loader.loadScene(url, this.autoScaleScene, (gltf) => {
-      loader.loadIBL(this.IBL, (ibl) => {
-        this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
-        this.renderer.setIBL(ibl);
-        this.renderer.setScene(gltf, () => {
-          if (this.pathtracing)
-            this.startPathtracing();
-        })
+    const scenePromise = loader.loadScene(url, this.autoScaleScene);
+    const iblPromise = loader.loadIBL(this.IBL);
 
-        this.three_renderer.setScene(gltf.scene, () => {
-          this.three_renderer.setIBL(ibl);
-        });
-
-        if (!this.pathtracing)
-          this.startRasterizer();
+    Promise.all([scenePromise, iblPromise]).then(([gltf, ibl]) => {
+      this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
+      this.renderer.setIBL(ibl);
+      this.renderer.setScene(gltf).then(() => {
+        if (this.pathtracing)
+          this.startPathtracing();
       });
+
+      this.three_renderer.setScene(gltf.scene);
+      this.three_renderer.setIBL(ibl);
+      if (!this.pathtracing) {
+        this.startRasterizer();
+      }
     });
   }
+
 
   initUI() {
     if (this._gui)
@@ -242,7 +243,7 @@ class App {
     this._gui = new GUI();
     this._gui.domElement.classList.add("hidden");
     this._gui.width = 300;
-    
+
     this._gui.add(this, 'pathtracing').name('Use Pathtracing').onChange((value) => {
       if (value == false) {
         _this.startRasterizer();
@@ -259,7 +260,7 @@ class App {
 
     this._gui.add(this, "IBL", ibl_index).onChange(function (value) {
       console.log(`Loading ${value}`);
-      loader.loadIBL(_this.IBL, (ibl) => {
+      loader.loadIBL(_this.IBL).then((ibl) => {
         _this.renderer.setIBL(ibl);
         _this.three_renderer.setIBL(ibl);
       });
@@ -268,7 +269,7 @@ class App {
     // this._gui.add(_this.renderer, 'iblSampling').name('IBL Sampling');
 
     this._gui.add(_this.renderer, 'exposure').name('Display Exposure').min(0).max(3).step(0.01).onChange(function (value) {
-      _this.three_renderer.exposure  = value;
+      _this.three_renderer.exposure = value;
     });
 
     this._gui.add(this, 'autoRotate').name('Auto Rotate').onChange(function (value) {

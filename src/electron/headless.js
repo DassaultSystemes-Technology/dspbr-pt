@@ -16,14 +16,13 @@
 import "core-js/stable";
 import 'regenerator-runtime/runtime'
 import * as THREE from 'three'
-import { PathtracingRenderer } from '../../lib/renderer';
+import {PathtracingRenderer} from '../../lib/renderer';
 import * as loader from '../../lib/scene_loader';
 
-const { ipcRenderer } = window.require('electron');
+const {ipcRenderer} = window.require('electron');
 var path = window.require('path');
 
-let remote = window.require('electron').remote,
-  args = remote.getGlobal('sharedObject').args;
+let remote = window.require('electron').remote, args = remote.getGlobal('sharedObject').args;
 
 function startRenderer() {
   let canvas = document.getElementById("canvas");
@@ -35,7 +34,7 @@ function startRenderer() {
   renderer.iblRotation = args.ibl_rotation;
   renderer.maxBounces = args.bounces;
 
-  loader.loadScene(args.gltf_path, false, (gltf) => {
+  loader.loadScene(args.gltf_path, false).then(gltf => {
     let cameras = [];
     gltf.scene.traverse((child) => {
       if (child.isCamera) {
@@ -44,25 +43,25 @@ function startRenderer() {
       }
     });
 
-    if(cameras.length > 0) {
+    if (cameras.length > 0) {
       var camera = cameras[0];
     } else {
-      var camera = new THREE.PerspectiveCamera(45, 
-        window.innerWidth / window.innerHeight, 0.1, 1000);
+      var camera =
+          new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
       this.camera.position.set(0, 0, 3);
     }
 
-    renderer.setScene(gltf, () => {
-     if (args.ibl === "None") {
-        renderer.render(camera, args.samples, () => { }, (result) => {
+    renderer.setScene(gltf).then(() => {
+      if (args.ibl === "None") {
+        renderer.render(camera, args.samples, () => {}, (result) => {
           console.log("icpRenderer Ready");
           ipcRenderer.send('rendererReady');
         });
       } else {
-        loader.loadIBL(args.ibl, (ibl) => {
+        loader.loadIBL(args.ibl).then((ibl) => {
           console.log("loaded ibl" + args.ibl);
-          renderer.setIBL(ibl );
-          renderer.render(camera, args.samples, () => { }, (result) => {
+          renderer.setIBL(ibl);
+          renderer.render(camera, args.samples, () => {}, (result) => {
             console.log("icpRenderer Ready");
             ipcRenderer.send('rendererReady');
           });
@@ -72,6 +71,4 @@ function startRenderer() {
   });
 }
 
-window.onload = function () {
-  startRenderer();
-};
+window.onload = function() { startRenderer(); };
