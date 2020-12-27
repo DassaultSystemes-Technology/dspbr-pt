@@ -61,12 +61,8 @@ void unpackMaterialData(in uint idx, out MaterialData matData) {
   val = texelFetch(u_sampler2D_MaterialData, getStructParameterTexCoord(idx, 6u, MATERIAL_SIZE), 0);
   matData.clearcoat = val.x;
   matData.clearcoatRoughness = val.y;
-  matData.flakeCoverage = val.z;
-  matData.flakeSize = val.w;
-
-  val = texelFetch(u_sampler2D_MaterialData, getStructParameterTexCoord(idx, 7u, MATERIAL_SIZE), 0);
-  matData.flakeRoughness = val.x;
-  matData.flakeColor = val.yzw;
+  matData.translucency = val.z;
+  matData.alphaCutoff = val.w;
 
   val = texelFetch(u_sampler2D_MaterialData, getStructParameterTexCoord(idx, 8u, MATERIAL_SIZE), 0);
   matData.attenuationDistance = val.x;
@@ -75,10 +71,6 @@ void unpackMaterialData(in uint idx, out MaterialData matData) {
   val = texelFetch(u_sampler2D_MaterialData, getStructParameterTexCoord(idx, 9u, MATERIAL_SIZE), 0);
   matData.subsurfaceColor = val.xyz;
   matData.thinWalled = int(val.w);
-
-  val = texelFetch(u_sampler2D_MaterialData, getStructParameterTexCoord(idx, 10u, MATERIAL_SIZE), 0);
-  matData.translucency = val.x;
-  matData.alphaCutoff = val.y;
 }
 
 TexInfo getTextureInfo(ivec2 texInfoIdx, ivec2 transformInfoIdx) {
@@ -175,14 +167,14 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
   }
 
   vec4 transmission = evaluateMaterialTextureValue(matTexInfo.transmissionTexture, uv);
-  c.transparency = matData.transparency * transmission.x;
+  c.transparency = matData.transparency;// * transmission.x;
 
   c.thin_walled = bool(matData.thinWalled);
   c.ior = matData.ior;
 
-  vec4 occlusionMetallicRoughness = evaluateMaterialTextureValue(matTexInfo.metallicRoughnessTexture, uv);
-  c.metallic = matData.metallic * occlusionMetallicRoughness.z;
-  float roughness = matData.roughness * occlusionMetallicRoughness.y;
+  vec4 occlusionRoughnessMetallic = evaluateMaterialTextureValue(matTexInfo.metallicRoughnessTexture, uv);
+  c.metallic = matData.metallic * occlusionRoughnessMetallic.z;
+  float roughness = matData.roughness * occlusionRoughnessMetallic.y;
   c.alpha = roughness_conversion(roughness, matData.anisotropy);
 
   // //vec4 specularColor = evaluateMaterialTextureValue(matTexInfo.specularColorTexture, rs.uv0);

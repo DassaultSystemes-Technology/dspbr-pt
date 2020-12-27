@@ -17,7 +17,7 @@ import "core-js/stable";
 import 'regenerator-runtime/runtime'
 import * as THREE from 'three'
 import { PathtracingRenderer } from '../../lib/renderer';
-import * as loader from '../scene_loader';
+import * as loader from '../../lib/scene_loader';
 
 const { ipcRenderer } = window.require('electron');
 var path = window.require('path');
