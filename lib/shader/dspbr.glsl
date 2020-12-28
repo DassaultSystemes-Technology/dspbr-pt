@@ -15,15 +15,15 @@
 
 uniform int u_int_SheenG;
 
-const int E_REFLECTION_DIFFUSE = 1 << 0;  // Lambert, Oren-Nayar
-const int E_REFLECTION_GLOSSY = 1 << 1;   // Microfacet (includes specularity=0.0)
-const int E_REFLECTION_SINGULAR = 1 << 2; // Singular reflection and microfacet with specularity=1.0
+const int E_REFLECTION_DIFFUSE = 1 << 0;  // Lambert
+const int E_REFLECTION_GLOSSY = 1 << 1;   // Microfacet 
+const int E_REFLECTION_SINGULAR = 1 << 2; // Singular reflection and microfacet 
 
 const int E_TRANSMISSION_DIFFUSE = 1 << 3;  // Translucency
-const int E_TRANSMISSION_GLOSSY = 1 << 4;   // Thin and Volumetric Microfacet (includes specularity=0.0)
-const int E_TRANSMISSION_SINGULAR = 1 << 5; // Volumetric Microfacet with specularity=1.0
-const int E_TRANSMISSION_STRAIGHT = 1 << 6; // Thin Microfacet with specularity=1.0, Volumetric Microfacet with
-                                            // specularity=1.0 and IOR=1 (no refraction)
+const int E_TRANSMISSION_GLOSSY = 1 << 4;   // Thin and Volumetric Microfacet 
+const int E_TRANSMISSION_SINGULAR = 1 << 5; // Volumetric Microfacet
+const int E_TRANSMISSION_STRAIGHT =
+    1 << 6; // Thin Microfacet, Volumetric Microfacet with alpha == MINIMUM_ROUGHNESS and IOR=1 (no refraction)
 
 const int E_REFLECTION = E_REFLECTION_DIFFUSE | E_REFLECTION_GLOSSY | E_REFLECTION_SINGULAR;
 const int E_TRANSMISSION =
@@ -495,11 +495,7 @@ vec3 coating_layer(out float base_weight, float clearcoat, float clearcoat_alpha
 vec3 eval_dspbr(const in MaterialClosure c, vec3 wi, vec3 wo) {
   vec3 wh = normalize(wi + wo);
 
-  Geometry g;
-  g.n = c.n;
-  g.t = c.t;
-  g.b = cross(c.n, c.t);
-
+  Geometry g = calculateBasis(c.n, c.t);
   vec3 bsdf = vec3(0.0);
 
   bsdf += diffuse_bsdf_eval(c, wi, wo, g);
@@ -527,10 +523,7 @@ float thinTransmissionRoughness(float ior, float roughness) {
 
 vec3 sample_dspbr(const in MaterialClosure c, vec3 wi, in vec3 uvw, out vec3 bsdf_over_pdf, out float pdf,
                   out int event) {
-  Geometry g;
-  g.n = c.n;
-  g.t = c.t;
-  g.b = cross(c.n, c.t);
+  Geometry g = calculateBasis(c.n, c.t);
 
   pdf = 1.0;
 
@@ -653,4 +646,4 @@ vec3 sample_dspbr(const in MaterialClosure c, vec3 wi, in vec3 uvw, out vec3 bsd
 
   return wo;
 }
-///////////////////////////////////////////////////////////////////////////////
+

@@ -13,8 +13,7 @@
  * limitations under the License.
  */
 
-struct Ray
-{
+struct Ray {
   vec3 dir;
   vec3 org;
   float tfar;
@@ -22,26 +21,20 @@ struct Ray
   ivec3 sign;
 };
 
-struct HitInfo
-{
+struct HitInfo {
   int triIndex;
   float tfar;
   vec2 uv;
 };
 
-Ray createRay(in vec3 direction, in vec3 origin, in float tfar)
-{
+Ray createRay(in vec3 direction, in vec3 origin, in float tfar) {
   vec3 inv_direction = vec3(1.0) / direction;
 
-  return Ray(direction,
-             origin,
-             tfar,
-             inv_direction,
+  return Ray(direction, origin, tfar, inv_direction,
              ivec3((inv_direction.x < 0.0) ? 1 : 0, (inv_direction.y < 0.0) ? 1 : 0, (inv_direction.z < 0.0) ? 1 : 0));
 }
 
-bool intersectAABB(const in Ray ray, const in vec3 aabb[2], out float tmin, out float tmax)
-{
+bool intersectAABB(const in Ray ray, const in vec3 aabb[2], out float tmin, out float tmax) {
   float tymin, tymax, tzmin, tzmax;
   tmin = (aabb[ray.sign[0]].x - ray.org.x) * ray.inv_dir.x;
   tmax = (aabb[1 - ray.sign[0]].x - ray.org.x) * ray.inv_dir.x;
@@ -55,14 +48,8 @@ bool intersectAABB(const in Ray ray, const in vec3 aabb[2], out float tmin, out 
 }
 
 // std. moeller trumbore triangle intersection test
-bool intersectTriangle(const in Ray r,
-                       in vec3 p0,
-                       in vec3 p1,
-                       in vec3 p2,
-                       const in float tfar,
-                       out float t,
-                       out vec2 uv)
-{
+bool intersectTriangle(const in Ray r, in vec3 p0, in vec3 p1, in vec3 p2, const in float tfar, out float t,
+                       out vec2 uv) {
   vec3 e0 = p1 - p0;
   vec3 e1 = p2 - p0;
   vec3 pvec = cross(r.dir, e1);
@@ -91,14 +78,12 @@ bool intersectTriangle(const in Ray r,
   return (t > 0.0) && (t < tfar);
 }
 
-uint getMaterialIndex(const in uint triIndex)
-{
+uint getMaterialIndex(const in uint triIndex) {
   ivec2 idx = getStructParameterTexCoord(triIndex, 0u, TRIANGLE_STRIDE);
   return uint(texelFetch(u_sampler2D_TriangleData, idx, 0).w);
 }
 
-void getSceneTriangle(const in uint index, out vec3 p0, out vec3 p1, out vec3 p2)
-{
+void getSceneTriangle(const in uint index, out vec3 p0, out vec3 p1, out vec3 p2) {
   ivec2 idx0 = getStructParameterTexCoord(index, POSITION_OFFSET, TRIANGLE_STRIDE);
   ivec2 idx1 = getStructParameterTexCoord(index, POSITION_OFFSET + VERTEX_STRIDE, TRIANGLE_STRIDE);
   ivec2 idx2 = getStructParameterTexCoord(index, POSITION_OFFSET + 2u * VERTEX_STRIDE, TRIANGLE_STRIDE);
@@ -108,22 +93,19 @@ void getSceneTriangle(const in uint index, out vec3 p0, out vec3 p1, out vec3 p2
   p2 = texelFetch(u_sampler2D_TriangleData, idx2, 0).xyz;
 }
 
-vec3 calculateInterpolatedNormal(const in uint index, const in vec2 uv)
-{
+vec3 calculateInterpolatedNormal(const in uint index, const in vec2 uv) {
   ivec2 idx0 = getStructParameterTexCoord(index, NORMAL_OFFSET, TRIANGLE_STRIDE);
   ivec2 idx1 = getStructParameterTexCoord(index, NORMAL_OFFSET + VERTEX_STRIDE, TRIANGLE_STRIDE);
   ivec2 idx2 = getStructParameterTexCoord(index, NORMAL_OFFSET + 2u * VERTEX_STRIDE, TRIANGLE_STRIDE);
 
-  mat3 normals;
-  normals[0] = texelFetch(u_sampler2D_TriangleData, idx0, 0).xyz;
-  normals[1] = texelFetch(u_sampler2D_TriangleData, idx1, 0).xyz;
-  normals[2] = texelFetch(u_sampler2D_TriangleData, idx2, 0).xyz;
+  vec3 n0 = texelFetch(u_sampler2D_TriangleData, idx0, 0).xyz;
+  vec3 n1 = texelFetch(u_sampler2D_TriangleData, idx1, 0).xyz;
+  vec3 n2 = texelFetch(u_sampler2D_TriangleData, idx2, 0).xyz;
 
-  return normalize((1.0 - uv.x - uv.y) * normals[0] + uv.x * normals[1] + uv.y * normals[2]);
+  return normalize((1.0 - uv.x - uv.y) * n0 + uv.x * n1 + uv.y * n2);
 }
 
-vec2 calculateInterpolatedUV(const in uint index, const in vec2 hit_uv, int set)
-{
+vec2 calculateInterpolatedUV(const in uint index, const in vec2 hit_uv, int set) {
   ivec2 idx0 = getStructParameterTexCoord(index, UV_OFFSET, TRIANGLE_STRIDE);
   ivec2 idx1 = getStructParameterTexCoord(index, UV_OFFSET + VERTEX_STRIDE, TRIANGLE_STRIDE);
   ivec2 idx2 = getStructParameterTexCoord(index, UV_OFFSET + 2u * VERTEX_STRIDE, TRIANGLE_STRIDE);
@@ -139,28 +121,41 @@ vec2 calculateInterpolatedUV(const in uint index, const in vec2 hit_uv, int set)
   }
 }
 
-bool hasTangent(const in uint triIdx)
-{
-  ivec2 idx0 = getStructParameterTexCoord(triIdx, TANGENT_OFFSET, TRIANGLE_STRIDE);
-  return bool(texelFetch(u_sampler2D_TriangleData, idx0, 0).w);
-}
-
-vec3 calculateInterpolatedTangent(const in uint index, const in vec2 uv)
-{
+vec4 calculateInterpolatedTangent(const in uint index, const in vec2 uv, vec3 n) {
   ivec2 idx0 = getStructParameterTexCoord(index, TANGENT_OFFSET, TRIANGLE_STRIDE);
   ivec2 idx1 = getStructParameterTexCoord(index, TANGENT_OFFSET + VERTEX_STRIDE, TRIANGLE_STRIDE);
   ivec2 idx2 = getStructParameterTexCoord(index, TANGENT_OFFSET + 2u * VERTEX_STRIDE, TRIANGLE_STRIDE);
 
-  mat3 tangents;
-  tangents[0] = texelFetch(u_sampler2D_TriangleData, idx0, 0).xyz;
-  tangents[1] = texelFetch(u_sampler2D_TriangleData, idx1, 0).xyz;
-  tangents[2] = texelFetch(u_sampler2D_TriangleData, idx2, 0).xyz;
+  vec4 t0 = texelFetch(u_sampler2D_TriangleData, idx0, 0);
+  vec4 t1 = texelFetch(u_sampler2D_TriangleData, idx1, 0);
+  vec4 t2 = texelFetch(u_sampler2D_TriangleData, idx2, 0);
 
-  return normalize((1.0 - uv.x - uv.y) * tangents[0] + uv.x * tangents[1] + uv.y * tangents[2]);
+  float handedness = (t0.w == t1.w && t0.w == t2.w) ? t0.w : 0.0;
+  vec3 tangent = normalize((1.0 - uv.x - uv.y) * t0.xyz + uv.x * t1.xyz + uv.y * t2.xyz);
+
+  vec4 ret;
+  // TODO ensure proper tangents when parsing the scene on CPU
+  if (length(tangent) > 0.99 && abs(handedness) > 0.99) {
+    ret = vec4(tangent, -handedness);
+  } else {
+    ret = vec4(get_onb(n)[0], 1.0);
+  }
+
+  return ret;
 }
 
-bool bvh_IntersectRayBox(const in Ray r, const in float tfar, int pn, out int si, out int ei)
-{
+vec4 calculateInterpolatedVertexColors(const in uint index, const in vec2 hit_uv) {
+  ivec2 idx0 = getStructParameterTexCoord(index, COLOR_OFFSET, TRIANGLE_STRIDE);
+  ivec2 idx1 = getStructParameterTexCoord(index, COLOR_OFFSET + VERTEX_STRIDE, TRIANGLE_STRIDE);
+  ivec2 idx2 = getStructParameterTexCoord(index, COLOR_OFFSET + 2u * VERTEX_STRIDE, TRIANGLE_STRIDE);
+  vec4 c0 = texelFetch(u_sampler2D_TriangleData, idx0, 0);
+  vec4 c1 = texelFetch(u_sampler2D_TriangleData, idx1, 0);
+  vec4 c2 = texelFetch(u_sampler2D_TriangleData, idx2, 0);
+
+  return (1.0 - hit_uv.x - hit_uv.y) * c0 + hit_uv.x * c1 + hit_uv.y * c2;
+}
+
+bool bvh_IntersectRayBox(const in Ray r, const in float tfar, int pn, out int si, out int ei) {
   int idx_x0 = int(pn * 2 + 0) % int(MAX_TEXTURE_SIZE);
   int idx_y0 = int(pn * 2 + 0) / int(MAX_TEXTURE_SIZE);
 
@@ -186,8 +181,7 @@ bool bvh_IntersectRayBox(const in Ray r, const in float tfar, int pn, out int si
     - sort out the many tfars
     - sort the needed data in ray payload and return values
 */
-bool intersectSceneTriangles_BVH(const in Ray r, out HitInfo hit)
-{
+bool intersectSceneTriangles_BVH(const in Ray r, out HitInfo hit) {
   hit.tfar = r.tfar;
   hit.triIndex = -1;
 
@@ -232,8 +226,7 @@ bool intersectSceneTriangles_BVH(const in Ray r, out HitInfo hit)
   return foundHit;
 }
 
-bool intersectSceneTriangles_Bruteforce(const in Ray r, out HitInfo hit)
-{
+bool intersectSceneTriangles_Bruteforce(const in Ray r, out HitInfo hit) {
   hit.tfar = r.tfar;
   hit.triIndex = -1;
 
@@ -254,21 +247,18 @@ bool intersectSceneTriangles_Bruteforce(const in Ray r, out HitInfo hit)
   return hit.triIndex >= 0;
 }
 
-bool intersectScene_Nearest(const in Ray r, out HitInfo hit)
-{
+bool intersectScene_Nearest(const in Ray r, out HitInfo hit) {
   // return intersectSceneTriangles_Bruteforce(r, hit);
   return intersectSceneTriangles_BVH(r, hit);
 }
 
-bool isVisible(const in vec3 p0, const in vec3 p1)
-{
+bool isVisible(const in vec3 p0, const in vec3 p1) {
   Ray r = createRay(normalize(p1 - p0), p0, length(p1 - p0));
   HitInfo hit;
   return !intersectScene_Nearest(r, hit); //!!TOOPT: add an early hit function here
 }
 
-bool isEnvVisible(const in vec3 p0, const in vec3 dir)
-{
+bool isEnvVisible(const in vec3 p0, const in vec3 dir) {
   Ray r = createRay(normalize(dir), p0, TFAR_MAX);
   HitInfo hit;
   return !intersectScene_Nearest(r, hit); //!!TOOPT: add an early hit function here

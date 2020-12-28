@@ -93,7 +93,6 @@ struct MaterialData {
   // 9
   vec3 subsurfaceColor;
   bool thinWalled;
-
 };
 
 struct MaterialClosure {
@@ -120,7 +119,7 @@ struct MaterialClosure {
   bool backside;
   vec3 n;
   vec3 ng;
-  vec3 t;
+  vec4 t;
 };
 
 // struct Light {
@@ -134,7 +133,7 @@ struct RenderState {
   vec3 hitPos;
   vec3 normal;
   vec3 geometryNormal;
-  vec3 tangent;
+  vec4 tangent;
   vec3 wo;
   vec3 wi;
   vec2 uv0;
@@ -174,16 +173,13 @@ void fillRenderState(const in Ray r, const in HitInfo hit, out RenderState rs) {
   rs.geometryNormal = compute_triangle_normal(p0, p1, p2);
   rs.normal = calculateInterpolatedNormal(triIdx, hit.uv);
 
-  if (hasTangent(triIdx)) {
-    rs.uv0 = calculateInterpolatedUV(triIdx, hit.uv, 0);
-    rs.tangent = normalize(calculateInterpolatedTangent(triIdx, hit.uv));
-  } else {
-    rs.uv0 = vec2(0.0);
-    rs.tangent = get_onb(rs.normal)[0];
-  }
+  rs.uv0 = calculateInterpolatedUV(triIdx, hit.uv, 0);
+  rs.tangent = calculateInterpolatedTangent(triIdx, hit.uv, rs.normal);
+
+  vec4 vertexColor = calculateInterpolatedVertexColors(triIdx, hit.uv);
 
   uint matIdx = getMaterialIndex(triIdx);
-  configure_material(matIdx, rs, rs.closure);
+  configure_material(matIdx, rs, rs.closure, vertexColor);
 }
 
 int sampleBSDFBounce(inout RenderState rs, inout vec3 pathWeight, out int eventType) {
@@ -200,11 +196,8 @@ int sampleBSDFBounce(inout RenderState rs, inout vec3 pathWeight, out int eventT
   } else {
     float sample_pdf = 1.0;
     vec3 sample_weight = vec3(1.0);
-
-    vec3 wi = y_to_z_up * rs.wi;
-    vec3 wo = sample_dspbr(rs.closure, wi, vec3(rng_NextFloat(), rng_NextFloat(), rng_NextFloat()), sample_weight,
-                           sample_pdf, eventType);
-    rs.wo = transpose(y_to_z_up) * wo;
+    rs.wo = sample_dspbr(rs.closure, rs.wi, vec3(rng_NextFloat(), rng_NextFloat(), rng_NextFloat()), sample_weight,
+                         sample_pdf, eventType);
 
     if (sample_pdf > EPS_PDF) {
       pathWeight *= sample_weight;
@@ -234,7 +227,7 @@ int sampleBSDFBounce(inout RenderState rs, inout vec3 pathWeight, out int eventT
 vec3 sampleAndEvaluateDirectLight(const in RenderState rs) {
   // Light light;
   // unpackLightData(0u, light);
-  vec3 n = transpose(y_to_z_up) * rs.closure.n;
+  vec3 n = rs.closure.n;
 
   vec3 light_dir = cPointLightPosition - rs.hitPos;
   float dist2 = dot(light_dir, light_dir);
@@ -251,19 +244,19 @@ vec3 sampleAndEvaluateDirectLight(const in RenderState rs) {
   vec3 allLightContrib = vec3(0.0);
   if ((cosNL > 0.0) && isVisible) {
     allLightContrib =
-        eval_dspbr(rs.closure, y_to_z_up * rs.wi, y_to_z_up * light_dir) * (cPointLightEmission / dist2) * cosNL;
+        eval_dspbr(rs.closure, rs.wi, light_dir) * (cPointLightEmission / dist2) * cosNL;
   }
 
   // if (u_bool_iblSampling) {
   //   float pdf = 0.0;
-  //   vec3 iblDir = transpose(y_to_z_up)*sampleHemisphereCosine(vec2(rng_NextFloat(), rng_NextFloat()), pdf);
+  //   vec3 iblDir = sampleHemisphereCosine(vec2(rng_NextFloat(), rng_NextFloat()), pdf);
   //   //vec3 iblDir = mapUVToDir(vec2(rng_NextFloat(), rng_NextFloat()), pdf);
   //   isVisible = isEnvVisible(rs.hitPos + n * EPS_NORMAL, iblDir);
 
   //   cosNL = dot(iblDir, n);
   //   if ((cosNL > 0.0) && isVisible) {
   //     allLightContrib +=
-  //         eval_dspbr(rs.closure, y_to_z_up * rs.wi, y_to_z_up * iblDir) * sampleIBL(iblDir) * cosNL / pdf;
+  //         eval_dspbr(rs.closure, rs.wi, iblDir) * sampleIBL(iblDir) * cosNL / pdf;
   //   }
   // }
   return allLightContrib;
@@ -288,11 +281,11 @@ vec4 traceDebug(const Ray r) {
     if (u_int_DebugMode == 4)
       contrib = rs.closure.n;
     if (u_int_DebugMode == 5) {
-      contrib = rs.closure.t;
+      contrib = rs.closure.t.xyz;
     }
     if (u_int_DebugMode == 6) {
-      mat3 onb = get_onb(rs.closure.n, rs.closure.t);
-      contrib = onb[1];
+      Geometry g = calculateBasis(rs.closure.n, rs.closure.t);
+      contrib = g.b;
     }
     if (u_int_DebugMode == 7) {
       contrib = vec3(rs.closure.transparency);
