@@ -29,7 +29,7 @@ class Light {
 }
 
 type DebugMode = "None" | "Albedo" | "Metalness" | "Roughness" | "Normals" | "Tangents" | "Bitangents" | "Transparency" | "UV0";
-type TonemappingMode = "None" | "Reinhard" | "Uncharted2" | "OptimizedCineon" | "AcesFilm";
+type TonemappingMode = "None" | "Reinhard" | "Cineon" | "AcesFilm";
 type SheenMode = "Charlie" | "Ashikhmin";
 
 var fileLoader = new THREE.FileLoader();
@@ -96,7 +96,7 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
-  public tonemappingModes = ["None", "Reinhard", "Uncharted2", "OptimizedCineon", "AcesFilm"];
+  public tonemappingModes = ["None", "Reinhard", "Cineon", "AcesFilm"];
   private _tonemapping: TonemappingMode = "None";
   public get tonemapping() {
     return this._tonemapping;
@@ -847,7 +847,7 @@ export class PathtracingRenderer {
 
         // tangent
         srcIdx = srcTriangleIdx * 12 + vertIdx * 4;
-        
+
         combinedMeshBuffer[dstIdx + 12] = tga[srcIdx];
         combinedMeshBuffer[dstIdx + 13] = tga[srcIdx + 1];
         combinedMeshBuffer[dstIdx + 14] = tga[srcIdx + 2];

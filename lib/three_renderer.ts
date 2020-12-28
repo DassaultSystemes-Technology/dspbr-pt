@@ -1,5 +1,6 @@
 
 import * as THREE from 'three';
+import { LinearToneMapping } from 'three';
 
 export class ThreeRenderer {
   private gl: any;
@@ -7,16 +8,30 @@ export class ThreeRenderer {
 
   private ibl: THREE.Texture;
   private pmremGenerator: THREE.PMREMGenerator;
-  private scene: THREE.Scene;
+  private scene: THREE.Scene | null;
   private renderer: THREE.WebGLRenderer;
 
   private isRendering = false;
 
-  public set exposure(val) {
+  private dirty = false;
+
+  public set exposure(val: number) {
     this.renderer.toneMappingExposure = val;
   }
   public get exposure() {
     return this.renderer.toneMappingExposure;
+  }
+
+  private tonemappingModes = {
+    "None": THREE.LinearToneMapping, 
+    "Reinhard": THREE.ReinhardToneMapping, 
+    "Cineon": THREE.CineonToneMapping, 
+    "AcesFilm": THREE.ACESFilmicToneMapping
+  };
+
+  set tonemapping(val: string) {
+    this.renderer.toneMapping = this.tonemappingModes[val];
+    this.dirty = true;
   }
 
   showBackground(flag) {
@@ -27,11 +42,13 @@ export class ThreeRenderer {
     }
   }
 
-  public useIBL(val) {
+  useIBL(val) {
     if (val) {
       this.scene.environment = this.ibl;
+      this.showBackground(true);
     } else {
       this.scene.environment = null;
+      this.showBackground(false);
     }
   }
  
@@ -39,15 +56,9 @@ export class ThreeRenderer {
     this.canvas = canvas !== undefined ? canvas : document.createElementNS('http://www.w3.org/1999/xhtml', 'canvas');
     this.gl = this.canvas.getContext('webgl2');
 
-    //THREE.Object3D.DefaultUp = new THREE.Vector3(0,0,1);
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, context: this.gl, powerPreference: "high-performance", alpha: true });
     this.renderer.setPixelRatio(pixelRatio);
     this.renderer.setSize(canvas.width, canvas.height);
-    this.renderer.extensions.get('EXT_color_buffer_float');
-    this.renderer.extensions.get('EXT_color_buffer_half_float');
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping; 
-    // this.renderer.toneMapping = THREE.NoToneMapping
-    // this.renderer.outputEncoding = THREE.sRGBEncoding;
     this.renderer.outputEncoding = THREE.GammaEncoding;
     this.renderer.physicallyCorrectLights = true;
 
@@ -66,14 +77,17 @@ export class ThreeRenderer {
     }
     this.isRendering = true;
 
-    let _this = this;
     let renderFrame = () => {
-      if (!_this.isRendering) {
+      if (!this.isRendering) {
         return;
       }
 
-      this.renderer.render(_this.scene, camera);
+      if(this.dirty) {
+        this.renderer.compile(this.scene, camera);
+        this.dirty = false;
+      }
 
+      this.renderer.render(this.scene, camera);
       if (frameFinishedCB !== undefined)
         frameFinishedCB();
       requestAnimationFrame(renderFrame);
@@ -83,11 +97,10 @@ export class ThreeRenderer {
   }
 
   resize(width: number, height: number) {
-    // this.renderer.setPixelRatio(1.0);
     this.renderer.setSize(width, height);
   }
 
-  setIBL(texture) {
+  setIBL(tex: any) {
     if (!this.scene) {
       return;
     }
@@ -96,14 +109,12 @@ export class ThreeRenderer {
       this.ibl.dispose();
     }
 
-    this.ibl = this.pmremGenerator.fromEquirectangular(texture).texture;
-
+    this.ibl = this.pmremGenerator.fromEquirectangular(tex).texture;
     this.scene.background = this.ibl;
     this.scene.environment  = this.ibl;
   }
 
   setScene(scene) {
-    // console.log("GL Renderer state before load:\n", this.renderer.info);
     this.scene = scene;
   }
 

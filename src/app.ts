@@ -159,7 +159,7 @@ class App {
             this.hideSpinner();
           });
 
-          this.three_renderer.setScene(gltf.scene);
+          this.three_renderer.setScene(new THREE.Scene().add(gltf.scene));
           this.three_renderer.setIBL(ibl);
         });
       }
@@ -227,7 +227,7 @@ class App {
           this.startPathtracing();
       });
 
-      this.three_renderer.setScene(gltf.scene);
+      this.three_renderer.setScene(new THREE.Scene().add(gltf.scene));
       this.three_renderer.setIBL(ibl);
       if (!this.pathtracing) {
         this.startRasterizer();
@@ -283,7 +283,9 @@ class App {
     });
 
     this._gui.add(this.renderer, 'debugMode', this.renderer.debugModes).name('Debug Mode');
-    this._gui.add(this.renderer, 'tonemapping', this.renderer.tonemappingModes).name('Tonemapping');
+    this._gui.add(this.renderer, 'tonemapping', this.renderer.tonemappingModes).name('Tonemapping').onChange(val => {
+        this.three_renderer.tonemapping = val;
+    });
     this._gui.add(this.renderer, 'enableGamma').name('Gamma');
 
     this._gui.add(this.renderer, 'renderScale').name('Render Res').min(0.1).max(1.0);
