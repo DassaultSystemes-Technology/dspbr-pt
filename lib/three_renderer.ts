@@ -88,6 +88,10 @@ export class ThreeRenderer {
   }
 
   setIBL(texture) {
+    if (!this.scene) {
+      return;
+    }
+
     if (this.ibl !== undefined) {
       this.ibl.dispose();
     }
@@ -101,7 +105,6 @@ export class ThreeRenderer {
   setScene(scene) {
     // console.log("GL Renderer state before load:\n", this.renderer.info);
     this.scene = scene;
-    //scene.applyMatrix4(y_to_z_up);
   }
 
 }

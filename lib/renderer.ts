@@ -194,8 +194,6 @@ export class PathtracingRenderer {
   private _isRendering = false;
   private _gltf: any;
 
-  //var y_to_z_up = new THREE.Matrix4().makeRotationX(-Math.PI *0.5);
-
   constructor(canvas: HTMLCanvasElement | undefined, pixelRatio: number = 1.0) {
     // console.time("Init Pathtracing Renderer");
     this.canvas = canvas !== undefined ? canvas : document.createElementNS('http://www.w3.org/1999/xhtml', 'canvas');
@@ -606,7 +604,7 @@ export class PathtracingRenderer {
       }
       if ('KHR_materials_volume' in extensions) {
         let ext = extensions["KHR_materials_volume"];
-        matInfo.thinWalled = get_param("thickness", ext, 0.0) > 0.0 ? 0 : 1;
+        matInfo.thinWalled = get_param("thicknessFactor", ext, 0.0) > 0.0 ? 0 : 1;
         matInfo.attenuationColor = get_param("attenuationColor", ext, matInfo.attenuationColor);
         matInfo.attenuationDistance = get_param("attenuationDistance", ext, matInfo.attenuationDistance);
         matInfo.subsurfaceColor = get_param("subsurfaceColor", ext, matInfo.subsurfaceColor);
@@ -650,7 +648,6 @@ export class PathtracingRenderer {
         + ' it may contain individual 3D resources.'
       );
     }
-    //scene.applyMatrix4(y_to_z_up);
 
     this._gltf = gltf;
 
@@ -722,7 +719,6 @@ export class PathtracingRenderer {
       materialTextureInfoBuffer.push(<MaterialTextureInfo>matTexInfo);
     }
 
-    //var flattenedMeshList = [].concat.apply([], meshes);
     await this.prepareDataBuffers(meshes, lights, materialBuffer, materialTextureInfoBuffer, triangleMaterialMarkers);
 
     console.timeEnd("Inititialized path-tracer");
@@ -851,7 +847,7 @@ export class PathtracingRenderer {
 
         // tangent
         srcIdx = srcTriangleIdx * 12 + vertIdx * 4;
-
+        
         combinedMeshBuffer[dstIdx + 12] = tga[srcIdx];
         combinedMeshBuffer[dstIdx + 13] = tga[srcIdx + 1];
         combinedMeshBuffer[dstIdx + 14] = tga[srcIdx + 2];

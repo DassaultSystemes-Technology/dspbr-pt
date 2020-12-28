@@ -146,7 +146,7 @@ vec2 roughness_conversion(float roughness, float anisotropy) {
   return max(a * a, vec2(MINIMUM_ROUGHNESS));
 }
 
-void configure_material(const in uint matIdx, inout RenderState rs, out MaterialClosure c) {
+void configure_material(const in uint matIdx, inout RenderState rs, out MaterialClosure c, vec4 vertexColor) {
   vec2 uv = rs.uv0;
 
   MaterialData matData;
@@ -157,6 +157,11 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
 
   vec4 albedo = evaluateMaterialTextureValue(matTexInfo.albedoTexture, uv);
   c.albedo = matData.albedo * pow(albedo.xyz, vec3(2.2));
+
+  if (length(vertexColor) > 0.0) {
+    c.albedo *= vertexColor.xyz;
+    albedo.w *= vertexColor.w;
+  }
 
   c.cutout_opacity = matData.cutoutOpacity * albedo.w;
   if (matData.alphaCutoff > 0.0) { // MASK
@@ -190,24 +195,25 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
   c.sheen_roughness = matData.sheenRoughness * sheenRoughness.x;
   c.sheen_color = matData.sheenColor * sheenColor.xyz;
 
-  c.n = y_to_z_up * rs.normal;
-  c.ng = y_to_z_up * rs.geometryNormal;
-  c.t = y_to_z_up * rs.tangent;
+  c.n = rs.normal;
+  c.ng = rs.geometryNormal;
+  c.t = vec4(rs.tangent.xyz, rs.tangent.w);
 
   if (matTexInfo.normalTexture.texIdx >= 0) {
-    mat3 to_world = get_onb(c.n, c.t);
+    mat3 to_world = get_onb(c.n, c.t.xyz);
     vec3 n = normalize(evaluateMaterialTextureValue(matTexInfo.normalTexture, uv).xyz * 2.0 - vec3(1.0));
     c.n = to_world * n;
+
+    // ensure orthonormal tangent after changing normal
+    vec3 b = normalize(cross(c.n, c.t.xyz)) * c.t.w;
+    c.t.xyz = cross(b, c.n);
   }
 
   // ensure n and ng point into the same hemisphere as wi
   // remember whether we hit from backside
-  vec3 wi = y_to_z_up * rs.wi;
+  vec3 wi = rs.wi;
   c.backside = fix_normals(c.n, c.ng, wi);
-
-  // ensure orthonormal basis
-  c.t = get_onb(c.n, c.t)[0];
-
+  
   // apply aniso rotation
   c.t = rotation_to_tangent(matData.anisotropyRotation, c.n, c.t);
 

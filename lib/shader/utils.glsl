@@ -17,8 +17,6 @@ struct Geometry {
   vec3 n, t, b;
 };
 
-const mat3 y_to_z_up = mat3(1, 0, 0, 0, 0, 1, 0, -1, 0);
-
 float saturate(float val) {
   return clamp(val, 0.0, 1.0);
 }
@@ -122,6 +120,14 @@ mat3 get_onb(vec3 n, vec3 t) {
   return mat3(tt, b, n);
 }
 
+Geometry calculateBasis(vec3 n, vec4 t) {
+  Geometry g;
+  g.n = n;
+  g.t = t.xyz;
+  g.b = cross(n, t.xyz) * t.w;
+  return g;
+}
+
 float computeTheta(vec3 dir) {
   return acos(max(-1.0, min(1.0, -dir.y)));
 }
@@ -198,15 +204,11 @@ float max_(vec3 v) {
   return max(v.x, max(v.y, v.z));
 }
 
-bool same_hemisphere(const in vec3 wi, const in vec3 wo) {
-  return wi.z * wo.z > 0.0;
-}
 
-vec3 rotation_to_tangent(float anisotropy_rotation_angle, vec3 normal, vec3 tangent) {
-  if (anisotropy_rotation_angle > 0.0) {
-    float angle = anisotropy_rotation_angle;
-    vec3 bitangent = cross(normal, tangent);
-    return tangent * cos(angle) + bitangent * sin(angle);
+vec4 rotation_to_tangent(float angle, vec3 normal, vec4 tangent) {
+  if (angle > 0.0) {
+    Geometry g = calculateBasis(normal, tangent);
+    return vec4(g.t * cos(angle) + g.b * sin(angle), tangent.w);
   } else {
     return tangent;
   }

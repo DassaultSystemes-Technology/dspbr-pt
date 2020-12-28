@@ -17,13 +17,13 @@
 // import 'regenerator-runtime/runtime'
 import Stats from 'three/examples/jsm/libs/stats.module.js';
 import { GUI } from 'dat.GUI';
-import scene_index from '../assets/scenes/scene_index.js';
-import ibl_index from '../assets/env/ibl_index.js';
-import * as loader from '../lib/scene_loader';
 import { ThreeRenderer } from '../lib/three_renderer';
 import { PathtracingRenderer } from '../lib/renderer';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import * as Assets from '../assets/asset_index';
+import * as Loader from '../lib/scene_loader';
+
 
 if (window.File && window.FileReader && window.FileList && window.Blob) {
   // Great success! All the File APIs are supported.
@@ -42,10 +42,10 @@ class App {
   canvas: HTMLCanvasElement;
   canvas_three: HTMLCanvasElement;
   canvas_pt: HTMLCanvasElement;
-  spinner: HTMLElement;
+  spinner: Element;
   container: HTMLElement | null;
-  Scene: string;
-  IBL: string;
+  scene: string;
+  ibl: string;
   camera: THREE.PerspectiveCamera;
   controls: OrbitControls;
 
@@ -61,8 +61,8 @@ class App {
   sceneBoundingBox: THREE.Box3;
 
   constructor() {
-    this.Scene = Object.values<string>(scene_index)[0];
-    this.IBL = Object.values<string>(ibl_index)[0];
+    this.scene = Assets.getScene(0).name;
+    this.ibl = Assets.getIBL(0).name;
 
     this.container = document.createElement('div');
     document.body.appendChild(this.container);
@@ -118,7 +118,7 @@ class App {
 
     this.renderer = new PathtracingRenderer(this.canvas_pt, window.devicePixelRatio);
     this.three_renderer = new ThreeRenderer(this.canvas_three, window.devicePixelRatio);
-    this.loadScene(this.Scene);
+    // this.loadScene(Assets.getScene(0).url);
 
     this.renderer.renderScale = 0.5;
     // this.renderer.iblRotation = 180.0;
@@ -141,14 +141,16 @@ class App {
         getFileExtension(e.dataTransfer.files[0].name) == "hdr") {
         console.log("loading HDR...");
         // const url = URL.createObjectURL(e.dataTransfer.getData('text/html'));
-        loader.loadIBL(URL.createObjectURL(e.dataTransfer.items[0].getAsFile())).then((ibl) => {
+        Loader.loadIBL(URL.createObjectURL(e.dataTransfer.items[0].getAsFile())).then((ibl) => {
           this.renderer.setIBL(ibl);
           this.three_renderer.setIBL(ibl);
+          const iblNode = document.getElementById("ibl-info");
+          iblNode.innerHTML = '';
         });
       } else {
         this.showSpinner();
-        const scenePromise = loader.loadSceneFromBlobs(e.dataTransfer.files, this.autoScaleScene);
-        const iblPromise = loader.loadIBL(this.IBL);
+        const scenePromise = Loader.loadSceneFromBlobs(e.dataTransfer.files, this.autoScaleScene);
+        const iblPromise = Loader.loadIBL(Assets.getIBLByName(this.ibl).url);
         Promise.all([scenePromise, iblPromise]).then(([gltf, ibl]) => {
           this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
           this.renderer.setIBL(ibl);
@@ -213,9 +215,9 @@ class App {
     this.camera.updateProjectionMatrix();
   }
 
-  private loadScene(url) {
-    const scenePromise = loader.loadScene(url, this.autoScaleScene);
-    const iblPromise = loader.loadIBL(this.IBL);
+  private loadScene(sceneUrl) {
+    const scenePromise = Loader.loadScene(sceneUrl, this.autoScaleScene);
+    const iblPromise = Loader.loadIBL(Assets.getIBLByName(this.ibl).url);
 
     Promise.all([scenePromise, iblPromise]).then(([gltf, ibl]) => {
       this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
@@ -233,12 +235,9 @@ class App {
     });
   }
 
-
   initUI() {
     if (this._gui)
       return;
-
-    let _this = this;
 
     this._gui = new GUI();
     this._gui.domElement.classList.add("hidden");
@@ -246,59 +245,65 @@ class App {
 
     this._gui.add(this, 'pathtracing').name('Use Pathtracing').onChange((value) => {
       if (value == false) {
-        _this.startRasterizer();
+        this.startRasterizer();
       } else {
-        _this.startPathtracing();
+        this.startPathtracing();
       }
     });
-
-    this._gui.add(this, "Scene", scene_index).onChange(function (value) {
-      console.log(`Loading ${value}`);
-      _this.loadScene(value);
-    });
+  
+    this._gui.add(this, "scene", Assets.scene_names).name('Scene').onChange((value) => {
+      const sceneInfo = Assets.getSceneByName(value);
+      console.log(`Loading ${sceneInfo.name}`);
+      this.loadScene(sceneInfo.url);
+      this.setSceneInfo(sceneInfo);
+    }).setValue(Assets.getScene(0).name);
+    
     this._gui.add(this, 'autoScaleScene').name('Autoscale Scene');
 
-    this._gui.add(this, "IBL", ibl_index).onChange(function (value) {
-      console.log(`Loading ${value}`);
-      loader.loadIBL(_this.IBL).then((ibl) => {
-        _this.renderer.setIBL(ibl);
-        _this.three_renderer.setIBL(ibl);
+    this._gui.add(this, "ibl", Assets.ibl_names).name('IBL').onChange((value) => {
+      const iblInfo = Assets.getIBLByName(value);
+      console.log(`Loading ${iblInfo.name}`);
+      Loader.loadIBL(iblInfo.url).then((ibl) => {
+        this.renderer.setIBL(ibl);
+        this.three_renderer.setIBL(ibl);
+        this.setIBLInfo(iblInfo);
       });
-    });
-    this._gui.add(_this.renderer, 'iblRotation').name('IBL Rotation').min(-180.0).max(180.0).step(0.1);
+    }).setValue(Assets.getIBL(0).name);
+
+    this._gui.add(this.renderer, 'iblRotation').name('IBL Rotation').min(-180.0).max(180.0).step(0.1);
     // this._gui.add(_this.renderer, 'iblSampling').name('IBL Sampling');
 
-    this._gui.add(_this.renderer, 'exposure').name('Display Exposure').min(0).max(3).step(0.01).onChange(function (value) {
-      _this.three_renderer.exposure = value;
+    this._gui.add(this.renderer, 'exposure').name('Display Exposure').min(0).max(3).step(0.01).onChange((value) => {
+      this.three_renderer.exposure = value;
     });
 
-    this._gui.add(this, 'autoRotate').name('Auto Rotate').onChange(function (value) {
-      _this.controls.autoRotate = value;
-      _this.renderer.resetAccumulation();
+    this._gui.add(this, 'autoRotate').name('Auto Rotate').onChange((value) => {
+      this.controls.autoRotate = value;
+      this.renderer.resetAccumulation();
     });
 
-    this._gui.add(_this.renderer, 'debugMode', this.renderer.debugModes).name('Debug Mode');
-    this._gui.add(_this.renderer, 'tonemapping', this.renderer.tonemappingModes).name('Tonemapping');
-    this._gui.add(_this.renderer, 'enableGamma').name('Gamma');
+    this._gui.add(this.renderer, 'debugMode', this.renderer.debugModes).name('Debug Mode');
+    this._gui.add(this.renderer, 'tonemapping', this.renderer.tonemappingModes).name('Tonemapping');
+    this._gui.add(this.renderer, 'enableGamma').name('Gamma');
 
-    this._gui.add(_this.renderer, 'renderScale').name('Render Res').min(0.1).max(1.0);
+    this._gui.add(this.renderer, 'renderScale').name('Render Res').min(0.1).max(1.0);
     this._gui.add(this, 'interactionScale').name('Interaction Res').min(0.1).max(1.0).step(0.1);
 
-    this._gui.add(_this.renderer, 'useIBL').name('Use IBL').onChange((value) => {
-      _this.three_renderer.useIBL(value);
+    this._gui.add(this.renderer, 'useIBL').name('Use IBL').onChange((value) => {
+      this.three_renderer.useIBL(value);
     });
-    this._gui.add(_this.renderer, 'showBackground').name('Show Background').onChange((value) => {
-      _this.three_renderer.showBackground(value);
+    this._gui.add(this.renderer, 'showBackground').name('Show Background').onChange((value) => {
+      this.three_renderer.showBackground(value);
     });
 
-    this._gui.add(_this.renderer, 'forceIBLEval').name('Force IBL Eval');
-    this._gui.add(_this.renderer, 'maxBounces').name('Bounce Depth').min(0).max(32).step(1);
-    this._gui.add(_this.renderer, 'sheenG', this.renderer.sheenGModes).name('Sheen G');
+    this._gui.add(this.renderer, 'forceIBLEval').name('Force IBL Eval');
+    this._gui.add(this.renderer, 'maxBounces').name('Bounce Depth').min(0).max(32).step(1);
+    this._gui.add(this.renderer, 'sheenG', this.renderer.sheenGModes).name('Sheen G');
 
     let reload_obj = {
       reload: () => {
         console.log("Reload");
-        this.loadScene(this.Scene);
+        this.loadScene(Assets.getSceneByName(this.scene).url);
       }
     };
     this._gui.add(reload_obj, 'reload').name('Reload');
@@ -317,13 +322,17 @@ class App {
     };
     this._gui.add(center_obj, 'centerView').name('Center View');
 
-    // const save_img = {
-    //   save_img: () => {
-    //     console.log("Reload");
-    //     var dataURL = this.canvas.toDataURL('image/png');
-    //   }
-    // };
-    // this._gui.add(save_img, 'save_img').name('Save PNG');
+    const save_img = {
+      save_img: () => {
+        console.log("Save Image");
+        var dataURL = this.canvas.toDataURL('image/png');
+        const link = document.createElement("a");
+        link.download = 'capture.png';
+        link.href = dataURL;
+        link.click();
+      }
+    };
+    this._gui.add(save_img, 'save_img').name('Save PNG');
   }
 
   showSpinner() {
@@ -332,6 +341,24 @@ class App {
 
   hideSpinner() {
     this.spinner.style.display = 'none';
+  }
+
+  setIBLInfo(ibl: any) {
+    const html = `
+      IBL: ${ibl.name} by ${ibl.author} 
+      from <a href="${ibl.source_url}"> ${ibl.source} </a>
+      <a href="${ibl.license_url}">(${ibl.license})</a>
+      `;
+    document.getElementById("ibl-info").innerHTML = html;
+  }
+
+  setSceneInfo(scene: any) {
+    const html = `
+      Scene: ${scene.name} by ${scene.author} 
+      from <a href="${scene.source_url}"> ${scene.source} </a>
+      <a href="${scene.license_url}">(${scene.license})</a>
+      `;
+    document.getElementById("scene-info").innerHTML = html;
   }
 }
 
