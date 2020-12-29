@@ -13,10 +13,8 @@
  * limitations under the License.
  */
 
-import "core-js/stable";
 import 'regenerator-runtime/runtime'
-import * as THREE from 'three'
-import {PathtracingRenderer} from '../../lib/renderer';
+import {PathtracingRenderer, PerspectiveCamera} from '../../lib/renderer';
 import * as loader from '../../lib/scene_loader';
 
 const {ipcRenderer} = window.require('electron');
@@ -47,7 +45,7 @@ function startRenderer() {
       var camera = cameras[0];
     } else {
       var camera =
-          new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+          new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
       this.camera.position.set(0, 0, 3);
     }
 
