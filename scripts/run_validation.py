@@ -19,7 +19,7 @@ ibl_path = "../EnterprisePBRShadingModel/validation/scenes/ball/environment.hdr"
 scenarios = [
   "ball",
   "sphere",
-  "sphere-ibl"
+  "sphere-ibl" 
 ]
 
 for scenario in scenarios:
@@ -34,7 +34,7 @@ for scenario in scenarios:
     file  = file.replace('\\', '/')
     out_image  = out_image.replace('\\', '/')
 
-    render_call = ['npm', 'run', 'render', '--', '--', "../"+ file, '--res', '400', '400', '--samples', '512', '-b', '32', '--ibl-rotation', '180'];
+    render_call = ['npm', 'run', 'render', '--', '--', "../"+ file, '--res', '400', '400', '--samples', '64', '-b', '32', '--ibl-rotation', '180'];
     if len(hdrs) > 0: 
       ibl_path = '../' + hdrs[0].replace('\\', '/')
       subprocess.run(render_call + ['--ibl', ibl_path], shell=True)
