@@ -1,6 +1,5 @@
 
 import * as THREE from 'three';
-import { LinearToneMapping } from 'three';
 
 export class ThreeRenderer {
   private gl: any;
@@ -51,14 +50,14 @@ export class ThreeRenderer {
       this.showBackground(false);
     }
   }
- 
-  constructor(canvas: HTMLCanvasElement | undefined, pixelRatio: number = 1.0) {
-    this.canvas = canvas !== undefined ? canvas : document.createElementNS('http://www.w3.org/1999/xhtml', 'canvas');
-    this.gl = this.canvas.getContext('webgl2');
 
-    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, context: this.gl, powerPreference: "high-performance", alpha: true });
-    this.renderer.setPixelRatio(pixelRatio);
-    this.renderer.setSize(canvas.width, canvas.height);
+  setPixelRatio(val: number) {
+    this.renderer.setPixelRatio(val);
+  }
+ 
+  constructor(parameters?: THREE.WebGLRendererParameters) {
+    this.renderer = new THREE.WebGLRenderer(parameters);
+    // this.renderer.setSize(canvas.width, canvas.height);
     this.renderer.outputEncoding = THREE.GammaEncoding;
     this.renderer.physicallyCorrectLights = true;
 

@@ -13,8 +13,6 @@
  * limitations under the License.
  */
 
-// import "core-js/stable";
-// import 'regenerator-runtime/runtime'
 import Stats from 'three/examples/jsm/libs/stats.module.js';
 import { GUI } from 'dat.GUI';
 import { ThreeRenderer } from '../lib/three_renderer';
@@ -24,16 +22,8 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import * as Assets from '../assets/asset_index';
 import * as Loader from '../lib/scene_loader';
 
-
-if (window.File && window.FileReader && window.FileList && window.Blob) {
-  // Great success! All the File APIs are supported.
-} else {
+if (!window.File || !window.FileReader || !window.FileList || !window.Blob) {
   alert('The File APIs are not fully supported in this browser.');
-}
-
-
-function getFileExtension(filename: string) {
-  return filename.split('.').pop();
 }
 
 class App {
@@ -102,12 +92,12 @@ class App {
     });
 
     this.controls.addEventListener('start', () => {
-      this["renderScale"] = this.renderer.renderScale;
-      this.renderer.renderScale = this.interactionScale;
+      this["pixelRatio"] = this.renderer.pixelRatio;
+      this.renderer.pixelRatio = this.interactionScale;
     });
 
     this.controls.addEventListener('end', () => {
-      this.renderer.renderScale = this["renderScale"];
+      this.renderer.pixelRatio = this["pixelRatio"];
     });
 
     this.controls.mouseButtons = {
@@ -116,11 +106,10 @@ class App {
       RIGHT: THREE.MOUSE.DOLLY
     }
 
-    this.renderer = new PathtracingRenderer(this.canvas_pt, window.devicePixelRatio);
-    this.three_renderer = new ThreeRenderer(this.canvas_three, window.devicePixelRatio);
-    // this.loadScene(Assets.getScene(0).url);
+    this.renderer = new PathtracingRenderer({ canvas: this.canvas_pt});
+    this.three_renderer = new ThreeRenderer({ canvas: this.canvas_three, powerPreference: "high-performance", alpha: true });
 
-    this.renderer.renderScale = 0.5;
+    this.renderer.pixelRatio = 0.5; 
     // this.renderer.iblRotation = 180.0;
 
     window.addEventListener('resize', () => {
@@ -138,7 +127,7 @@ class App {
       e.stopPropagation();
 
       if (e.dataTransfer.files.length == 1 &&
-        getFileExtension(e.dataTransfer.files[0].name) == "hdr") {
+        e.dataTransfer.files[0].name.match(/\.hdr$/)) {
         console.log("loading HDR...");
         // const url = URL.createObjectURL(e.dataTransfer.getData('text/html'));
         Loader.loadIBL(URL.createObjectURL(e.dataTransfer.items[0].getAsFile())).then((ibl) => {
@@ -154,9 +143,10 @@ class App {
         Promise.all([scenePromise, iblPromise]).then(([gltf, ibl]) => {
           this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
           this.renderer.setIBL(ibl);
-          this.renderer.setScene(gltf).then(() => {
+          this.renderer.setScene(gltf.scene, gltf).then(() => {
             this.startPathtracing();
             this.hideSpinner();
+            document.getElementById("scene-info").innerHTML = '';
           });
 
           this.three_renderer.setScene(new THREE.Scene().add(gltf.scene));
@@ -222,7 +212,7 @@ class App {
     Promise.all([scenePromise, iblPromise]).then(([gltf, ibl]) => {
       this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
       this.renderer.setIBL(ibl);
-      this.renderer.setScene(gltf).then(() => {
+      this.renderer.setScene(gltf.scene, gltf).then(() => {
         if (this.pathtracing)
           this.startPathtracing();
       });
@@ -287,9 +277,9 @@ class App {
         this.three_renderer.tonemapping = val;
     });
     this._gui.add(this.renderer, 'enableGamma').name('Gamma');
-
-    this._gui.add(this.renderer, 'renderScale').name('Render Res').min(0.1).max(1.0);
-    this._gui.add(this, 'interactionScale').name('Interaction Res').min(0.1).max(1.0).step(0.1);
+    
+    this._gui.add(this.renderer, 'pixelRatio').name('Pixel Ratio').min(0.1).max(1.0);
+    this._gui.add(this, 'interactionScale').name('Interaction Ratio').min(0.1).max(1.0).step(0.1);
 
     this._gui.add(this.renderer, 'useIBL').name('Use IBL').onChange((value) => {
       this.three_renderer.useIBL(value);

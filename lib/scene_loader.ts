@@ -62,8 +62,7 @@ export function loadScene(url: string, autoscale: boolean, manager?: LoadingMana
       if (!scene) {
         // Valid, but not supported by this viewer.
         throw new Error(
-          'This model contains no scene, and cannot be viewed here. However,'
-          + ' it may contain individual 3D resources.'
+          'This model contains no scene, and cannot be viewed.'
         );
       }
 
