@@ -716,25 +716,25 @@ export class PathtracingRenderer {
           delete geo.attributes[attr];
       }
 
-      if (geo.attributes.normal === undefined)
+      if (!geo.attributes.normal)
         geo.computeVertexNormals();
-      if (geo.attributes.uv !== undefined && geo.attributes.tangent === undefined)
+      if (geo.attributes.uv  && !geo.attributes.tangent)
         BufferGeometryUtils.computeTangents(geo);
 
-      const numVertices = geo.attributes.position.count / 3;
-      if (geo.attributes.uv === undefined) {
+      const numVertices = geo.attributes.position.count;
+      if (!geo.attributes.uv) {
         const uvs = new Float32Array(numVertices * 2);
         geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
       }
-      if (geo.attributes.uv2 === undefined) {
+      if (!geo.attributes.uv2) {
         const uvs = new Float32Array(numVertices * 2);
         geo.setAttribute('uv2', new THREE.BufferAttribute(uvs, 2));
       }
-      if (geo.attributes.tangent === undefined) {
+      if (!geo.attributes.tangent) {
         const tangents = new Float32Array(numVertices * 4);
         geo.setAttribute('tangent', new THREE.BufferAttribute(tangents, 4));
       }
-      if (geo.attributes.color === undefined) {
+      if (!geo.attributes.color) {
         const col = new Float32Array(numVertices * 4);
         geo.setAttribute('color', new THREE.BufferAttribute(col, 4));
       }
@@ -752,7 +752,7 @@ export class PathtracingRenderer {
     if (bufferGeometry.index)
       bufferGeometry = bufferGeometry.toNonIndexed();
 
-    let total_number_of_triangles = bufferGeometry.attributes.position.array.length / 9;
+    let total_number_of_triangles = bufferGeometry.attributes.position.count / 3;
 
     console.time("BvhGeneration");
     var vpa = new Float32Array(total_number_of_triangles * 12);
@@ -797,14 +797,14 @@ export class PathtracingRenderer {
 
         // position
         let srcIdx = srcTriangleIdx * 12 + vertIdx * 4;
-        combinedMeshBuffer[dstIdx + 0] = vpa[srcIdx];
+        combinedMeshBuffer[dstIdx + 0] = vpa[srcIdx + 0];
         combinedMeshBuffer[dstIdx + 1] = vpa[srcIdx + 1];
         combinedMeshBuffer[dstIdx + 2] = vpa[srcIdx + 2];
         combinedMeshBuffer[dstIdx + 3] = vpa[srcIdx + 3];
 
         // normal
         srcIdx = srcTriangleIdx * 9 + vertIdx * 3;
-        combinedMeshBuffer[dstIdx + 4] = vna[srcIdx];
+        combinedMeshBuffer[dstIdx + 4] = vna[srcIdx + 0];
         combinedMeshBuffer[dstIdx + 5] = vna[srcIdx + 1];
         combinedMeshBuffer[dstIdx + 6] = vna[srcIdx + 2];
         combinedMeshBuffer[dstIdx + 7] = 0.0;
@@ -821,7 +821,7 @@ export class PathtracingRenderer {
         // tangent
         srcIdx = srcTriangleIdx * 12 + vertIdx * 4;
 
-        combinedMeshBuffer[dstIdx + 12] = tga[srcIdx];
+        combinedMeshBuffer[dstIdx + 12] = tga[srcIdx + 0];
         combinedMeshBuffer[dstIdx + 13] = tga[srcIdx + 1];
         combinedMeshBuffer[dstIdx + 14] = tga[srcIdx + 2];
         combinedMeshBuffer[dstIdx + 15] = tga[srcIdx + 3];

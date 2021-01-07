@@ -1,5 +1,3 @@
-## 
-
 # Enterprise PBR Sample Renderer ([Demo](https://dassaultsystemes-technology.github.io/dspbr-pt/) |  [Validation Report](https://dassaultsystemes-technology.github.io/dspbr-pt/report/))
 
 
@@ -28,8 +26,8 @@ All of the mentioned extensions are implemented in terms of the Enterprise PBR s
 > ### Caveats
 > The renderer serves as a fancy wrapper for the Enterprise PBR Shading Model code sample, **performance is not a priority**. Some major limiting factors are 
 > * Naive single-level BVH acceleration structure which is slow and prohibits dynamic scenes.
-> * We decided to use plain WebGL2 for accessibility reasons. Implied API limits and required overhead in shader complexity to make "arbitrary" scenes with texturable PBR materials work for path-tracing is insane and a major drag for the performance.
-> * No light importance sampling for now. Expect a significant amount of slow-converging noise for high frequency lighting scenarios and rough materials.
+> * Plain WebGL2 for accessibility reasons. Implied API limits and required overhead in shader complexity to make "arbitrary" scenes with texturable PBR materials work for path-tracing is insane and a major performance drag.
+> * No light importance sampling. Expect a significant amount of slow-converging noise for high frequency lighting scenarios and rough materials.
 
 
 ## [Demo App](https://dassaultsystemes-technology.github.io/dspbr-pt/)

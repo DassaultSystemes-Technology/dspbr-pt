@@ -225,7 +225,8 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
   c.specular_f0 = (1.0 - c.metallic) * c.specular * c.f0 * c.specular_tint + c.metallic * c.albedo;
   c.specular_f90 = vec3((1.0 - c.metallic) * c.specular + c.metallic);
 
-  c.emission = pow(evaluateMaterialTextureValue(matTexInfo.emissionTexture, uv).xyz, vec3(2.2)) * matData.emission;
+  vec3 emission = evaluateMaterialTextureValue(matTexInfo.emissionTexture, uv).xyz;
+  c.emission = matData.emission * pow(emission, vec3(2.2));
 
   vec4 clearcoat = evaluateMaterialTextureValue(matTexInfo.clearcoatTexture, uv);
   c.clearcoat = matData.clearcoat * clearcoat.x;
