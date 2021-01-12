@@ -23,7 +23,7 @@ import { SimpleTriangleBVH } from './bvh';
 import { MaterialData, TexInfo, MaterialTextureInfo } from './material';
 import { Scene } from 'three';
 
-type DebugMode = "None" | "Albedo" | "Metalness" | "Roughness" | "Normals" | "Tangents" | "Bitangents" | "Transparency" | "UV0";
+type DebugMode = "None" | "Albedo" | "Metalness" | "Roughness" | "Normals" | "Tangents" | "Bitangents" | "Transparency" | "UV0" | "Clearcoat";
 type TonemappingMode = "None" | "Reinhard" | "Cineon" | "AcesFilm";
 type SheenMode = "Charlie" | "Ashikhmin";
 
@@ -73,7 +73,7 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
-  public debugModes = ["None", "Albedo", "Metalness", "Roughness", "Normals", "Tangents", "Bitangents", "Transparency", "UV0"];
+  public debugModes = ["None", "Albedo", "Metalness", "Roughness", "Normals", "Tangents", "Bitangents", "Transparency", "UV0", "Clearcoat"];
   private _debugMode: DebugMode = "None";
   public get debugMode() {
     return this._debugMode;
@@ -467,9 +467,9 @@ export class PathtracingRenderer {
       matInfo.normalScale = mat.normalScale.x;
     }
 
+    matInfo.emission = mat.emissive.toArray();
     if (mat.emissiveMap) {
       matTexInfo.emissionTexture = this.parseTexture(mat.emissiveMap);
-      matInfo.emission = mat.emissive.toArray();
     }
 
     matInfo.clearcoat = mat.clearcoat || 0;
