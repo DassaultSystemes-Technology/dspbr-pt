@@ -14,12 +14,18 @@
  */
 
 import * as THREE from 'three';
+import { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+export { PerspectiveCamera } from 'three';
+
 import * as glu from './gl_utils';
 import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { SimpleTriangleBVH } from './bvh';
 import { MaterialData, TexInfo, MaterialTextureInfo } from './material';
-export { PerspectiveCamera } from 'three';
+import { Scene } from 'three';
 
+type DebugMode = "None" | "Albedo" | "Metalness" | "Roughness" | "Normals" | "Tangents" | "Bitangents" | "Transparency" | "UV0" | "Clearcoat";
+type TonemappingMode = "None" | "Reinhard" | "Cineon" | "AcesFilm";
+type SheenMode = "Charlie" | "Ashikhmin";
 
 class Light {
   position = [1, 1, 1];
@@ -28,30 +34,11 @@ class Light {
   pad = 0;
 }
 
-type DebugMode = "None" | "Albedo" | "Metalness" | "Roughness" | "Normals" | "Tangents" | "Bitangents" | "Transparency" | "UV0";
-type TonemappingMode = "None" | "Reinhard" | "Cineon" | "AcesFilm";
-type SheenMode = "Charlie" | "Ashikhmin";
 
-var fileLoader = new THREE.FileLoader();
-function filePromiseLoader(url: string, onProgress?: () => void) {
-  return new Promise<string | ArrayBuffer>((resolve, reject) => {
-    fileLoader.load(url, resolve, onProgress, reject);
-  });
+export interface PathtracingRendererParameters {
+  canvas?: HTMLCanvasElement;
+  context?: WebGL2RenderingContext;
 }
-
-function flattenArray(arr: any, result: number[] = []) {
-  for (let i = 0, length = arr.length; i < length; i++) {
-    const value: any = arr[i];
-    if (Array.isArray(value)) {
-      flattenArray(value, result);
-    } else {
-      result.push(<number>value);
-    }
-  }
-  return result;
-};
-
-// let clock = new THREE.Clock();
 
 export class PathtracingRenderer {
   private gl: any;
@@ -86,7 +73,7 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
-  public debugModes = ["None", "Albedo", "Metalness", "Roughness", "Normals", "Tangents", "Bitangents", "Transparency", "UV0"];
+  public debugModes = ["None", "Albedo", "Metalness", "Roughness", "Normals", "Tangents", "Bitangents", "Transparency", "UV0", "Clearcoat"];
   private _debugMode: DebugMode = "None";
   public get debugMode() {
     return this._debugMode;
@@ -143,16 +130,6 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
-  private _renderScale = 1.0;
-  public get renderScale() {
-    return this._renderScale;
-  }
-  public set renderScale(val) {
-    this._renderScale = val;
-    this.resize(this.canvas.width, this.canvas.height);
-    this.resetAccumulation();
-  }
-
   private _forceIBLEval = false;
   public get forceIBLEval() {
     return this._forceIBLEval;
@@ -190,19 +167,24 @@ export class PathtracingRenderer {
   }
 
   private _pixelRatio = 1.0;
+  public get pixelRatio() {
+    return this._pixelRatio;
+  }
+  public set pixelRatio(val) {
+    this._pixelRatio = val;
+    this.resize(this.canvas.width, this.canvas.height);
+    this.resetAccumulation();
+  }
+
   private _frameCount = 1;
   private _isRendering = false;
-  private _gltf: any;
 
-  constructor(canvas: HTMLCanvasElement | undefined, pixelRatio: number = 1.0) {
-    // console.time("Init Pathtracing Renderer");
-    this.canvas = canvas !== undefined ? canvas : document.createElementNS('http://www.w3.org/1999/xhtml', 'canvas');
-    this.gl = this.canvas.getContext('webgl2');
+  constructor(parameters?: PathtracingRendererParameters) {
+    this.canvas = parameters.canvas ? parameters.canvas : document.createElementNS('http://www.w3.org/1999/xhtml', 'canvas');
+    this.gl = parameters.context ? parameters.context : this.canvas.getContext('webgl2');
     this.gl.getExtension('EXT_color_buffer_float');
     this.gl.getExtension('OES_texture_float_linear');
 
-    if (pixelRatio !== undefined)
-      this._pixelRatio = pixelRatio;
     this.initRenderer();
   }
 
@@ -213,9 +195,8 @@ export class PathtracingRenderer {
   resize(width: number, height: number) {
     this._isRendering = false;
     this.displayRes = [width, height];
-    let scale = this._pixelRatio * this._renderScale;
-    this.renderRes = [Math.ceil(this.displayRes[0] * scale),
-    Math.ceil(this.displayRes[1] * scale)];
+    this.renderRes = [Math.ceil(this.displayRes[0] * this._pixelRatio),
+    Math.ceil(this.displayRes[1] * this._pixelRatio)];
 
     this.initFramebuffers(this.renderRes[0], this.renderRes[1]);
     this.resetAccumulation();
@@ -459,7 +440,7 @@ export class PathtracingRenderer {
   }
 
 
-  private async parseMaterial(mat: THREE.MeshPhysicalMaterial) {
+  private async parseMaterial(mat: THREE.MeshPhysicalMaterial, gltf?: GLTF) {
     let matInfo = new MaterialData();
     let matTexInfo = new MaterialTextureInfo();
 
@@ -486,9 +467,9 @@ export class PathtracingRenderer {
       matInfo.normalScale = mat.normalScale.x;
     }
 
+    matInfo.emission = mat.emissive.toArray();
     if (mat.emissiveMap) {
       matTexInfo.emissionTexture = this.parseTexture(mat.emissiveMap);
-      matInfo.emission = mat.emissive.toArray();
     }
 
     matInfo.clearcoat = mat.clearcoat || 0;
@@ -506,115 +487,117 @@ export class PathtracingRenderer {
       matTexInfo.transmissionTexture = this.parseTexture(mat.transmissionMap);
     }
 
-    let setTextureTransformFromExt = (texInfo: TexInfo, ext: any) => {
-      if ("KHR_texture_transform" in ext.extensions) {
-        let transform = ext.extensions["KHR_texture_transform"];
-        if ("offset" in transform)
-          texInfo.texOffset = transform["offset"];
-        if ("scale" in transform)
-          texInfo.texScale = transform["scale"];
-      }
-    };
-
-    if ("gltfExtensions" in mat.userData) {
-
-      let get_param = function (name: string, obj: any, default_value: any) {
-        return (name in obj) ? obj[name] : default_value;
+    if (gltf) {
+      let setTextureTransformFromExt = (texInfo: TexInfo, ext: any) => {
+        if ("KHR_texture_transform" in ext.extensions) {
+          let transform = ext.extensions["KHR_texture_transform"];
+          if ("offset" in transform)
+            texInfo.texOffset = transform["offset"];
+          if ("scale" in transform)
+            texInfo.texScale = transform["scale"];
+        }
       };
 
-      let extensions = mat.userData.gltfExtensions;
+      if ("gltfExtensions" in mat.userData) {
 
-      if ('3DS_materials_anisotropy' in extensions) {
-        let ext = extensions["3DS_materials_anisotropy"];
-        matInfo.anisotropy = get_param("anisotropyFactor", ext, matInfo.anisotropy);
-        matInfo.anisotropyRotation = get_param("anisotropyRotationFactor", ext, matInfo.anisotropyRotation);
-      }
-      if ('KHR_materials_anisotropy' in extensions) {
-        let ext = extensions["KHR_materials_anisotropy"];
-        matInfo.anisotropy = get_param("anisotropyFactor", ext, matInfo.anisotropy);
-        matInfo.anisotropyRotation = get_param("anisotropyRotationFactor", ext, matInfo.anisotropyRotation);
-      }
-      if ('KHR_materials_transmission' in extensions) {
-        let ext = extensions["KHR_materials_transmission"];
-        matInfo.transparency = get_param("transmissionFactor", ext, matInfo.transparency);
-      }
-      if ('3DS_materials_transparency' in extensions) {
-        let ext = extensions["3DS_materials_transparency"];
-        matInfo.transparency = get_param("transparencyFactor", ext, matInfo.transparency);
-      }
-      if ('KHR_materials_specular' in extensions) {
-        let ext = extensions["KHR_materials_specular"];
-        // matTexInfo.specularTexture = this.parseTexture(mat.);
-        matInfo.specular = get_param("specularFactor", ext, matInfo.specular);
-        matInfo.specularTint = get_param("specularColorFactor", ext, matInfo.specularTint);
-      }
-      if ('3DS_materials_specular' in extensions) {
-        let ext = extensions["3DS_materials_specular"];
-        matInfo.specular = get_param("specularFactor", ext, matInfo.specular);
-        matInfo.specularTint = get_param("specularColorFactor", ext, matInfo.specularTint);
-      }
-      if ('KHR_materials_ior' in extensions) {
-        matInfo.ior = get_param("ior", extensions["KHR_materials_ior"], matInfo.ior);
-      }
-      if ('3DS_materials_ior' in extensions) {
-        matInfo.ior = get_param("ior", extensions["3DS_materials_ior"], matInfo.ior);
-      }
-      if ('3DS_materials_clearcoat' in extensions) {
-        let ext = extensions["3DS_materials_clearcoat"];
-        matInfo.clearcoat = get_param("clearcoatFactor", ext, matInfo.clearcoat);
-        matInfo.clearcoatRoughness = get_param("clearcoatRoughnessFactor", ext, matInfo.clearcoatRoughness);
-      }
-      if ('KHR_materials_sheen' in extensions) {
-        let ext = extensions["KHR_materials_sheen"];
-        matInfo.sheen = 1.0;
-        matInfo.sheenColor = get_param("sheenColorFactor", ext, matInfo.sheenColor);
-        matInfo.sheenRoughness = get_param("sheenRoughnessFactor", ext, matInfo.sheenRoughness);
+        let get_param = function (name: string, obj: any, default_value: any) {
+          return (name in obj) ? obj[name] : default_value;
+        };
 
-        if ("sheenColorTexture" in ext) {
-          await this._gltf.parser.getDependency('texture', ext.sheenColorTexture.index)
-            .then((tex: THREE.Texture) => {
-              matTexInfo.sheenColorTexture = this.parseTexture(tex);
-              setTextureTransformFromExt(matTexInfo.sheenColorTexture, ext.sheenColorTexture);
-            });
+        let extensions = mat.userData.gltfExtensions;
+
+        if ('3DS_materials_anisotropy' in extensions) {
+          let ext = extensions["3DS_materials_anisotropy"];
+          matInfo.anisotropy = get_param("anisotropyFactor", ext, matInfo.anisotropy);
+          matInfo.anisotropyRotation = get_param("anisotropyRotationFactor", ext, matInfo.anisotropyRotation);
         }
-        if ("sheenRoughnessTexture" in ext) {
-          await this._gltf.parser.getDependency('texture', ext.sheenRoughnessTexture.index)
-            .then((tex: THREE.Texture) => {
-              matTexInfo.sheenRoughnessTexture = this.parseTexture(tex);
-              setTextureTransformFromExt(matTexInfo.sheenRoughnessTexture, ext.sheenRoughnessTexture);
-            });
+        if ('KHR_materials_anisotropy' in extensions) {
+          let ext = extensions["KHR_materials_anisotropy"];
+          matInfo.anisotropy = get_param("anisotropyFactor", ext, matInfo.anisotropy);
+          matInfo.anisotropyRotation = get_param("anisotropyRotationFactor", ext, matInfo.anisotropyRotation);
         }
-      }
-      if ('3DS_materials_sheen' in extensions) {
-        let ext = extensions["3DS_materials_sheen"];
-        matInfo.sheen = get_param("sheenFactor", ext, matInfo.sheen);
-        matInfo.sheenColor = get_param("sheenColorFactor", ext, matInfo.sheenColor);
-        matInfo.sheenRoughness = get_param("sheenRoughnessFactor", ext, matInfo.sheenRoughness);
-      }
-      if ('KHR_materials_translucency' in extensions) {
-        let ext = extensions["KHR_materials_translucency"];
-        matInfo.translucency = get_param("translucencyFactor", ext, matInfo.transparency);
-        // if ("translucencyTexture" in ext) {
-        //   await this._gltf.parser.getDependency('texture', ext.translucencyTexture.index)
-        //     .then((tex) => {
-        //       matTexInfo.translucencyTexture = this.parseTexture(tex);
-        //       setTextureTransformFromExt(matTexInfo.translucencyTexture, ext.translucencyTexture);
-        //     });
-        // }
-      }
-      if ('KHR_materials_volume' in extensions) {
-        let ext = extensions["KHR_materials_volume"];
-        matInfo.thinWalled = get_param("thicknessFactor", ext, 0.0) > 0.0 ? 0 : 1;
-        matInfo.attenuationColor = get_param("attenuationColor", ext, matInfo.attenuationColor);
-        matInfo.attenuationDistance = get_param("attenuationDistance", ext, matInfo.attenuationDistance);
-        matInfo.subsurfaceColor = get_param("subsurfaceColor", ext, matInfo.subsurfaceColor);
-      }
-      if ('3DS_materials_volume' in extensions) {
-        let ext = extensions["3DS_materials_volume"];
-        matInfo.thinWalled = get_param("thinWalled", ext, matInfo.thinWalled);
-        matInfo.attenuationColor = get_param("attenuationColor", ext, matInfo.attenuationColor);
-        matInfo.attenuationDistance = get_param("attenuationDistance", ext, matInfo.attenuationDistance);
-        matInfo.subsurfaceColor = get_param("subsurfaceColor", ext, matInfo.subsurfaceColor);
+        if ('KHR_materials_transmission' in extensions) {
+          let ext = extensions["KHR_materials_transmission"];
+          matInfo.transparency = get_param("transmissionFactor", ext, matInfo.transparency);
+        }
+        if ('3DS_materials_transparency' in extensions) {
+          let ext = extensions["3DS_materials_transparency"];
+          matInfo.transparency = get_param("transparencyFactor", ext, matInfo.transparency);
+        }
+        if ('KHR_materials_specular' in extensions) {
+          let ext = extensions["KHR_materials_specular"];
+          // matTexInfo.specularTexture = this.parseTexture(mat.);
+          matInfo.specular = get_param("specularFactor", ext, matInfo.specular);
+          matInfo.specularTint = get_param("specularColorFactor", ext, matInfo.specularTint);
+        }
+        if ('3DS_materials_specular' in extensions) {
+          let ext = extensions["3DS_materials_specular"];
+          matInfo.specular = get_param("specularFactor", ext, matInfo.specular);
+          matInfo.specularTint = get_param("specularColorFactor", ext, matInfo.specularTint);
+        }
+        if ('KHR_materials_ior' in extensions) {
+          matInfo.ior = get_param("ior", extensions["KHR_materials_ior"], matInfo.ior);
+        }
+        if ('3DS_materials_ior' in extensions) {
+          matInfo.ior = get_param("ior", extensions["3DS_materials_ior"], matInfo.ior);
+        }
+        if ('3DS_materials_clearcoat' in extensions) {
+          let ext = extensions["3DS_materials_clearcoat"];
+          matInfo.clearcoat = get_param("clearcoatFactor", ext, matInfo.clearcoat);
+          matInfo.clearcoatRoughness = get_param("clearcoatRoughnessFactor", ext, matInfo.clearcoatRoughness);
+        }
+        if ('KHR_materials_sheen' in extensions) {
+          let ext = extensions["KHR_materials_sheen"];
+          matInfo.sheen = 1.0;
+          matInfo.sheenColor = get_param("sheenColorFactor", ext, matInfo.sheenColor);
+          matInfo.sheenRoughness = get_param("sheenRoughnessFactor", ext, matInfo.sheenRoughness);
+
+          if ("sheenColorTexture" in ext) {
+            await gltf.parser.getDependency('texture', ext.sheenColorTexture.index)
+              .then((tex: THREE.Texture) => {
+                matTexInfo.sheenColorTexture = this.parseTexture(tex);
+                setTextureTransformFromExt(matTexInfo.sheenColorTexture, ext.sheenColorTexture);
+              });
+          }
+          if ("sheenRoughnessTexture" in ext) {
+            await gltf.parser.getDependency('texture', ext.sheenRoughnessTexture.index)
+              .then((tex: THREE.Texture) => {
+                matTexInfo.sheenRoughnessTexture = this.parseTexture(tex);
+                setTextureTransformFromExt(matTexInfo.sheenRoughnessTexture, ext.sheenRoughnessTexture);
+              });
+          }
+        }
+        if ('3DS_materials_sheen' in extensions) {
+          let ext = extensions["3DS_materials_sheen"];
+          matInfo.sheen = get_param("sheenFactor", ext, matInfo.sheen);
+          matInfo.sheenColor = get_param("sheenColorFactor", ext, matInfo.sheenColor);
+          matInfo.sheenRoughness = get_param("sheenRoughnessFactor", ext, matInfo.sheenRoughness);
+        }
+        if ('KHR_materials_translucency' in extensions) {
+          let ext = extensions["KHR_materials_translucency"];
+          matInfo.translucency = get_param("translucencyFactor", ext, matInfo.transparency);
+          // if ("translucencyTexture" in ext) {
+          //   await this._gltf.parser.getDependency('texture', ext.translucencyTexture.index)
+          //     .then((tex) => {
+          //       matTexInfo.translucencyTexture = this.parseTexture(tex);
+          //       setTextureTransformFromExt(matTexInfo.translucencyTexture, ext.translucencyTexture);
+          //     });
+          // }
+        }
+        if ('KHR_materials_volume' in extensions) {
+          let ext = extensions["KHR_materials_volume"];
+          matInfo.thinWalled = get_param("thicknessFactor", ext, 0.0) > 0.0 ? 0 : 1;
+          matInfo.attenuationColor = get_param("attenuationColor", ext, matInfo.attenuationColor);
+          matInfo.attenuationDistance = get_param("attenuationDistance", ext, matInfo.attenuationDistance);
+          matInfo.subsurfaceColor = get_param("subsurfaceColor", ext, matInfo.subsurfaceColor);
+        }
+        if ('3DS_materials_volume' in extensions) {
+          let ext = extensions["3DS_materials_volume"];
+          matInfo.thinWalled = get_param("thinWalled", ext, matInfo.thinWalled);
+          matInfo.attenuationColor = get_param("attenuationColor", ext, matInfo.attenuationColor);
+          matInfo.attenuationDistance = get_param("attenuationDistance", ext, matInfo.attenuationDistance);
+          matInfo.subsurfaceColor = get_param("subsurfaceColor", ext, matInfo.subsurfaceColor);
+        }
       }
     }
 
@@ -640,19 +623,11 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
-  setScene(gltf: any) {
+  setScene(scene: THREE.Group, gltf?: GLTF) {
     this.stopRendering();
-    if (!gltf.scene) {
-      throw new Error(
-        'This model contains no scene, and cannot be viewed here. However,'
-        + ' it may contain individual 3D resources.'
-      );
-    }
-
-    this._gltf = gltf;
-
+    
     return new Promise<void>((resolve, rejecct) => {
-      this.createPathTracingScene(gltf.scene).then(() => {
+      this.createPathTracingScene(scene, gltf).then(() => {
         this.resetAccumulation();
         resolve();
       });
@@ -660,7 +635,7 @@ export class PathtracingRenderer {
   }
 
   // Initializes all necessary pathtracing related data structures from three scene
-  private async createPathTracingScene(scene: any) {
+  private async createPathTracingScene(scene: THREE.Group, gltf?: GLTF) {
     console.time("Inititialized path-tracer");
 
     this.texArrayDict = {};
@@ -714,7 +689,7 @@ export class PathtracingRenderer {
     });
 
     for (let m in materials) {
-      const [matInfo, matTexInfo] = await this.parseMaterial(materials[m]);
+      const [matInfo, matTexInfo] = await this.parseMaterial(materials[m], gltf);
       materialBuffer.push(<MaterialData>matInfo);
       materialTextureInfoBuffer.push(<MaterialTextureInfo>matTexInfo);
     }
@@ -732,8 +707,8 @@ export class PathtracingRenderer {
       let geo: THREE.BufferGeometry = <THREE.BufferGeometry>meshList[i].geometry.clone();
       geo.applyMatrix4(meshList[i].matrixWorld);
 
-      // mergeBufferGeometries expect consitent attributes throughout all geometries, otherwise it fails
-      // we need to get rid of otheres when present
+      // mergeBufferGeometries expects consitent attributes throughout all geometries, otherwise it fails
+      // we need to get rid of unsupported attributes
       const supportedAttributes = ["position", "normal", "tangent", "uv", "uv2", "color"];
 
       for (let attr in geo.attributes) {
@@ -741,25 +716,25 @@ export class PathtracingRenderer {
           delete geo.attributes[attr];
       }
 
-      if (geo.attributes.normal === undefined)
+      if (!geo.attributes.normal)
         geo.computeVertexNormals();
-      if (geo.attributes.uv !== undefined && geo.attributes.tangent === undefined)
+      if (geo.attributes.uv  && !geo.attributes.tangent)
         BufferGeometryUtils.computeTangents(geo);
 
-      const numVertices = geo.attributes.position.count / 3;
-      if (geo.attributes.uv === undefined) {
+      const numVertices = geo.attributes.position.count;
+      if (!geo.attributes.uv) {
         const uvs = new Float32Array(numVertices * 2);
         geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
       }
-      if (geo.attributes.uv2 === undefined) {
+      if (!geo.attributes.uv2) {
         const uvs = new Float32Array(numVertices * 2);
         geo.setAttribute('uv2', new THREE.BufferAttribute(uvs, 2));
       }
-      if (geo.attributes.tangent === undefined) {
+      if (!geo.attributes.tangent) {
         const tangents = new Float32Array(numVertices * 4);
         geo.setAttribute('tangent', new THREE.BufferAttribute(tangents, 4));
       }
-      if (geo.attributes.color === undefined) {
+      if (!geo.attributes.color) {
         const col = new Float32Array(numVertices * 4);
         geo.setAttribute('color', new THREE.BufferAttribute(col, 4));
       }
@@ -770,18 +745,16 @@ export class PathtracingRenderer {
       geoList.push(geo);
     }
 
-    // Merge geometry from all models into one new mesh
-    // TODO get rid of this extra merge step and merge directly into 
+    // Merge geometry from all models into a single mesh
+    // TODO get rid of this extra merge step and merge directly into the render data buffer
     let modelMesh = new THREE.Mesh(BufferGeometryUtils.mergeBufferGeometries(geoList));
     let bufferGeometry = <THREE.BufferGeometry>modelMesh.geometry;
     if (bufferGeometry.index)
       bufferGeometry = bufferGeometry.toNonIndexed();
 
-    let total_number_of_triangles = bufferGeometry.attributes.position.array.length / 9;
+    let total_number_of_triangles = bufferGeometry.attributes.position.count / 3;
 
     console.time("BvhGeneration");
-    //modelMesh.geometry.rotateY(Math.PI);
-
     var vpa = new Float32Array(total_number_of_triangles * 12);
     var vna = bufferGeometry.attributes.normal.array;
     var vuv = bufferGeometry.attributes.uv.array;
@@ -824,14 +797,14 @@ export class PathtracingRenderer {
 
         // position
         let srcIdx = srcTriangleIdx * 12 + vertIdx * 4;
-        combinedMeshBuffer[dstIdx + 0] = vpa[srcIdx];
+        combinedMeshBuffer[dstIdx + 0] = vpa[srcIdx + 0];
         combinedMeshBuffer[dstIdx + 1] = vpa[srcIdx + 1];
         combinedMeshBuffer[dstIdx + 2] = vpa[srcIdx + 2];
         combinedMeshBuffer[dstIdx + 3] = vpa[srcIdx + 3];
 
         // normal
         srcIdx = srcTriangleIdx * 9 + vertIdx * 3;
-        combinedMeshBuffer[dstIdx + 4] = vna[srcIdx];
+        combinedMeshBuffer[dstIdx + 4] = vna[srcIdx + 0];
         combinedMeshBuffer[dstIdx + 5] = vna[srcIdx + 1];
         combinedMeshBuffer[dstIdx + 6] = vna[srcIdx + 2];
         combinedMeshBuffer[dstIdx + 7] = 0.0;
@@ -848,7 +821,7 @@ export class PathtracingRenderer {
         // tangent
         srcIdx = srcTriangleIdx * 12 + vertIdx * 4;
 
-        combinedMeshBuffer[dstIdx + 12] = tga[srcIdx];
+        combinedMeshBuffer[dstIdx + 12] = tga[srcIdx + 0];
         combinedMeshBuffer[dstIdx + 13] = tga[srcIdx + 1];
         combinedMeshBuffer[dstIdx + 14] = tga[srcIdx + 2];
         combinedMeshBuffer[dstIdx + 15] = tga[srcIdx + 3];
@@ -889,7 +862,6 @@ export class PathtracingRenderer {
       }
     }
     this.pathtracingDataTextures = {} as { [k: string]: WebGLTexture | null };
-
     this.pathtracingDataTextures["u_sampler2D_BVHData"] = glu.createDataTexture(gl, flatBVHData);
     this.pathtracingDataTextures["u_sampler2D_TriangleData"] = glu.createDataTexture(gl, combinedMeshBuffer);
     this.pathtracingDataTextures["u_sampler2D_MaterialData"] = glu.createDataTexture(gl, new Float32Array(flattenArray(flatMaterialParamList)));
@@ -953,8 +925,6 @@ export class PathtracingRenderer {
       gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.REPEAT);
       gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.REPEAT);
 
-      // at some point three seems to enable flip_y unpack. We need to disable it as it is not supported by texImage3D
-      // gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
       gl.texImage3D(
         gl.TEXTURE_2D_ARRAY,
         0,
@@ -1037,11 +1007,6 @@ export class PathtracingRenderer {
           const uint MAX_TEXTURE_SIZE = ${glu.getMaxTextureSize(gl)}u;
       `;
 
-    // if (this.ptProgram !== undefined) {
-    //   gl.useProgram(null);
-    //   gl.deleteProgram(this.ptProgram);
-    // }
-
     this.ptProgram = glu.createProgramFromSource(gl, vertexShader, fragmentShader, shaderChunks);
 
     gl.useProgram(this.ptProgram);
@@ -1061,5 +1026,23 @@ export class PathtracingRenderer {
     console.timeEnd("BvhGeneration");
     this.resetAccumulation();
   }
-
 }
+
+const fileLoader = new THREE.FileLoader();
+function filePromiseLoader(url: string, onProgress?: () => void) {
+  return new Promise<string | ArrayBuffer>((resolve, reject) => {
+    fileLoader.load(url, resolve, onProgress, reject);
+  });
+};
+
+function flattenArray(arr: any, result: number[] = []) {
+  for (let i = 0, length = arr.length; i < length; i++) {
+    const value: any = arr[i];
+    if (Array.isArray(value)) {
+      flattenArray(value, result);
+    } else {
+      result.push(<number>value);
+    }
+  }
+  return result;
+};

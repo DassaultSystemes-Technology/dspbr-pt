@@ -1,23 +1,46 @@
-## 
-
 # Enterprise PBR Sample Renderer ([Demo](https://dassaultsystemes-technology.github.io/dspbr-pt/) |  [Validation Report](https://dassaultsystemes-technology.github.io/dspbr-pt/report/))
 
-A WebGL path-tracer implementing the [Enterprise PBR Shading Model (DSPBR)](https://github.com/DassaultSystemes-Technology/EnterprisePBRShadingModel).
 
-Supports the [glTF](https://www.khronos.org/gltf/) file format with several PBR Next extensions and wip extension proposals (marked as PR below).
+A WebGL2 path-tracer implementing the [Enterprise PBR Shading Model (DSPBR)](https://github.com/DassaultSystemes-Technology/EnterprisePBRShadingModel).
 
-* [KHR_materials_sheen](https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_materials_sheen/README.md)
-* [KHR_materials_clearcoat](https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_materials_clearcoat/README.md)
-* [KHR_materials_transmission](https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_materials_transmission/README.md)
-* [KHR_materials_translucency PR](https://github.com/KhronosGroup/glTF/pull/1825)
-* [KHR_materials_specular PR](https://github.com/KhronosGroup/glTF/pull/1719)
-* [KHR_materials_ior PR](https://github.com/KhronosGroup/glTF/pull/1718)
-* [KHR_materials_volume PR](https://github.com/KhronosGroup/glTF/blob/c6be3dbc8c5b744f9ae13dbf0ba25b6eec05da0c/extensions/2.0/Khronos/KHR_materials_volume/README.md) (refraction only)
+### Overview
+* [x] Browser-based, unbiased[*](#Notes) GPU path-tracing 
+* [x] Three.js compatibility
+  * The renderer loads the three.js scene group format
+  * The interface is similar to WebGLRenderer
+* [x] When fed with [glTF](https://www.khronos.org/gltf/) via three.js GLTFLoader it supports most of the new [glTF](https://www.khronos.org/gltf/) PBR Next material extensions and wip extension proposals (marked as PR below).<br>
+All of the mentioned extensions are implemented in terms of the Enterprise PBR specification. If you're interested in equations head over to the spec repo and check our [latest specification document](https://dassaultsystemes-technology.github.io/EnterprisePBRShadingModel/spec-2021x.md.html). If you're looking for code, [dspbr.glsl](./lib/shader/dspbr.glsl) should give you most of the relevant pieces.
 
-The renderer implements the listed extensions in terms of the Enterprise PBR specification. If you're interested in equations head over to the spec repo and check the [latest specification document](https://dassaultsystemes-technology.github.io/EnterprisePBRShadingModel/spec-2021x.md.html). If you're looking for code, [dspbr.glsl](./lib/shader/dspbr.glsl) should give you most of the relevant pieces.
+  * [KHR_materials_sheen](https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_materials_sheen/README.md)
+  * [KHR_materials_clearcoat](https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_materials_clearcoat/README.md)
+  * [KHR_materials_transmission](https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_materials_transmission/README.md)
+  * [KHR_materials_translucency PR](https://github.com/KhronosGroup/glTF/pull/1825)
+  * [KHR_materials_specular PR](https://github.com/KhronosGroup/glTF/pull/1719)
+  * [KHR_materials_ior PR](https://github.com/KhronosGroup/glTF/pull/1718)
+  * [KHR_materials_volume PR](https://github.com/KhronosGroup/glTF/blob/c6be3dbc8c5b744f9ae13dbf0ba25b6eec05da0c/extensions/2.0/Khronos/KHR_materials_volume/README.md) (refraction only)
 
-> **NOTE**  
-> The demo app uses the three.js [WebGLRenderer](https://threejs.org/docs/#api/en/renderers/WebGLRenderer) as fallback when path-tracing is disabled. Please check the three.js [documentation](https://threejs.org/docs/#api/en/materials/MeshPhysicalMaterial) for information on supported material extensions. 
+
+
+* [x] [Validated](https://dassaultsystemes-technology.github.io/dspbr-pt/report/) against the official Dassault Systèmes Stellar renderer. The Stellar renderer proved its capabilities in industry use-cases like physical light-simulation and validated its results against real-world measurements on several occasions. Please see below for more info on the [validation suite](#Validation).
+
+> ### Caveats
+> The renderer serves as a fancy wrapper for the Enterprise PBR Shading Model code sample, **performance is not a priority**. Some major limiting factors are 
+> * Naive single-level BVH acceleration structure which is slow and prohibits dynamic scenes.
+> * Plain WebGL2 for accessibility reasons. Implied API limits and required overhead in shader complexity to make "arbitrary" scenes with texturable PBR materials work for path-tracing is insane and a major performance drag.
+> * No light importance sampling. Expect a significant amount of slow-converging noise for high frequency lighting scenarios and rough materials.
+
+
+## [Demo App](https://dassaultsystemes-technology.github.io/dspbr-pt/)
+
+Drag & Drop glTF files to render your scenes. 
+
+The demo app uses the three.js [WebGLRenderer](https://threejs.org/docs/#api/en/renderers/WebGLRenderer) as fallback when path-tracing is disabled. Please check the three.js [documentation](https://threejs.org/docs/#api/en/materials/MeshPhysicalMaterial) for information on supported material extensions. 
+
+> ### Notes
+> * For performance reasons, the default bounce depth is set to 4. The result is therefore biased. For scenes with a complex transmission/reflection setup or major indirect light contribution, the bounce depth needs to be increased. :warning: You only want to play with this setting on a beefy GPU, otherwise a timeout is not unlikely. There's a "force IBL eval" flag which forces the integrator to evaluate IBL lighting at the end of a path without shadow test. This brings light into dark spot which would only receive light via multiple indirections otherwise. 
+> * Pixel-ratio is set to 0.5 by default, which sets the render resolution to half the size of the provided canvas. If you can afford it, set it to 1.0 for a beautiful, crispy, pixel-perfect eye-candy sensation.
+
+    
 
 ## Quickstart
 

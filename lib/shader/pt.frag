@@ -293,6 +293,9 @@ vec4 traceDebug(const Ray r) {
     if (u_int_DebugMode == 8) {
       contrib = vec3(rs.uv0, 0.0);
     }
+    if (u_int_DebugMode == 9) {
+      contrib = vec3(rs.closure.clearcoat);
+    }
     color = vec4(contrib, 1.0);
   } else { // direct background hit
     if (u_bool_ShowBackground) {
