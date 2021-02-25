@@ -355,13 +355,13 @@ vec3 sample_bsdf_microfacet_ggx_smith(const in MaterialClosure c, vec3 wi, Geome
     float g2 = ggx_smith_g2(c.alpha, wi, wo, wh, geo, true);
     bsdf_weight *= g2 / g1;
 
-    // if (c.thin_walled) {
-    pdf *= 1.0 / (4.0 * abs(cos_theta_i));
-    //} else {
-    // bsdf_weight *= sqr(ior_i / ior_o); // non symmetric adjoint brdf correction factor
-    // float denom = sqr(ior_i * dot(wi, wh) + ior_o * dot(wo, wh));
-    // pdf *= sqr(ior_o) * abs(dot(wo, wh)) / denom;
-    //}
+    if (c.thin_walled) {
+      pdf *= 1.0 / (4.0 * abs(cos_theta_i));
+    } else {
+      bsdf_weight *= sqr(ior_i / ior_o); // non symmetric adjoint brdf correction factor
+      float denom = sqr(ior_i * dot(wi, wh) + ior_o * dot(wo, wh));
+      pdf *= sqr(ior_o) * abs(dot(wo, wh)) / denom;
+    }
   }
 
   if ((event & (E_SINGULAR | E_STRAIGHT)) > 0) {

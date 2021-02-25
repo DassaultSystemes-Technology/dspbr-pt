@@ -184,10 +184,10 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
   float roughness = matData.roughness * occlusionRoughnessMetallic.y;
   c.alpha = roughness_conversion(roughness, matData.anisotropy);
 
-  // //vec4 specularColor = evaluateMaterialTextureValue(matTexInfo.specularColorTexture, rs.uv0);
-  c.specular_tint = matData.specularTint; // * specularColor.x;
+  vec4 specularColor = evaluateMaterialTextureValue(matTexInfo.specularColorTexture, rs.uv0);
+  c.specular_tint = matData.specularTint * pow(specularColor.rgb, vec3(2.2));
   vec4 specular = evaluateMaterialTextureValue(matTexInfo.specularTexture, rs.uv0);
-  c.specular = matData.specular; // * specular.x;
+  c.specular = matData.specular * specular.a;
 
   vec4 sheenColor = evaluateMaterialTextureValue(matTexInfo.sheenColorTexture, rs.uv0);
   vec4 sheenRoughness = evaluateMaterialTextureValue(matTexInfo.sheenRoughnessTexture, rs.uv0);

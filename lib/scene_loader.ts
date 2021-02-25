@@ -10,10 +10,10 @@ export function loadSceneFromBlobs(urlList: any, autoscale: boolean) {
   let blobs: any = {};
   for (var i = 0; i < urlList.length; i++) {
     let name = urlList[i].name;
-    if (getFileExtension(urlList[i].name) !== "gltf" &&
-      getFileExtension(urlList[i].name) !== "glb") {
-      name = "./" + name;
-    }
+    // if (getFileExtension(urlList[i].name) !== "gltf" &&
+    //   getFileExtension(urlList[i].name) !== "glb") {
+    //   name = "./" + name;
+    // }
 
     blobs[name] = urlList[i];
   }
@@ -24,6 +24,7 @@ export function loadSceneFromBlobs(urlList: any, autoscale: boolean) {
     if (url.startsWith("blob"))
       return url;
 
+    url = url.replace(/^.*[\\\/]/, '')
     console.log("Parsing blob resource: " + url);
     url = URL.createObjectURL(blobs[url]);
     objectURLs.push(url);

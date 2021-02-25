@@ -21,7 +21,7 @@ All of the mentioned extensions are implemented in terms of the Enterprise PBR s
 
 
 
-* [x] [Validated](https://dassaultsystemes-technology.github.io/dspbr-pt/report/) against the official Dassault Systèmes Stellar renderer. The Stellar renderer proved its capabilities in industry use-cases like physical light-simulation and validated its results against real-world measurements on several occasions. Please see below for more info on the [validation suite](#Validation).
+* [x] [Validated](https://dassaultsystemes-technology.github.io/dspbr-pt/report/) against the official Dassault Systèmes Stellar renderer for the available set of validation scenes. Currently, this only covers a subset of the material features. Please see below for more info on the [validation suite](#Validation).
 
 > ### Caveats
 > The renderer serves as a fancy wrapper for the Enterprise PBR Shading Model code sample, **performance is not a priority**. Some major limiting factors are 

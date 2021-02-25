@@ -534,6 +534,21 @@ export class PathtracingRenderer {
           let ext = extensions["3DS_materials_specular"];
           matInfo.specular = get_param("specularFactor", ext, matInfo.specular);
           matInfo.specularTint = get_param("specularColorFactor", ext, matInfo.specularTint);
+
+          if ("specularTexture" in ext) {
+            await gltf.parser.getDependency('texture', ext.specularTexture.index)
+              .then((tex: THREE.Texture) => {
+                matTexInfo.specularTexture = this.parseTexture(tex);
+                setTextureTransformFromExt(matTexInfo.specularTexture, ext.specularTexture);
+              });
+          }
+          if ("specularColorTexture" in ext) {
+            await gltf.parser.getDependency('texture', ext.specularColorTexture.index)
+              .then((tex: THREE.Texture) => {
+                matTexInfo.specularColorTexture = this.parseTexture(tex);
+                setTextureTransformFromExt(matTexInfo.specularColorTexture, ext.specularColorTexture);
+              });
+          }
         }
         if ('KHR_materials_ior' in extensions) {
           matInfo.ior = get_param("ior", extensions["KHR_materials_ior"], matInfo.ior);
@@ -589,7 +604,6 @@ export class PathtracingRenderer {
           matInfo.thinWalled = get_param("thicknessFactor", ext, 0.0) > 0.0 ? 0 : 1;
           matInfo.attenuationColor = get_param("attenuationColor", ext, matInfo.attenuationColor);
           matInfo.attenuationDistance = get_param("attenuationDistance", ext, matInfo.attenuationDistance);
-          matInfo.subsurfaceColor = get_param("subsurfaceColor", ext, matInfo.subsurfaceColor);
         }
         if ('3DS_materials_volume' in extensions) {
           let ext = extensions["3DS_materials_volume"];
@@ -598,6 +612,11 @@ export class PathtracingRenderer {
           matInfo.attenuationDistance = get_param("attenuationDistance", ext, matInfo.attenuationDistance);
           matInfo.subsurfaceColor = get_param("subsurfaceColor", ext, matInfo.subsurfaceColor);
         }
+        // if ('KHR_materials_sss' in extensions) {
+        //   let ext = extensions["KHR_materials_sss"];
+        //   matInfo.scatterColor = get_param("scatterColor", ext, matInfo.scatterColor);
+        //   matInfo.scatterDistance = get_param("scatterDistance", ext, matInfo.scatterDistance);
+        // }
       }
     }
 
