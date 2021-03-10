@@ -287,7 +287,13 @@ class App {
       this.three_renderer.useIBL(value);
     });
     this._gui.add(this.renderer, 'showBackground').name('Show Background').onChange((value) => {
-      this.three_renderer.showBackground(value);
+      this.three_renderer.showBackground = value;
+    });
+
+    this.backgroundColor = [0, 0, 0];
+    this._gui.addColor(this, 'backgroundColor').name('Background Color').onChange((value) => {
+      this.renderer.backgroundColor = [value[0]/255.0, value[1]/255.0, value[2]/255.0];
+      this.three_renderer.backgroundColor = [value[0]/255.0, value[1]/255.0, value[2]/255.0];
     });
 
     this._gui.add(this.renderer, 'forceIBLEval').name('Force IBL Eval');

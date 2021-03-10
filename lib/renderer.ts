@@ -176,6 +176,15 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
+  private _backgroundColor = [0.0, 0.0, 0.0];
+  public get backgroundColor() {
+    return this._backgroundColor;
+  }
+  public set backgroundColor(val) {
+    this._backgroundColor = val;
+    this.resetAccumulation();
+  }
+
   private _frameCount = 1;
   private _isRendering = false;
 
@@ -261,6 +270,8 @@ export class PathtracingRenderer {
         this._iblSampling);
       gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_bool_ShowBackground"),
         this._showBackground);
+      gl.uniform3fv(gl.getUniformLocation(this.ptProgram, "u_vec3_BackgroundColor"),
+        this._backgroundColor);
       gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_int_maxBounces"),
         this._maxBounces);
       gl.uniform2f(gl.getUniformLocation(this.ptProgram, "u_vec2_InverseResolution"),

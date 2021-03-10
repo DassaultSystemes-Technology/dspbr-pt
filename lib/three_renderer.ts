@@ -16,6 +16,7 @@ export class ThreeRenderer {
 
   public set exposure(val: number) {
     this.renderer.toneMappingExposure = val;
+    this.setBackground();
   }
   public get exposure() {
     return this.renderer.toneMappingExposure;
@@ -33,11 +34,33 @@ export class ThreeRenderer {
     this.dirty = true;
   }
 
-  showBackground(flag) {
-    if (!flag) {
-      this.scene.background = new THREE.Color(0, 0, 0);
-    } else {
+  private _backgroundColor = [0.0, 0.0, 0.0];
+  public get backgroundColor() {
+    return this._backgroundColor;
+  }
+  public set backgroundColor(val) {
+    this._backgroundColor = val;
+    this.setBackground();
+  }
+
+  private _showBackground = true;
+  public get showBackground() {
+    return this._showBackground;
+  }
+  public set showBackground(val) {
+    this._showBackground = val;
+    this.setBackground();
+  }
+
+  private setBackground() {
+    if(this._showBackground) {
       this.scene.background = this.ibl;
+    }
+    else {
+      this.scene.background = new THREE.Color(
+        this._backgroundColor[0] * this.renderer.toneMappingExposure, 
+        this._backgroundColor[1] * this.renderer.toneMappingExposure, 
+        this._backgroundColor[2] * this.renderer.toneMappingExposure);
     }
   }
 
@@ -57,7 +80,8 @@ export class ThreeRenderer {
  
   constructor(parameters?: THREE.WebGLRendererParameters) {
     this.renderer = new THREE.WebGLRenderer(parameters);
-    // this.renderer.setSize(canvas.width, canvas.height);
+    // this.renderer.setSize(canvas.width, canvas.height);'
+    this.renderer.toneMapping = THREE.LinearToneMapping;
     this.renderer.outputEncoding = THREE.GammaEncoding;
     this.renderer.physicallyCorrectLights = true;
 

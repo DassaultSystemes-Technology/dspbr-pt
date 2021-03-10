@@ -48,6 +48,7 @@ uniform sampler2D u_samplerCube_EnvMap;
 uniform int u_int_DebugMode;
 uniform bool u_bool_UseIBL;
 uniform bool u_bool_ShowBackground;
+uniform vec3 u_vec3_BackgroundColor;
 
 layout(location = 0) out vec4 out_FragColor;
 
@@ -363,7 +364,7 @@ vec4 trace(const Ray r) {
     if (u_bool_ShowBackground) {
       color = vec4(sampleIBL(r.dir), 1.0);
     } else {
-      color = vec4(0, 0, 0, 0);
+      color = vec4(pow(u_vec3_BackgroundColor, vec3(2.2)), 0);
     }
   }
 
