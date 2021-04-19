@@ -156,7 +156,7 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
   unpackMaterialTexInfo(matIdx, matTexInfo);
 
   vec4 albedo = evaluateMaterialTextureValue(matTexInfo.albedoTexture, uv);
-  c.albedo = matData.albedo * pow(albedo.xyz, vec3(2.2));
+  c.albedo = matData.albedo * to_linear_rgb(albedo.xyz);
 
   if (length(vertexColor) > 0.0) {
     c.albedo *= vertexColor.xyz;
@@ -226,7 +226,7 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
   c.specular_f90 = vec3((1.0 - c.metallic) * c.specular + c.metallic);
 
   vec3 emission = evaluateMaterialTextureValue(matTexInfo.emissionTexture, uv).xyz;
-  c.emission = matData.emission * pow(emission, vec3(2.2));
+  c.emission = matData.emission * to_linear_rgb(emission);
 
   vec4 clearcoat = evaluateMaterialTextureValue(matTexInfo.clearcoatTexture, uv);
   c.clearcoat = matData.clearcoat * clearcoat.y;
@@ -234,4 +234,7 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
   float clearcoat_alpha =
       matData.clearcoatRoughness * matData.clearcoatRoughness * clearcoatRoughness.x * clearcoatRoughness.x;
   c.clearcoat_alpha = max(clearcoat_alpha, MINIMUM_ROUGHNESS);
+
+  c.attenuationColor =  matData.attenuationColor;
+  c.attenuationDistance = matData.attenuationDistance;
 }

@@ -116,6 +116,8 @@ struct MaterialClosure {
   float clearcoat;
   float clearcoat_alpha;
   bool thin_walled;
+  float attenuationDistance;
+  vec3 attenuationColor;
   float ior;
   bool backside;
   vec3 n;
@@ -209,6 +211,13 @@ int sampleBSDFBounce(inout RenderState rs, inout vec3 pathWeight, out int eventT
     HitInfo hit;
     if (intersectScene_Nearest(r, hit)) {
       fillRenderState(r, hit, rs);
+
+      // Absorption
+      if(rs.closure.backside) {
+        vec3 absorptionCoefficient = -log(rs.closure.attenuationColor) / rs.closure.attenuationDistance;
+        pathWeight *= exp(-absorptionCoefficient*hit.tfar);
+      }
+
       return 1;
     }
   }
@@ -354,6 +363,7 @@ vec4 trace(const Ray r) {
         contrib += sampleIBL(rs.wo) * pathWeight;
         break;
       }
+
       // All clear. next sample has properly been generated and intersection was found.
       // Render state contains new intersection info.
       i++;
