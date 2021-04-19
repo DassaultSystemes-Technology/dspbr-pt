@@ -14,11 +14,10 @@ All of the mentioned extensions are implemented in terms of the Enterprise PBR s
   * [KHR_materials_sheen](https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_materials_sheen/README.md)
   * [KHR_materials_clearcoat](https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_materials_clearcoat/README.md)
   * [KHR_materials_transmission](https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_materials_transmission/README.md)
+  * [KHR_materials_specular](https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_specular)
+  * [KHR_materials_ior](https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_ior)
+  * [KHR_materials_volume](https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_volume)
   * [KHR_materials_translucency PR](https://github.com/KhronosGroup/glTF/pull/1825)
-  * [KHR_materials_specular PR](https://github.com/KhronosGroup/glTF/pull/1719)
-  * [KHR_materials_ior PR](https://github.com/KhronosGroup/glTF/pull/1718)
-  * [KHR_materials_volume PR](https://github.com/KhronosGroup/glTF/blob/c6be3dbc8c5b744f9ae13dbf0ba25b6eec05da0c/extensions/2.0/Khronos/KHR_materials_volume/README.md) (refraction only)
-
 
 
 * [x] [Validated](https://dassaultsystemes-technology.github.io/dspbr-pt/report/) against the official Dassault Systèmes Stellar renderer for the available set of validation scenes. Currently, this only covers a subset of the material features. Please see below for more info on the [validation suite](#Validation).
