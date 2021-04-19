@@ -218,3 +218,7 @@ ivec2 getStructParameterTexCoord(uint structIdx, uint paramIdx, uint structStrid
   return ivec2((structIdx * structStride + paramIdx) % MAX_TEXTURE_SIZE,
                (structIdx * structStride + paramIdx) / MAX_TEXTURE_SIZE);
 }
+
+vec3 to_linear_rgb(vec3 srgb) {
+  return pow(srgb.xyz, vec3(2.2));
+}
