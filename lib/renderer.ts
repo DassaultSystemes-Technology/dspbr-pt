@@ -500,7 +500,7 @@ export class PathtracingRenderer {
 
     if (gltf) {
       let setTextureTransformFromExt = (texInfo: TexInfo, ext: any) => {
-        if ("KHR_texture_transform" in ext.extensions) {
+        if ("extensions" in ext && "KHR_texture_transform" in ext.extensions) {
           let transform = ext.extensions["KHR_texture_transform"];
           if ("offset" in transform)
             texInfo.texOffset = transform["offset"];
@@ -537,9 +537,23 @@ export class PathtracingRenderer {
         }
         if ('KHR_materials_specular' in extensions) {
           let ext = extensions["KHR_materials_specular"];
-          // matTexInfo.specularTexture = this.parseTexture(mat.);
           matInfo.specular = get_param("specularFactor", ext, matInfo.specular);
           matInfo.specularTint = get_param("specularColorFactor", ext, matInfo.specularTint);
+
+          if ("specularTexture" in ext) {
+            await gltf.parser.getDependency('texture', ext.specularTexture.index)
+              .then((tex: THREE.Texture) => {
+                matTexInfo.specularTexture = this.parseTexture(tex);
+                setTextureTransformFromExt(matTexInfo.specularTexture, ext.specularTexture);
+              });
+          }
+          if ("specularColorTexture" in ext) {
+            await gltf.parser.getDependency('texture', ext.specularColorTexture.index)
+              .then((tex: THREE.Texture) => {
+                matTexInfo.specularColorTexture = this.parseTexture(tex);
+                setTextureTransformFromExt(matTexInfo.specularColorTexture, ext.specularColorTexture);
+              });
+          }
         }
         if ('3DS_materials_specular' in extensions) {
           let ext = extensions["3DS_materials_specular"];
