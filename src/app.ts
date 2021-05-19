@@ -44,7 +44,7 @@ class App {
 
   useControls: true;
   pathtracing = true;
-  autoScaleScene = true;
+  autoScaleScene = false;
   autoRotate = false;
   interactionScale = 0.2;
 
@@ -81,8 +81,7 @@ class App {
 
     let aspect = window.innerWidth / window.innerHeight;
     this.camera = new THREE.PerspectiveCamera(45, aspect, 0.01, 1000);
-    this.camera.position.set(0, 0, 3);
-
+    
     this.controls = new OrbitControls(this.camera, this.canvas);
     this.controls.screenSpacePanning = true;
 
@@ -144,6 +143,7 @@ class App {
         const iblPromise = Loader.loadIBL(Assets.getIBLByName(this.ibl).url);
         Promise.all([scenePromise, iblPromise]).then(([gltf, ibl]) => {
           this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
+          this.updateCameraFromBoundingBox();
           this.renderer.setIBL(ibl);
           this.renderer.setScene(gltf.scene, gltf).then(() => {
             this.startPathtracing();
@@ -207,12 +207,32 @@ class App {
     this.camera.updateProjectionMatrix();
   }
 
+  private updateCameraFromBoundingBox() {
+    this.controls.reset();
+    let diag = this.sceneBoundingBox.max.distanceTo(this.sceneBoundingBox.min); 
+    let dist = diag * 2 / Math.tan(45.0 * Math.PI / 180.0);
+
+    let center = new THREE.Vector3();
+    this.sceneBoundingBox.getCenter(center);
+
+    let pos = center.clone();
+    pos.add(new THREE.Vector3(0,0, dist));
+    pos.add(new THREE.Vector3(0,diag, 0));
+
+    this.camera.position.set(pos.x, pos.y, pos.z);
+    this.camera.lookAt(center);
+    this.camera.updateMatrixWorld();
+    this.controls.update();
+  }
+
   private loadScene(sceneUrl) {
     const scenePromise = Loader.loadScene(sceneUrl, this.autoScaleScene);
     const iblPromise = Loader.loadIBL(Assets.getIBLByName(this.ibl).url);
 
     Promise.all([scenePromise, iblPromise]).then(([gltf, ibl]) => {
       this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
+      this.updateCameraFromBoundingBox();
+      
       this.renderer.setIBL(ibl);
       this.renderer.setScene(gltf.scene, gltf).then(() => {
         if (this.pathtracing)
