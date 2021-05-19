@@ -44,29 +44,29 @@ function parseArguments(args) {
   );
 
   parser.addArgument(
-    ["-r", "--res"],
+    "-r", "--res",
     {
-      defaultValue: [1024, 1024],
+      default: [1024, 1024],
       metavar: ["WIDTH", "HEIGHT"],
       nargs: 2,
-      type: "int",
+      type: 'int',
       help: "Dimensions of the output image"
     }
   );
 
   parser.addArgument(
-    ["-s", "--samples"],
+    "-s", "--samples",
     {
-      defaultValue: 32,
+      default: 32,
       type: 'int',
       help: "Number of samples per pixel."
     }
   );
 
   parser.addArgument(
-    ["-b", "--bounces"],
+    "-b", "--bounces",
     {
-      defaultValue: 32,
+      default: 32,
       type: 'int',
       help: "Maximum bounce depth. Hard maximum path length for probabilitic path termination."
     }
@@ -75,8 +75,8 @@ function parseArguments(args) {
   parser.addArgument(
     '--ibl',
     {
-      defaultValue: "None",
-      type: 'string',
+      default: "None",
+      type: 'str',
       help: 'The environment map path to use for image based lighting',
     }
   );
@@ -90,7 +90,7 @@ function parseArguments(args) {
     }
   );
 
-  const parsedArgs = parser.parseArgs(args);
+  const parsedArgs = parser.parse_args(args);
 
   if (parsedArgs.gltf_path === null) {
     console.log("%s\n", parser.description);
