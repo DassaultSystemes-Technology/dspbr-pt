@@ -205,72 +205,11 @@ vec3 eval_brdf_microfacet_ggx_smith(vec3 f0, vec3 f90, vec2 alpha, vec3 wi, vec3
   return (f * g * d) / abs(4.0 * dot(wi, geo.n) * dot(wo, geo.n));
 }
 
-vec3 eval_bsdf_microfacet_ggx_smith(const in MaterialClosure c, const in vec3 wi, in vec3 wo, Geometry geo, int event) {
-  // bool is_transmission = dot(wo, c.ng) < 0.0;
-  // float ior_i = 1.0;
-  // float ior_o = c.ior;
-  // if (c.backside) {
-  //   ior_i = c.ior;
-  //   ior_o = 1.0;
-  // }
-
+// TODO Needs proper implementation
+vec3 eval_bsdf_microfacet_ggx_smith(vec3 specular_f0, vec3 specular_f90, vec2 alpha, const in vec3 wi, in vec3 wo, Geometry geo) {  
   vec3 wo_f = flip(wo, -geo.n);
   vec3 wh = normalize(wi + wo_f);
-  return eval_brdf_microfacet_ggx_smith(c.specular_f0, c.specular_f90, c.alpha, wi, wo_f, wh, geo);
-
-  // // vec3 wh;
-  // // if (is_transmission) {
-  // //   // BTDF
-  // //   if (c.thin_walled) {
-  // // thin transmission: flip to front side to get corresponding reflection direction
-  // wo = flip(wo, geo.n);
-  // wh = normalize(wi + wo);
-  // if (abs(dot(wi, geo.n)) < EPS_COS || dot(wo, geo.n) < EPS_COS) {
-  //   return vec3(0.0);
-  // }
-  // //   } else {
-  // //     wh = normalize(wo * ior_o + wi * ior_i); // points into thicker medium
-  // //     if (ior_o > ior_i) {
-  // //       wh *= -1.0; // make pointing to outgoing direction's medium
-  // //     }
-  // //   }
-  // // } else {
-  // //   // BRDF
-  // //   wh = normalize(wi + wo);
-  // // }
-
-  // // vec3 fr = dielectric_schlick_fresnel(
-  // //             dot(wi, wh), c.specular_f0, c.specular_f90, ior_i, ior_o, c.thin_walled);
-  // // vec3 ft = (1.0 - fr) * c.transparency;
-  // float cos_theta_i_h = dot(wi, wh);
-  // vec3 fr = fresnel_schlick(c.specular_f0, c.specular_f90, cos_theta_i_h);       // * (1.0 - c.transparency);
-  // vec3 ft = 1.0 - fresnel_schlick(c.specular_f0, c.specular_f90, cos_theta_i_h); // * c.transparency;
-
-  // float d = ggx_eval(c.alpha, wh, geo);
-  // float g = ggx_smith_g2(c.alpha, wi, wo, wh, geo);
-
-  // vec3 contrib;
-  // // float dwh_dwi;
-  // // bool refraction = !c.thin_walled && is_transmission;
-  // // if (refraction) {
-  // // float denom = sqr(ior_i * cos_theta_i_h + ior_o * dot(wo, wh));
-  // // float a = abs(cos_theta_i_h) * abs(dot(wo, wh)) / abs(dot(wi, geo.n));
-
-  // // contrib = a * sqr(ior_o) * ft * g * d / denom;
-  // // contrib *= sqr(ior_i / ior_o);
-  // // p.adjoint ? 1.0 : sqr(p.ior_i / p.ior_o); // non symmetric adjoint brdf correction factor
-  // // dwh_dwi = sqr(ior_o) * abs(dot(wo, wh)) / denom;
-  // //} else {
-  // // contrib = (is_transmission ? ft : fr) * d * g / abs(4.0 * dot(wi, geo.n) * dot(wo, geo.n));
-  // contrib = ft * d * g / abs(4.0 * dot(wi, geo.n) * dot(wo, geo.n));
-  // // dwh_dwi = 1.0 / (4.0 * abs(cos_theta_i_h));
-  // //}
-
-  // // if (dot(geo.n, wh) < 0.0 || cos_theta_i_h < 0.0 || (!is_transmission && dot(wo, geo.n) < 0.0)) {
-  // //  contrib = vec3(0.0);
-  // // }
-
-  // return contrib;
+  return eval_brdf_microfacet_ggx_smith(specular_f0, specular_f90, alpha, wi, wo_f, wh, geo);
 }
 
 vec3 sample_brdf_microfacet_ggx_smith(vec2 alpha, vec3 wi, Geometry g, vec2 uv, out float pdf) {
@@ -285,6 +224,22 @@ vec3 sample_brdf_microfacet_ggx_smith(vec2 alpha, vec3 wi, Geometry g, vec2 uv, 
 
   pdf = ggx_eval_vndf(alpha, wi, wh, g) * jacobian;
   return wo;
+}
+
+vec3 fresnel_reflection(MaterialClosure c, float cos_theta, float ni, float nt) {
+  vec3 f0 = sqr((ni - nt) / (ni + nt)) * c.specular*c.specular_tint;
+  vec3 f90 = vec3(c.specular);
+
+  vec3 _metal = fresnel_schlick(c.albedo, vec3(1.0), cos_theta);
+  vec3 _plastic = fresnel_schlick(f0, f90, cos_theta);
+  vec3 _glass = fresnel_schlick_dielectric(cos_theta, f0, f90, ni, nt, c.thin_walled);
+  return mix(mix(_plastic, _glass, c.transparency), _metal, c.metallic);
+}
+
+vec3 fresnel_transmission(MaterialClosure c, float cos_theta, float ni, float nt) {
+  vec3 f0 = sqr((ni - nt) / (ni + nt)) * c.specular * c.specular_tint;
+  vec3 f90 = vec3(c.specular);
+  return (vec3(1.0) - fresnel_schlick_dielectric(cos_theta, f0, f90, ni, nt, c.thin_walled)) * c.albedo * (1.0f - c.metallic) * c.transparency;
 }
 
 vec3 sample_bsdf_microfacet_ggx_smith(const in MaterialClosure c, vec3 wi, Geometry geo, vec3 uvw, inout float pdf,
@@ -303,8 +258,8 @@ vec3 sample_bsdf_microfacet_ggx_smith(const in MaterialClosure c, vec3 wi, Geome
     ior_o = 1.0;
   }
 
-  vec3 fr = fresnel_schlick_dielectric(cos_theta_i, c.specular_f0, c.specular_f90, ior_i, ior_o, c.thin_walled);
-  vec3 ft = (1.0 - fr);
+  vec3 fr = fresnel_reflection(c, cos_theta_i, ior_i, ior_o);
+  vec3 ft = fresnel_transmission(c, cos_theta_i, ior_i, ior_o);
 
   float prob_fr = sum(fr) / (sum(fr) + sum(ft));
   if (isNan(prob_fr)) {
@@ -351,7 +306,6 @@ vec3 sample_bsdf_microfacet_ggx_smith(const in MaterialClosure c, vec3 wi, Geome
   } else if ((event & E_TRANSMISSION) > 0) {
     pdf *= (1.0 - prob_fr);
     bsdf_weight = ft / (1.0 - prob_fr);
-    bsdf_weight *= sqrt(c.albedo);
     float g2 = ggx_smith_g2(c.alpha, wi, wo, wh, geo, true);
     bsdf_weight *= g2 / g1;
 
@@ -501,6 +455,7 @@ vec3 eval_dspbr(const in MaterialClosure c, vec3 wi, vec3 wo) {
   bsdf += diffuse_bsdf_eval(c, wi, wo, g);
   bsdf += eval_brdf_microfacet_ggx_smith(c.specular_f0, c.specular_f90, c.alpha, wi, wo, wh, g);
   bsdf += eval_brdf_microfacet_ggx_smith_ms(c.specular_f0, c.specular_f90, c.alpha, wi, wo, g);
+  // bsdf += eval_bsdf_microfacet_ggx_smith(c.specular_f0, c.specular_f90, c.alpha, wi, wo, g);
 
   float sheen_base_weight;
   vec3 sheen = sheen_layer(sheen_base_weight, c.sheen, c.sheen_color, c.sheen_roughness, wi, wo, wh, g);
@@ -529,15 +484,17 @@ vec3 sample_dspbr(const in MaterialClosure c, vec3 wi, in vec3 uvw, out vec3 bsd
 
   vec3 ggx_importance = fresnel_schlick(c.specular_f0, vec3(1.0), dot(wi, g.n));
 
-  vec3 diffuse_importance = c.albedo * (1.0 - c.metallic) * (1.0 - c.transparency);
+  vec3 diffuse_importance = c.albedo * (1.0 - c.transparency);
   vec3 sheen_importance = c.sheen * c.sheen_color;
-  vec3 microfacet_importance = (1.0 - c.transparency) * (1.0 - c.clearcoat) * ggx_importance;
+  vec3 specular_refl_importance = (1.0 - c.clearcoat) * ggx_importance * c.metallic;
   float clearcoat_importance = c.clearcoat;
-  vec3 transmission_importance = vec3(c.albedo * c.transparency) * (vec3(1.0) - ggx_importance);
+  vec3 transmission_importance = vec3(c.albedo * c.transparency) * (vec3(1.0) - ggx_importance) * (1.0 - c.metallic);
+
+
 
   float bsdf_importance[4];
-  bsdf_importance[0] = luminance(diffuse_importance + sheen_importance);
-  bsdf_importance[1] = luminance(microfacet_importance);
+  bsdf_importance[0] = luminance(diffuse_importance + sheen_importance) * (1.0 - c.metallic);
+  bsdf_importance[1] = luminance(specular_refl_importance);
   bsdf_importance[2] = clearcoat_importance;
   bsdf_importance[3] = luminance(transmission_importance);
 
