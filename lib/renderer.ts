@@ -624,6 +624,17 @@ export class PathtracingRenderer {
           //     });
           // }
         }
+        if ('3DS_materials_translucency' in extensions) {
+          let ext = extensions["3DS_materials_translucency"];
+          matInfo.translucency = get_param("translucencyFactor", ext, matInfo.transparency);
+          // if ("translucencyTexture" in ext) {
+          //   await this._gltf.parser.getDependency('texture', ext.translucencyTexture.index)
+          //     .then((tex) => {
+          //       matTexInfo.translucencyTexture = this.parseTexture(tex);
+          //       setTextureTransformFromExt(matTexInfo.translucencyTexture, ext.translucencyTexture);
+          //     });
+          // }
+        }
         if ('KHR_materials_volume' in extensions) {
           let ext = extensions["KHR_materials_volume"];
           matInfo.thinWalled = get_param("thicknessFactor", ext, 0.0) > 0.0 ? 0 : 1;
