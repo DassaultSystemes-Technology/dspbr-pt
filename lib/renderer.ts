@@ -588,7 +588,6 @@ export class PathtracingRenderer {
         }
         if ('KHR_materials_sheen' in extensions) {
           let ext = extensions["KHR_materials_sheen"];
-          matInfo.sheen = 1.0;
           matInfo.sheenColor = get_param("sheenColorFactor", ext, matInfo.sheenColor);
           matInfo.sheenRoughness = get_param("sheenRoughnessFactor", ext, matInfo.sheenRoughness);
 
@@ -606,12 +605,6 @@ export class PathtracingRenderer {
                 setTextureTransformFromExt(matTexInfo.sheenRoughnessTexture, ext.sheenRoughnessTexture);
               });
           }
-        }
-        if ('3DS_materials_sheen' in extensions) {
-          let ext = extensions["3DS_materials_sheen"];
-          matInfo.sheen = get_param("sheenFactor", ext, matInfo.sheen);
-          matInfo.sheenColor = get_param("sheenColorFactor", ext, matInfo.sheenColor);
-          matInfo.sheenRoughness = get_param("sheenRoughnessFactor", ext, matInfo.sheenRoughness);
         }
         if ('KHR_materials_translucency' in extensions) {
           let ext = extensions["KHR_materials_translucency"];

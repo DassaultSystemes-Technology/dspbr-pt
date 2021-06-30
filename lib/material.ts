@@ -56,12 +56,12 @@ export class MaterialData {
     return this.data[8];
   }
   
-  public set sheen(val: number) {
-    this._data[9] = val;
-  }
-  public get sheen() {
-    return this.data[9];
-  }
+  // public set sheen(val: number) {
+  //   this._data[9] = val;
+  // }
+  // public get sheen() {
+  //   return this.data[9];
+  // }
   
   public set normalScale(val: number) {
     this._data[10] = val;
@@ -195,7 +195,7 @@ export class MaterialData {
     this.transparency = 0;
 
     this.cutoutOpacity = 1;
-    this.sheen = 0; // deprecated
+    // this.sheen = 0; // deprecated
     this.normalScale = 1;
     this.ior = 1.49;
 
@@ -203,7 +203,7 @@ export class MaterialData {
     this.specularTint = [1, 1, 1];
 
     this.sheenRoughness = 0;
-    this.sheenColor = [1, 1, 1];
+    this.sheenColor = [0, 0, 0];
 
     this.normalScaleClearcoat = 1;
     this.emission = [0, 0, 0];

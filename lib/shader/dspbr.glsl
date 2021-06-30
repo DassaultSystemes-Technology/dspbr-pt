@@ -402,13 +402,14 @@ float charlieV(float alpha, float cos_theta_i, float cos_theta_o) {
   return 1.0 / (1.0 + lambda_sheen(cos_theta_i, alpha) + lambda_sheen(cos_theta_o, alpha));
 }
 
-// https://dassaultsystemes-technology.github.io/EnterprisePBRShadingModel/spec-2021x.md.html#components/sheen
-vec3 sheen_layer(out float base_weight, float sheen_intensity, vec3 sheen_color, float sheen_roughness, vec3 wi,
+// https://dassaultsystemes-technology.github.io/EnterprisePBRShadingModel/spec-2022x.md.html#components/sheen
+vec3 sheen_layer(out float base_weight, vec3 sheen_color, float sheen_roughness, vec3 wi,
                  vec3 wo, vec3 wh, Geometry g) {
   // We clamp the roughness to range[0.07; 1] to avoid numerical issues and
   // because we observed that the directional albedo at grazing angles becomes
   // larger than 1 if roughness is below 0.07
   float alpha = max(sheen_roughness, 0.07);
+  alpha = alpha*alpha;
   float inv_alpha = 1.0 / alpha;
 
   float cos_theta_i = saturate_cos(dot(wi, g.n));
@@ -427,12 +428,12 @@ vec3 sheen_layer(out float base_weight, float sheen_intensity, vec3 sheen_color,
 
   float sheen = G * D / (4.0 * cos_theta_i * cos_theta_o);
 
-  float Ewi = sheen_intensity * max_(sheen_color) * directional_albedo_sheen(cos_theta_i, alpha);
-  float Ewo = sheen_intensity * max_(sheen_color) * directional_albedo_sheen(cos_theta_o, alpha);
+  float Ewi = max_(sheen_color) * directional_albedo_sheen(cos_theta_i, alpha);
+  float Ewo = max_(sheen_color) * directional_albedo_sheen(cos_theta_o, alpha);
 
   base_weight = min(1.0 - Ewi, 1.0 - Ewo);
 
-  return sheen_intensity * sheen_color * sheen;
+  return sheen_color * sheen;
 }
 
 vec3 coating_layer(out float base_weight, float clearcoat, float clearcoat_alpha, vec3 wi, vec3 wo, vec3 wh,
@@ -458,7 +459,7 @@ vec3 eval_dspbr(const in MaterialClosure c, vec3 wi, vec3 wo) {
   // bsdf += eval_bsdf_microfacet_ggx_smith(c.specular_f0, c.specular_f90, c.alpha, wi, wo, g);
 
   float sheen_base_weight;
-  vec3 sheen = sheen_layer(sheen_base_weight, c.sheen, c.sheen_color, c.sheen_roughness, wi, wo, wh, g);
+  vec3 sheen = sheen_layer(sheen_base_weight, c.sheen_color, c.sheen_roughness, wi, wo, wh, g);
   bsdf = sheen + bsdf * sheen_base_weight;
 
   float clearcoat_base_weight;
@@ -485,12 +486,10 @@ vec3 sample_dspbr(const in MaterialClosure c, vec3 wi, in vec3 uvw, out vec3 bsd
   vec3 ggx_importance = fresnel_schlick(c.specular_f0, vec3(1.0), dot(wi, g.n));
 
   vec3 diffuse_importance = c.albedo * (1.0 - c.transparency);
-  vec3 sheen_importance = c.sheen * c.sheen_color;
+  vec3 sheen_importance = c.sheen_color;
   vec3 specular_refl_importance = (1.0 - c.clearcoat) * ggx_importance * c.metallic;
   float clearcoat_importance = c.clearcoat;
   vec3 transmission_importance = vec3(c.albedo * c.transparency) * (vec3(1.0) - ggx_importance) * (1.0 - c.metallic);
-
-
 
   float bsdf_importance[4];
   bsdf_importance[0] = luminance(diffuse_importance + sheen_importance) * (1.0 - c.metallic);
@@ -531,7 +530,7 @@ vec3 sample_dspbr(const in MaterialClosure c, vec3 wi, in vec3 uvw, out vec3 bsd
       vec3 wh = normalize(wi + wo);
 
       float sheen_base_weight;
-      vec3 sheen = sheen_layer(sheen_base_weight, c.sheen, c.sheen_color, c.sheen_roughness, wi, wo, wh, g);
+      vec3 sheen = sheen_layer(sheen_base_weight, c.sheen_color, c.sheen_roughness, wi, wo, wh, g);
       bsdf_over_pdf = sheen + bsdf_over_pdf * sheen_base_weight;
 
       float clearcoat_base_weight;
@@ -555,7 +554,7 @@ vec3 sample_dspbr(const in MaterialClosure c, vec3 wi, in vec3 uvw, out vec3 bsd
     bsdf_over_pdf += eval_brdf_microfacet_ggx_smith_ms(c.specular_f0, c.specular_f90, c.alpha, wi, wo, g);
 
     float sheen_base_weight;
-    sheen_layer(sheen_base_weight, 0.0, c.sheen_color, c.sheen_roughness, wi, wo, wh, g);
+    sheen_layer(sheen_base_weight, c.sheen_color, c.sheen_roughness, wi, wo, wh, g);
     bsdf_over_pdf *= sheen_base_weight;
 
     float clearcoat_base_weight;
@@ -592,7 +591,7 @@ vec3 sample_dspbr(const in MaterialClosure c, vec3 wi, in vec3 uvw, out vec3 bsd
       bsdf_over_pdf += eval_brdf_microfacet_ggx_smith_ms(c.specular_f0, c.specular_f90, c.alpha, wi, wo, g);
       vec3 wh = normalize(wi + wo);
       float sheen_base_weight;
-      sheen_layer(sheen_base_weight, 0.0, c.sheen_color, c.sheen_roughness, wi, wo, wh, g);
+      sheen_layer(sheen_base_weight, c.sheen_color, c.sheen_roughness, wi, wo, wh, g);
       bsdf_over_pdf *= sheen_base_weight;
 
       float clearcoat_base_weight;

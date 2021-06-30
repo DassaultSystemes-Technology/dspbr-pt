@@ -191,7 +191,6 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
 
   vec4 sheenColor = evaluateMaterialTextureValue(matTexInfo.sheenColorTexture, rs.uv0);
   vec4 sheenRoughness = evaluateMaterialTextureValue(matTexInfo.sheenRoughnessTexture, rs.uv0);
-  c.sheen = matData.sheen;
   c.sheen_roughness = matData.sheenRoughness * sheenRoughness.x;
   c.sheen_color = matData.sheenColor * sheenColor.xyz;
 
