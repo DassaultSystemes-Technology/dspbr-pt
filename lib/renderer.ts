@@ -185,6 +185,15 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
+  private _rayEps = 0.0001;
+  public get rayEps() {
+    return this._rayEps;
+  }
+  public set rayEps(val) {
+    this._rayEps = val;
+    this.resetAccumulation();
+  }
+
   private _frameCount = 1;
   private _isRendering = false;
 
@@ -280,6 +289,8 @@ export class PathtracingRenderer {
         camera.near);
       gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_bool_forceIBLEval"),
         this._forceIBLEval);
+      gl.uniform1f(gl.getUniformLocation(this.ptProgram, "u_float_rayEps"),
+        this._rayEps);
 
       gl.bindVertexArray(this.quadVao);
       gl.viewport(0, 0, this.renderRes[0], this.renderRes[1]);
@@ -1029,7 +1040,6 @@ export class PathtracingRenderer {
           const float E =                2.71828182845904524;
           const float INFINITY =         1000000.0;
 
-          const float EPS_NORMAL = 0.001;
           const float EPS_COS = 0.001;
           const float EPS_PDF = 0.001;
           const float EPSILON  = 1e-8;

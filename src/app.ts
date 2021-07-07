@@ -319,6 +319,7 @@ class App {
     this._gui.add(this.renderer, 'forceIBLEval').name('Force IBL Eval');
     this._gui.add(this.renderer, 'maxBounces').name('Bounce Depth').min(0).max(32).step(1);
     this._gui.add(this.renderer, 'sheenG', this.renderer.sheenGModes).name('Sheen G');
+    this._gui.add(this.renderer, 'rayEps').name('Ray Offset');
 
     let reload_obj = {
       reload: () => {

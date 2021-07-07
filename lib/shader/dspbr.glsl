@@ -166,7 +166,7 @@ vec3 ggx_sample_vndf(vec2 alpha, vec3 wi_, vec2 uv) {
   // unstretch
   wh.x *= alpha.x;
   wh.y *= alpha.y;
-  wh.z = max(EPS_NORMAL, wh.z);
+  wh.z = max(EPS_COS, wh.z);
   return normalize(wh);
 }
 

@@ -34,6 +34,7 @@ uniform int u_int_maxBounces;
 uniform bool u_bool_forceIBLEval;
 uniform float u_float_iblRotation;
 uniform bool u_bool_iblSampling;
+uniform float u_float_rayEps;
 
 uniform sampler2D u_sampler2D_PreviousTexture;
 
@@ -190,7 +191,7 @@ int sampleBSDFBounce(inout RenderState rs, inout vec3 pathWeight, out int eventT
   if (rr_cutout > rs.closure.cutout_opacity) {
     eventType |= E_SINGULAR;
     rs.wo = -rs.wi;
-    Ray r = createRay(rs.wo, rs.hitPos + fix_normal(rs.geometryNormal, rs.wo) * EPS_NORMAL, TFAR_MAX);
+    Ray r = createRay(rs.wo, rs.hitPos + fix_normal(rs.geometryNormal, rs.wo) * u_float_rayEps, TFAR_MAX);
     HitInfo hit;
     if (intersectScene_Nearest(r, hit)) {
       fillRenderState(r, hit, rs);
@@ -207,7 +208,7 @@ int sampleBSDFBounce(inout RenderState rs, inout vec3 pathWeight, out int eventT
     } else {
       return -1; // teminate path
     }
-    Ray r = createRay(rs.wo, rs.hitPos + fix_normal(rs.geometryNormal, rs.wo) * EPS_NORMAL, TFAR_MAX);
+    Ray r = createRay(rs.wo, rs.hitPos + fix_normal(rs.geometryNormal, rs.wo) * u_float_rayEps, TFAR_MAX);
     HitInfo hit;
     if (intersectScene_Nearest(r, hit)) {
       fillRenderState(r, hit, rs);
@@ -245,7 +246,7 @@ vec3 sampleAndEvaluateDirectLight(const in RenderState rs) {
 
   float cosNL = dot(light_dir, n);
 
-  bool isVisible = isVisible(rs.hitPos + n * EPS_NORMAL, cPointLightPosition);
+  bool isVisible = isVisible(rs.hitPos + n * u_float_rayEps, cPointLightPosition);
 
   bool transmit = false;
   if (cosNL < 0.0 && rs.closure.transparency > 0.0)
@@ -261,7 +262,7 @@ vec3 sampleAndEvaluateDirectLight(const in RenderState rs) {
   //   float pdf = 0.0;
   //   vec3 iblDir = sampleHemisphereCosine(vec2(rng_NextFloat(), rng_NextFloat()), pdf);
   //   //vec3 iblDir = mapUVToDir(vec2(rng_NextFloat(), rng_NextFloat()), pdf);
-  //   isVisible = isEnvVisible(rs.hitPos + n * EPS_NORMAL, iblDir);
+  //   isVisible = isEnvVisible(rs.hitPos + n * u_float_rayEps, iblDir);
 
   //   cosNL = dot(iblDir, n);
   //   if ((cosNL > 0.0) && isVisible) {

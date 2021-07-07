@@ -79,7 +79,7 @@ vec3 clamp_normal(vec3 n, vec3 ng, vec3 wi) {
     vec3 offset_vec = n * (-r_dot_ng / ns_dot_ng);
     vec3 r_corrected = normalize(r + offset_vec); // move r on horizon
     r_corrected =
-        normalize(r_corrected + (ng * EPS_NORMAL) * ((v_dot_ng > 0.0) ? 1.0 : -1.0)); // to avoid precision problems
+        normalize(r_corrected + (ng * EPS_COS) * ((v_dot_ng > 0.0) ? 1.0 : -1.0)); // to avoid precision problems
     ns_new = normalize(wi + r_corrected);
     ns_new *= (dot(ns_new, n) < 0.0) ? -1.0 : 1.0;
   }
