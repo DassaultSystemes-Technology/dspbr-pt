@@ -487,7 +487,7 @@ vec3 sample_dspbr(const in MaterialClosure c, vec3 wi, in vec3 uvw, out vec3 bsd
 
   vec3 diffuse_importance = c.albedo * (1.0 - c.transparency);
   vec3 sheen_importance = c.sheen_color;
-  vec3 specular_refl_importance = (1.0 - c.clearcoat) * ggx_importance * c.metallic;
+  vec3 specular_refl_importance = (1.0 - c.clearcoat) * ggx_importance;
   float clearcoat_importance = c.clearcoat;
   vec3 transmission_importance = vec3(c.albedo * c.transparency) * (vec3(1.0) - ggx_importance) * (1.0 - c.metallic);
 
