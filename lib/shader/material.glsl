@@ -201,6 +201,7 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
   if (matTexInfo.normalTexture.texIdx >= 0) {
     mat3 to_world = get_onb(c.n, c.t.xyz);
     vec3 n = normalize(evaluateMaterialTextureValue(matTexInfo.normalTexture, uv).xyz * 2.0 - vec3(1.0));
+    n = normalize(n * vec3(matData.normalScale, matData.normalScale, 1.0));
     c.n = to_world * n;
 
     // ensure orthonormal tangent after changing normal
