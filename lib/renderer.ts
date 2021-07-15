@@ -489,9 +489,11 @@ export class PathtracingRenderer {
       matInfo.normalScale = mat.normalScale.x;
     }
 
-    matInfo.emission = mat.emissive.toArray();
-    if (mat.emissiveMap) {
-      matTexInfo.emissionTexture = this.parseTexture(mat.emissiveMap);
+    if(mat.emissive) {
+      matInfo.emission = mat.emissive.toArray();
+      if (mat.emissiveMap) {
+        matTexInfo.emissionTexture = this.parseTexture(mat.emissiveMap);
+      }
     }
 
     matInfo.clearcoat = mat.clearcoat || 0;
