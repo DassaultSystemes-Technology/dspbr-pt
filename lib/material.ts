@@ -213,7 +213,7 @@ export class MaterialData {
     this.translucency = 0;
     this.alphaCutoff = 0;
 
-    this.attenuationDistance = 100000;
+    this.attenuationDistance = Number.MAX_VALUE;
     this.attenuationColor = [1, 1, 1];
 
     this.subsurfaceColor = [1, 1, 1];

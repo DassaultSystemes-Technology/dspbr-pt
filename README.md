@@ -115,7 +115,7 @@ const iblPromise = Loader.loadIBL(ibl_url);
 
 Promise.all([scenePromise, iblPromise]).then(([gltf, ibl]) => {
   renderer.setIBL(ibl);
-  renderer.setScene(gltf).then(() => {
+  renderer.setScene(gltf.scene, gltf).then(() => {
     renderer.render(camera, -1, (frame) => {
       controls.update();
       console.log("Finished frame number:", frame);

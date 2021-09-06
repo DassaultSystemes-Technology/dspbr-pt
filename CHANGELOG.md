@@ -1,29 +1,33 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.3.0] - 2021-09-06
 ### Added
-- [PT] UV debug mode
-- [PT] KHR_materials_transmission support. Includes rough and specular transmission 
-- [PT] KHR_materials_translucency support 
-- [PT] KHR_materials_volume (refraction only) support 
-- [PT] Tonemapping exposure property
-- [PT] Tonemapping techniques property
-- [PT] IBL rotation property
+- [PT] Tone-mapping exposure property
+- [PT] Tone-mapping techniques property
 - [PT] Gamma property
-- [PT] Sheen visibility function property
 - [PT] Vertex color support
+- [PT] Normal map scale support 
+- [MAT] KHR_materials_transmission support. Includes rough and specular transmission 
+- [MAT] KHR_materials_translucency support 
+- [MAT] KHR_materials_volume support 
+- [MAT] Sheen visibility function property
+- [App] IBL rotation property
 - [App] Progress indicator for scene loading 
 - [App] Adjustable navigation render resolution 
 - [App] Save PNG button
 - [App] Asset info box with 
+- [App] Adjustable background color
+- [App] Configurable ray-offset
 - Use clang format
 - Add CHANGELOG
 
 ### Changed
-- [PT] Ported pt renderer from three.js to plain WebGL
+- [PT] Port path-tracing renderer from three.js to plain WebGL
 - [PT] Use a single combined geometry buffer instead of one buffer per attribute 
-- [PT] Optimized GPU buffer generation by removing unnecessary buffer copy operations.
+- [PT] Optimize GPU buffer generation by removing unnecessary buffer copy operations.
+- Disable default scene auto-scale on load
+- Major typescript refactoring
 - Extract material class to its own file
 - Moved model/ibl loading functionality to it's own class
 - Ported renderer and app to typescript
@@ -34,10 +38,13 @@ All notable changes to this project will be documented in this file.
 - Update README
 
 ### Fixes
-- [PT] Fixed data buffer indexing issue which prevented loading of bigger glTF scenes
-- [PT] Resolved node transformation parsing issue which occurred in rare cases 
-- [PT] Fixed corrupted tangent issue which produced NaNs for several test scenes
-- [PT] KHR_materials_sheen implementation
+- [PT] Fix transmission sample weight
+- [PT] Fix data buffer indexing issue which prevented loading of bigger glTF scenes
+- [PT] Resolve node transformation parsing issue which occurred in rare cases 
+- [PT] Fix corrupted tangent issue which produced NaNs for several test scenes
+- [MAT] KHR_materials_sheen implementation
+- [MAT] Fix clearcoat/emission issues
+- Proper parsing of material extension which are not supported by three.js 
 - Many small fixes concerning rendering stability and glTF variation robustness
 
 ## [0.2.1] - 2020-07-25
@@ -59,7 +66,7 @@ All notable changes to this project will be documented in this file.
 - glTF alpha blending mode support
 - NaN issues on shader evaluation
 
-[Unreleased]: https://github.com/DassaultSystemes-Technology/dspbr-pt/compare/v0.2.1...HEAD
+[0.3.0]: https://github.com/DassaultSystemes-Technology/dspbr-pt/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/DassaultSystemes-Technology/dspbr-pt/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/DassaultSystemes-Technology/dspbr-pt/compare/v0.1.0...v0.2.0
 

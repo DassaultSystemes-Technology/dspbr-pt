@@ -1,10 +1,12 @@
 node_modules
 dist
-.cache
 package
 *.png
 assets
 scripts
 EnterprisePBRShadingModel
 validation
-
+.cache
+.vscode
+.clang-format
+.gitignore

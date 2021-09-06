@@ -18,7 +18,7 @@ import { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 export { PerspectiveCamera } from 'three';
 
 import * as glu from './gl_utils';
-import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { mergeBufferGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { SimpleTriangleBVH } from './bvh';
 import { MaterialData, TexInfo, MaterialTextureInfo } from './material';
 import { Scene } from 'three';
@@ -511,6 +511,29 @@ export class PathtracingRenderer {
       matTexInfo.transmissionTexture = this.parseTexture(mat.transmissionMap);
     }
 
+    matInfo.specular = mat.specularIntensity || 0;
+    if(mat.specularTint)
+      matInfo.specularTint = mat.specularTint.toArray();
+    if (mat.specularIntensityMap) {
+      matTexInfo.specularTexture = this.parseTexture(mat.specularIntensityMap);
+    }
+    if (mat.specularTintMap) {
+      matTexInfo.specularColorTexture = this.parseTexture(mat.specularTintMap);
+    }
+
+    // KHR_materials_volume
+    if(mat.thickness)
+      matInfo.thinWalled = mat.thickness == 0.01 ? 1 : 0; //hack: three.js defaults thickness to 0.01 when volume extensions doesn't exist.
+    if(mat.attenuationTint)
+      matInfo.attenuationColor = mat.attenuationTint.toArray();
+    matInfo.attenuationDistance = mat.attenuationDistance || matInfo.attenuationDistance;
+
+    if(matInfo.attenuationDistance == 0.0)
+      matInfo.attenuationDistance = Number.MAX_VALUE;
+
+    // KHR_materials_ior
+    matInfo.ior = mat.ior || matInfo.ior;
+
     if (gltf) {
       let setTextureTransformFromExt = (texInfo: TexInfo, ext: any) => {
         if ("extensions" in ext && "KHR_texture_transform" in ext.extensions) {
@@ -540,33 +563,9 @@ export class PathtracingRenderer {
           matInfo.anisotropy = get_param("anisotropyFactor", ext, matInfo.anisotropy);
           matInfo.anisotropyRotation = get_param("anisotropyRotationFactor", ext, matInfo.anisotropyRotation);
         }
-        if ('KHR_materials_transmission' in extensions) {
-          let ext = extensions["KHR_materials_transmission"];
-          matInfo.transparency = get_param("transmissionFactor", ext, matInfo.transparency);
-        }
         if ('3DS_materials_transparency' in extensions) {
           let ext = extensions["3DS_materials_transparency"];
           matInfo.transparency = get_param("transparencyFactor", ext, matInfo.transparency);
-        }
-        if ('KHR_materials_specular' in extensions) {
-          let ext = extensions["KHR_materials_specular"];
-          matInfo.specular = get_param("specularFactor", ext, matInfo.specular);
-          matInfo.specularTint = get_param("specularColorFactor", ext, matInfo.specularTint);
-
-          if ("specularTexture" in ext) {
-            await gltf.parser.getDependency('texture', ext.specularTexture.index)
-              .then((tex: THREE.Texture) => {
-                matTexInfo.specularTexture = this.parseTexture(tex);
-                setTextureTransformFromExt(matTexInfo.specularTexture, ext.specularTexture);
-              });
-          }
-          if ("specularColorTexture" in ext) {
-            await gltf.parser.getDependency('texture', ext.specularColorTexture.index)
-              .then((tex: THREE.Texture) => {
-                matTexInfo.specularColorTexture = this.parseTexture(tex);
-                setTextureTransformFromExt(matTexInfo.specularColorTexture, ext.specularColorTexture);
-              });
-          }
         }
         if ('3DS_materials_specular' in extensions) {
           let ext = extensions["3DS_materials_specular"];
@@ -587,9 +586,6 @@ export class PathtracingRenderer {
                 setTextureTransformFromExt(matTexInfo.specularColorTexture, ext.specularColorTexture);
               });
           }
-        }
-        if ('KHR_materials_ior' in extensions) {
-          matInfo.ior = get_param("ior", extensions["KHR_materials_ior"], matInfo.ior);
         }
         if ('3DS_materials_ior' in extensions) {
           matInfo.ior = get_param("ior", extensions["3DS_materials_ior"], matInfo.ior);
@@ -640,12 +636,6 @@ export class PathtracingRenderer {
           //       setTextureTransformFromExt(matTexInfo.translucencyTexture, ext.translucencyTexture);
           //     });
           // }
-        }
-        if ('KHR_materials_volume' in extensions) {
-          let ext = extensions["KHR_materials_volume"];
-          matInfo.thinWalled = get_param("thicknessFactor", ext, 0.0) > 0.0 ? 0 : 1;
-          matInfo.attenuationColor = get_param("attenuationColor", ext, matInfo.attenuationColor);
-          matInfo.attenuationDistance = get_param("attenuationDistance", ext, matInfo.attenuationDistance);
         }
         if ('3DS_materials_volume' in extensions) {
           let ext = extensions["3DS_materials_volume"];
@@ -780,7 +770,7 @@ export class PathtracingRenderer {
       if (!geo.attributes.normal)
         geo.computeVertexNormals();
       if (geo.attributes.uv  && !geo.attributes.tangent)
-        BufferGeometryUtils.computeTangents(geo);
+        geo.computeTangents();
 
       const numVertices = geo.attributes.position.count;
       if (!geo.attributes.uv) {
@@ -808,7 +798,7 @@ export class PathtracingRenderer {
 
     // Merge geometry from all models into a single mesh
     // TODO get rid of this extra merge step and merge directly into the render data buffer
-    let modelMesh = new THREE.Mesh(BufferGeometryUtils.mergeBufferGeometries(geoList));
+    let modelMesh = new THREE.Mesh(mergeBufferGeometries(geoList));
     let bufferGeometry = <THREE.BufferGeometry>modelMesh.geometry;
     if (bufferGeometry.index)
       bufferGeometry = bufferGeometry.toNonIndexed();
