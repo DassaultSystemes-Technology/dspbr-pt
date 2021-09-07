@@ -511,7 +511,7 @@ export class PathtracingRenderer {
       matTexInfo.transmissionTexture = this.parseTexture(mat.transmissionMap);
     }
 
-    matInfo.specular = mat.specularIntensity || 0;
+    matInfo.specular = (mat.specularIntensity === undefined) ? 1.0 : mat.specularIntensity;
     if(mat.specularTint)
       matInfo.specularTint = mat.specularTint.toArray();
     if (mat.specularIntensityMap) {
