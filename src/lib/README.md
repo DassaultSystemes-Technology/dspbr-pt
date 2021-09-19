@@ -58,7 +58,7 @@ Promise.all([scenePromise, iblPromise]).then(([gltf, ibl]) => {
 });
 ```
 
-For more details, please check the [viewer implementation](src/app.ts) and the [renderer interface](lib/renderer.ts).
+For more details, please check the [demo viewer](https://github.com/DassaultSystemes-Technology/dspbr-pt/blob/master/src/viewer/app.ts) and the [renderer interface](https://github.com/DassaultSystemes-Technology/dspbr-pt/blob/master/src/lib/renderer.ts) implementations.
 
 
 ## License
