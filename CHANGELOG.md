@@ -1,6 +1,17 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.3.2] - 2021-09-19
+### Changes
+- Major projects refactoring/restructuring 
+- Reduce npm package content to only include renderer lib
+- Add index file for easy module import
+
+## [0.3.1] - 2021-09-08
+### Fixes
+- Fix transmission sampling weight
+- Fix specular parsing
+
 ## [0.3.0] - 2021-09-06
 ### Added
 - [PT] Tone-mapping exposure property

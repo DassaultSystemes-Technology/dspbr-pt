@@ -32,7 +32,9 @@
     "dev": "npm run clean && parcel src/viewer/index.html --port 3000 --open",
     "validation": "npm run build-cli && python scripts/run_validation.py",
     "build-cli": "npm run clean && parcel build src/cli/headless.html --public-url ./",
-    "copy-lib-files": "copyfiles -u 2 src/lib/bvh.js src/lib/bvh.d.ts src/lib/README.md src/lib/shader/* dist/"
+    "copy-lib-files": "copyfiles -u 2 src/lib/bvh.js src/lib/bvh.d.ts src/lib/shader/* dist/",
+    "prepublishOnly": "shx mv README.md src/viewer/README.md && shx cp src/lib/README.md README.md",
+    "postpublish": "shx mv src/viewer/README.md README.md"
   },
   "staticFiles": {
     "staticPath": [
