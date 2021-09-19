@@ -15,12 +15,11 @@
 
 import Stats from 'three/examples/jsm/libs/stats.module.js';
 import { GUI } from 'dat.GUI';
-import { ThreeRenderer } from '../lib/three_renderer';
-import { PathtracingRenderer } from '../lib/renderer';
+import { ThreeRenderer } from './three_renderer';
+import { PathtracingRenderer, Loader } from '../lib/index';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import * as Assets from '../assets/asset_index';
-import * as Loader from '../lib/scene_loader';
+import * as Assets from '../../assets/asset_index';
 
 if (!window.File || !window.FileReader || !window.FileList || !window.Blob) {
   alert('The File APIs are not fully supported in this browser.');

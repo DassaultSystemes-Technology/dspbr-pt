@@ -40,10 +40,12 @@ export function loadSceneFromBlobs(urlList: any, autoscale: boolean) {
       getFileExtension(urlList[i].name) === "glb")
       return loadScene(urlList[i].name, autoscale, manager);
   }
+
+  return new Promise(()=>{});
 }
 
 export function loadIBL(ibl: string) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     new RGBELoader()
       .setDataType(THREE.FloatType)
       .load(ibl, (texture) => {

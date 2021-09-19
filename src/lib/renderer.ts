@@ -15,13 +15,12 @@
 
 import * as THREE from 'three';
 import { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
-export { PerspectiveCamera } from 'three';
 
 import * as glu from './gl_utils';
+// @ts-ignore
 import { mergeBufferGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { SimpleTriangleBVH } from './bvh';
 import { MaterialData, TexInfo, MaterialTextureInfo } from './material';
-import { Scene } from 'three';
 
 type DebugMode = "None" | "Albedo" | "Metalness" | "Roughness" | "Normals" | "Tangents" | "Bitangents" | "Transparency" | "UV0" | "Clearcoat";
 type TonemappingMode = "None" | "Reinhard" | "Cineon" | "AcesFilm";
@@ -197,7 +196,7 @@ export class PathtracingRenderer {
   private _frameCount = 1;
   private _isRendering = false;
 
-  constructor(parameters?: PathtracingRendererParameters) {
+  constructor(parameters: PathtracingRendererParameters = {}) {
     this.canvas = parameters.canvas ? parameters.canvas : document.createElementNS('http://www.w3.org/1999/xhtml', 'canvas');
     this.gl = parameters.context ? parameters.context : this.canvas.getContext('webgl2');
     this.gl.getExtension('EXT_color_buffer_float');
@@ -524,8 +523,9 @@ export class PathtracingRenderer {
     // KHR_materials_volume
     if(mat.thickness)
       matInfo.thinWalled = mat.thickness == 0.01 ? 1 : 0; //hack: three.js defaults thickness to 0.01 when volume extensions doesn't exist.
-    if(mat.attenuationTint)
-      matInfo.attenuationColor = mat.attenuationTint.toArray();
+    if(mat.attenuationColor)
+      matInfo.attenuationColor = mat.attenuationColor.toArray();
+
     matInfo.attenuationDistance = mat.attenuationDistance || matInfo.attenuationDistance;
 
     if(matInfo.attenuationDistance == 0.0)
@@ -677,7 +677,7 @@ export class PathtracingRenderer {
   setScene(scene: THREE.Group, gltf?: GLTF) {
     this.stopRendering();
     
-    return new Promise<void>((resolve, rejecct) => {
+    return new Promise<void>((resolve) => {
       this.createPathTracingScene(scene, gltf).then(() => {
         this.resetAccumulation();
         resolve();

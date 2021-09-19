@@ -14,8 +14,8 @@
  */
 
 import 'regenerator-runtime/runtime'
-import {PathtracingRenderer, PerspectiveCamera} from '../../lib/renderer';
-import * as loader from '../../lib/scene_loader';
+import {PathtracingRenderer, PerspectiveCamera} from '../lib/renderer';
+import * as loader from '../lib/scene_loader';
 
 const {ipcRenderer} = window.require('electron');
 var path = window.require('path');

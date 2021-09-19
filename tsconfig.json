@@ -1,17 +1,22 @@
 {
   "compilerOptions": {
     "target": "es6",
+    "module": "commonjs",
     "moduleResolution": "node",
-    "sourceMap": true,
+    "sourceMap": false,
     "removeComments": true,
     "noImplicitAny": true,
     "strict": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "declaration": true,
+    "outDir": "dist"
   },
   "include": [
-    "./src/**/*.ts",
-    "./lib/**/*.ts"
+    "./src/lib/**/*"
+  ],
+  "exclude": [
+    "./src/lib/three_renderer.ts"
   ]
 }
