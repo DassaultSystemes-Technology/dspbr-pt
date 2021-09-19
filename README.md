@@ -44,19 +44,20 @@ The demo app uses the three.js [WebGLRenderer](https://threejs.org/docs/#api/en/
 ## Quickstart
 
 ```bash
-# Installs all dependencies necessary to run and develop the renderer and viewer app
-npm install --production
-
-# Alternatively, if you intent to run the validation or CLI rendering (see below) omit the --production flag
-# This will additionally install electron (~200MB)
 npm install 
 
 # Launch the viewer in a browser with attached file watcher for auto refresh on file edits
 npm run dev
 ```
+
 ```bash
 # Builds a distributable package of the viewer to ./dist
-npm run build
+npm run build-viewer
+```
+
+```bash
+# Builds a distributable package of the renderer lib to ./dist (nmpmjs package)
+npm run build-lib
 ```
 
 Load glTF assets and HDR IBLs via drag & drop
@@ -123,7 +124,7 @@ Promise.all([scenePromise, iblPromise]).then(([gltf, ibl]) => {
   });
 });
 ```
-Please check [src/app.ts](src/app.ts) and [lib/renderer.ts](lib/renderer.ts) for more details.
+Please check [src/app.ts](src/viewer/app.ts) and [lib/renderer.ts](src/lib/renderer.ts) for more details.
 
 
 ## License
