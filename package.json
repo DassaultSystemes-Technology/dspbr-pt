@@ -21,6 +21,9 @@
     "replace-in-files-cli": "^1.0.0",
     "typescript": "^4.3.5"
   },
+  "browserslist": [
+    "last 1 Chrome version"
+  ],
   "scripts": {
     "render": "electron src/cli/offscreen.js --enable-logging",
     "clean": "shx rm -rf dist/*",
