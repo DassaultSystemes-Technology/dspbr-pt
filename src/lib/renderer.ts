@@ -461,7 +461,7 @@ export class PathtracingRenderer {
   }
 
 
-  private async parseMaterial(mat: THREE.MeshPhysicalMaterial, gltf?: GLTF) {
+  private async parseMaterial(mat: any, gltf?: GLTF) {
     let matInfo = new MaterialData();
     let matTexInfo = new MaterialTextureInfo();
 
@@ -523,8 +523,8 @@ export class PathtracingRenderer {
     // KHR_materials_volume
     if(mat.thickness)
       matInfo.thinWalled = mat.thickness == 0.01 ? 1 : 0; //hack: three.js defaults thickness to 0.01 when volume extensions doesn't exist.
-    if(mat.attenuationColor)
-      matInfo.attenuationColor = mat.attenuationColor.toArray();
+      if(mat.attenuationTint)
+      matInfo.attenuationColor = mat.attenuationTint.toArray();
 
     matInfo.attenuationDistance = mat.attenuationDistance || matInfo.attenuationDistance;
 
