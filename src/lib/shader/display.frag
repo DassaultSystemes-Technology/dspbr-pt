@@ -48,7 +48,9 @@ vec3 ACESFilmicToneMapping(vec3 color) {
 }
 
 void main() {
-  vec3 color = texture(tex, uv).xyz;
+  vec4 pixel_value = texture(tex, uv);
+  vec3 color = pixel_value.xyz;
+  float alpha = pixel_value.w;
 
   if (tonemappingMode == 0)
     color = LinearToneMapping(color);
@@ -64,5 +66,5 @@ void main() {
   if (gamma)
     color = pow(color, vec3(1.0 / 2.2));
 
-  out_FragColor = vec4(color, 1.0);
+  out_FragColor = vec4(color, alpha);
 }
