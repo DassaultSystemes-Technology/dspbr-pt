@@ -198,7 +198,7 @@ export class PathtracingRenderer {
 
   constructor(parameters: PathtracingRendererParameters = {}) {
     this.canvas = parameters.canvas ? parameters.canvas : document.createElementNS('http://www.w3.org/1999/xhtml', 'canvas');
-    this.gl = parameters.context ? parameters.context : this.canvas.getContext('webgl2');
+    this.gl = parameters.context ? parameters.context : this.canvas.getContext('webgl2', {alpha: true, powerPreference:"high-performance"});
     this.gl.getExtension('EXT_color_buffer_float');
     this.gl.getExtension('OES_texture_float_linear');
 
