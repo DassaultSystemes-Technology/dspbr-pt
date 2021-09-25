@@ -1,5 +1,11 @@
 # Changelog
-All notable changes to this project will be documented in this file.
+## [0.3.4] - 2021-09-25
+### Fixes
+- Fix metal weight in spec BSDF sampling
+- Add "high-performance" hint to context creation
+- Fix background alpha writes
+- Update ACES TMO to match three and glTF sample viewer
+
 ## [0.3.3] - 2021-09-20
 ### Fixes
 - Fix attenuation parsing
@@ -80,7 +86,10 @@ All notable changes to this project will be documented in this file.
 - glTF alpha blending mode support
 - NaN issues on shader evaluation
 
-[0.3.2]: https://github.com/DassaultSystemes-Technology/dspbr-pt/compare/v0.3.0...v0.3.2
+[0.3.4]: https://github.com/DassaultSystemes-Technology/dspbr-pt/compare/v0.3.3...v0.3.4
+[0.3.3]: https://github.com/DassaultSystemes-Technology/dspbr-pt/compare/v0.3.2...v0.3.3
+[0.3.2]: https://github.com/DassaultSystemes-Technology/dspbr-pt/compare/v0.3.1...v0.3.2
+[0.3.1]: https://github.com/DassaultSystemes-Technology/dspbr-pt/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/DassaultSystemes-Technology/dspbr-pt/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/DassaultSystemes-Technology/dspbr-pt/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/DassaultSystemes-Technology/dspbr-pt/compare/v0.1.0...v0.2.0
