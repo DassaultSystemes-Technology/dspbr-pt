@@ -473,6 +473,7 @@ export class PathtracingRenderer {
 
     matInfo.metallic = mat.metalness || 0;
     matInfo.roughness = mat.roughness || 0;
+    matInfo.doubleSided = mat.side == THREE.DoubleSide ? 1 : 0;
 
     matInfo.cutoutOpacity = mat.opacity;
     matInfo.alphaCutoff = mat.alphaTest;

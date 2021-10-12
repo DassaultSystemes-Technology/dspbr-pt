@@ -42,7 +42,7 @@ void unpackMaterialData(in uint idx, out MaterialData matData) {
 
   val = texelFetch(u_sampler2D_MaterialData, getStructParameterTexCoord(idx, 2u, MATERIAL_SIZE), 0);
   matData.cutoutOpacity = val.x;
-  matData.sheen = val.y;
+  matData.doubleSided = bool(val.y);
   matData.normalScale = val.z;
   matData.ior = val.w;
 
@@ -178,6 +178,8 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
 
   c.thin_walled = matData.thinWalled;
   c.ior = matData.ior;
+
+  c.double_sided = matData.doubleSided;
 
   vec4 occlusionRoughnessMetallic = evaluateMaterialTextureValue(matTexInfo.metallicRoughnessTexture, uv);
   c.metallic = matData.metallic * occlusionRoughnessMetallic.z;

@@ -56,12 +56,12 @@ export class MaterialData {
     return this.data[8];
   }
   
-  // public set sheen(val: number) {
-  //   this._data[9] = val;
-  // }
-  // public get sheen() {
-  //   return this.data[9];
-  // }
+  public set doubleSided(val: number) {
+    this._data[9] = val;
+  }
+  public get doubleSided() {
+    return this.data[9];
+  }
   
   public set normalScale(val: number) {
     this._data[10] = val;
@@ -195,7 +195,7 @@ export class MaterialData {
     this.transparency = 0;
 
     this.cutoutOpacity = 1;
-    // this.sheen = 0; // deprecated
+    this.doubleSided = 1; 
     this.normalScale = 1;
     this.ior = 1.49;
 

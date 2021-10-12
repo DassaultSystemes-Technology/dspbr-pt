@@ -66,7 +66,7 @@ struct MaterialData {
 
   // 2
   float cutoutOpacity;
-  float sheen;
+  bool doubleSided;
   float normalScale;
   float ior;
 
@@ -110,13 +110,13 @@ struct MaterialClosure {
   vec3 specular_tint;
   vec3 emission;
   vec3 normal;
-  float sheen;
   float sheen_roughness;
   vec3 sheen_color;
   vec2 alpha;
   float clearcoat;
   float clearcoat_alpha;
   bool thin_walled;
+  bool double_sided;
   float attenuationDistance;
   vec3 attenuationColor;
   float ior;
@@ -188,7 +188,8 @@ void fillRenderState(const in Ray r, const in HitInfo hit, out RenderState rs) {
 
 int sampleBSDFBounce(inout RenderState rs, inout vec3 pathWeight, out int eventType) {
   float rr_cutout = rng_NextFloat();
-  if (rr_cutout > rs.closure.cutout_opacity) {
+  bool ignoreBackfaces = false;//(!rs.closure.double_sided && rs.closure.backside);
+  if (rr_cutout > rs.closure.cutout_opacity || ignoreBackfaces) {
     eventType |= E_SINGULAR;
     rs.wo = -rs.wi;
     Ray r = createRay(rs.wo, rs.hitPos + fix_normal(rs.geometryNormal, rs.wo) * u_float_rayEps, TFAR_MAX);
@@ -214,7 +215,7 @@ int sampleBSDFBounce(inout RenderState rs, inout vec3 pathWeight, out int eventT
       fillRenderState(r, hit, rs);
 
       // Absorption
-      if(rs.closure.backside) {
+      if(rs.closure.backside) { //&& !rs.closure.thin_walled) {
         vec3 absorptionCoefficient = -log(rs.closure.attenuationColor) / rs.closure.attenuationDistance;
         pathWeight *= exp(-absorptionCoefficient*hit.tfar);
       }
