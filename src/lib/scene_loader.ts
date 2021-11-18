@@ -2,46 +2,64 @@
 import * as THREE from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { LoadingManager } from 'three';
+import { WebIO, VertexLayout, Document } from '@gltf-transform/core';
+import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
+import { weld } from '@gltf-transform/functions';
 
-export function loadSceneFromBlobs(urlList: any, autoscale: boolean) {
-  var manager = new THREE.LoadingManager();
 
-  let blobs: any = {};
-  for (var i = 0; i < urlList.length; i++) {
-    let name = urlList[i].name;
-    // if (getFileExtension(urlList[i].name) !== "gltf" &&
-    //   getFileExtension(urlList[i].name) !== "glb") {
-    //   name = "./" + name;
-    // }
+export async function loadSceneFromBlobs(files: [string, File][], autoscale: boolean) {
 
-    blobs[name] = urlList[i];
-  }
-
-  // Initialize loading manager with URL callback.
-  var objectURLs = [];
-  manager.setURLModifier((url: string) => {
-    if (url.startsWith("blob"))
-      return url;
-
-    url = url.replace(/^.*[\\\/]/, '')
-    console.log("Parsing blob resource: " + url);
-    url = URL.createObjectURL(blobs[url]);
-    objectURLs.push(url);
-    return url;
-  });
+  const io = new WebIO()
+    .registerExtensions(ALL_EXTENSIONS)
+    .setVertexLayout(VertexLayout.SEPARATE); // INTERLEAVED (default) or SEPARATE
 
   function getFileExtension(filename: string) {
     return filename.split('.').pop();
   }
 
-  for (var i = 0; i < urlList.length; i++) {
-    if (getFileExtension(urlList[i].name) === "gltf" ||
-      getFileExtension(urlList[i].name) === "glb")
-      return loadScene(urlList[i].name, autoscale, manager);
+  async function createJSONDocument(uris: [string, File][]) {
+    const binaries: { [id: string]: ArrayBuffer; } = {};
+    let json: any = {} 
+
+    for (let [path, file] of uris) {
+      const buffer = await file.arrayBuffer();
+      const ext = getFileExtension(file.name);
+     
+      if (ext == "gltf") {
+        const data = await file.text();
+        json = JSON.parse(data);
+      } else {
+        binaries[path.slice(1)] = buffer;
+      }
+    }
+    const jsonDocument = {
+      json: json,
+      resources: binaries
+    };
+
+    return jsonDocument;
   }
 
-  return new Promise(()=>{});
+  let doc = {} as Document
+  for(let f of files) {
+    const file = f[1];
+    if (getFileExtension(file.name) === "glb") {
+      const buffer = await file.arrayBuffer();
+      doc = await io.readBinary(buffer);
+    }
+
+    if (getFileExtension(file.name) === "gltf") {
+      const jsonDoc = await createJSONDocument(files);
+      doc = io.readJSON(jsonDoc);
+    }
+  }
+
+  await doc.transform(
+    weld()
+  );
+
+  const processed_glb = io.writeBinary(doc);
+  return loadScene(processed_glb, autoscale);
 }
 
 export function loadIBL(ibl: string) {
@@ -54,11 +72,24 @@ export function loadIBL(ibl: string) {
   });
 }
 
-export function loadScene(url: string, autoscale: boolean, manager?: LoadingManager) {
-  var loader = new GLTFLoader(manager);
+export async function loadSceneFromUrl(url: string, autoscale: boolean) {
+  const io = new WebIO()
+    .registerExtensions(ALL_EXTENSIONS)
+    .setVertexLayout(VertexLayout.SEPARATE); // INTERLEAVED (default) or SEPARATE
 
+  const doc = await io.read(url);
+  await doc.transform(
+    weld()
+  );
+  const glb = io.writeBinary(doc);
+  return loadScene(glb, autoscale);
+}
+
+function loadScene(glb: ArrayBuffer, autoscale: boolean) {
+  var loader = new GLTFLoader();
   return new Promise((resolve, reject) => {
-    loader.load(url, (gltf) => {
+
+    loader.parse(glb, "", (gltf) => {
 
       const scene = gltf.scene || gltf.scenes[0];
 
@@ -82,8 +113,6 @@ export function loadScene(url: string, autoscale: boolean, manager?: LoadingMana
       // scene.matrixAutoUpdate = false;
       scene.updateMatrixWorld();
       resolve(gltf);
-    }, (xhr) => {
-      console.log((xhr.loaded / xhr.total * 100) + '% loaded');
     }, (error) => {
       reject(new Error('Error loading glTF scene: ' + error));
     });

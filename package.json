@@ -5,10 +5,14 @@
   "types": "./dist/index.d.ts",
   "main": "./dist/index.js",
   "dependencies": {
+    "@gltf-transform/core": "^1.1.1",
+    "@gltf-transform/extensions": "^1.1.1",
+    "@gltf-transform/functions": "^1.1.1",
     "@types/three": "^0.131.0",
     "three": "^0.132.2"
   },
   "devDependencies": {
+    "simple-dropzone": "^0.8.1",
     "dat.gui": "^0.7.7",
     "parcel": "^1.12.3",
     "parcel-plugin-static-files-copy": "^2.6.0",

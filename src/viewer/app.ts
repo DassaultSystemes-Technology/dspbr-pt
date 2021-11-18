@@ -15,6 +15,7 @@
 
 import Stats from 'three/examples/jsm/libs/stats.module.js';
 import { GUI } from 'dat.GUI';
+import { SimpleDropzone } from 'simple-dropzone';
 import { ThreeRenderer } from './three_renderer';
 import { PathtracingRenderer, Loader } from '../lib/index';
 import * as THREE from 'three';
@@ -115,6 +116,12 @@ class App {
     window.addEventListener('resize', () => {
       this.resize();
     }, false);
+  
+    const input = document.createElement('input');
+    const dropCtrl = new SimpleDropzone(this.canvas, input);
+    dropCtrl.on('drop', ({ files }) => this.load(files));
+    dropCtrl.on('dropstart', () => this.showSpinner());
+    dropCtrl.on('droperror', () => this.hideSpinner());
 
     this.container.addEventListener('dragover', function (e) {
       e.stopPropagation();
@@ -122,42 +129,40 @@ class App {
       e.dataTransfer.dropEffect = 'copy';
     });
 
-    this.canvas.addEventListener('drop', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      if (e.dataTransfer.files.length == 1 &&
-        e.dataTransfer.files[0].name.match(/\.hdr$/)) {
-        console.log("loading HDR...");
-        // const url = URL.createObjectURL(e.dataTransfer.getData('text/html'));
-        Loader.loadIBL(URL.createObjectURL(e.dataTransfer.items[0].getAsFile())).then((ibl) => {
-          this.renderer.setIBL(ibl);
-          this.three_renderer.setIBL(ibl);
-          const iblNode = document.getElementById("ibl-info");
-          iblNode.innerHTML = '';
-        });
-      } else {
-        this.showSpinner();
-        const scenePromise = Loader.loadSceneFromBlobs(e.dataTransfer.files, this.autoScaleScene);
-        const iblPromise = Loader.loadIBL(Assets.getIBLByName(this.ibl).url);
-        Promise.all([scenePromise, iblPromise]).then(([gltf, ibl]) => {
-          this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
-          this.updateCameraFromBoundingBox();
-          this.renderer.setIBL(ibl);
-          this.renderer.setScene(gltf.scene, gltf).then(() => {
-            this.startPathtracing();
-            this.hideSpinner();
-            document.getElementById("scene-info").innerHTML = '';
-          });
-
-          this.three_renderer.setScene(new THREE.Scene().add(gltf.scene));
-          this.three_renderer.setIBL(ibl);
-        });
-      }
-    });
-
     this.initUI();
     this.hideSpinner();
+  }
+
+   private load(fileMap) {
+     const files : [string, File][] = Array.from(fileMap) 
+     if (files.length == 1 && files[0][1].name.match(/\.hdr$/)) {
+      console.log("loading HDR...");
+      // const url = URL.createObjectURL(e.dataTransfer.getData('text/html'));
+       Loader.loadIBL(URL.createObjectURL(files[0][1])).then((ibl) => {
+        this.renderer.setIBL(ibl);
+        this.three_renderer.setIBL(ibl);
+        const iblNode = document.getElementById("ibl-info");
+        iblNode.innerHTML = '';
+        this.hideSpinner();
+      });
+    } else {
+      // this.showSpinner();
+      const scenePromise = Loader.loadSceneFromBlobs(files, this.autoScaleScene);
+      const iblPromise = Loader.loadIBL(Assets.getIBLByName(this.ibl).url);
+      Promise.all([scenePromise, iblPromise]).then(([gltf, ibl]) => {
+        this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
+        this.updateCameraFromBoundingBox();
+        this.renderer.setIBL(ibl);
+        this.renderer.setScene(gltf.scene, gltf).then(() => {
+          this.startPathtracing();
+          this.hideSpinner();
+          document.getElementById("scene-info").innerHTML = '';
+        });
+
+        this.three_renderer.setScene(new THREE.Scene().add(gltf.scene));
+        this.three_renderer.setIBL(ibl);
+      });
+    }
   }
 
   private startRasterizer() {
@@ -225,7 +230,7 @@ class App {
   }
 
   private loadScene(sceneUrl) {
-    const scenePromise = Loader.loadScene(sceneUrl, this.autoScaleScene);
+    const scenePromise = Loader.loadSceneFromUrl(sceneUrl, this.autoScaleScene);
     const iblPromise = Loader.loadIBL(Assets.getIBLByName(this.ibl).url);
 
     Promise.all([scenePromise, iblPromise]).then(([gltf, ibl]) => {

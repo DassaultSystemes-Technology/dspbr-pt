@@ -32,7 +32,7 @@ function startRenderer() {
   renderer.iblRotation = args.ibl_rotation;
   renderer.maxBounces = args.bounces;
 
-  loader.loadScene(args.gltf_path, false).then(gltf => {
+  loader.loadSceneFromUrl(args.gltf_path, false).then(gltf => {
     let cameras = [];
     const scene = gltf.scene || gltf.scenes[0];
     gltf.scene.traverse((child) => {
