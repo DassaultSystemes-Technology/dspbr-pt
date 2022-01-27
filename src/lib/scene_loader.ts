@@ -4,7 +4,7 @@ import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { WebIO, VertexLayout, Document } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-import { weld } from '@gltf-transform/functions';
+import { weld, dequantize } from '@gltf-transform/functions';
 
 
 export async function loadSceneFromBlobs(files: [string, File][], autoscale: boolean) {
@@ -55,6 +55,7 @@ export async function loadSceneFromBlobs(files: [string, File][], autoscale: boo
   }
 
   await doc.transform(
+    dequantize(),
     weld()
   );
 
