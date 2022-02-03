@@ -487,14 +487,14 @@ vec3 sample_dspbr(const in MaterialClosure c, vec3 wi, in vec3 uvw, out vec3 bsd
 
   vec3 diffuse_importance = c.albedo * (1.0 - c.transparency);
   vec3 sheen_importance = c.sheen_color;
-  vec3 specular_refl_importance = vec3(1.0 - c.clearcoat) * max((1.0-c.transparency), c.metallic) * ggx_importance;
-  float clearcoat_importance = c.clearcoat;
+  vec3 specular_refl_importance = max((1.0-c.transparency), c.metallic) * ggx_importance;
+  vec3 clearcoat_importance = c.clearcoat * fresnel_schlick(c.specular_f0, vec3(1.0), dot(wi, g.n));;
   vec3 transmission_importance = vec3(c.albedo * c.transparency) * (1.0 - c.metallic) * (vec3(1.0) - ggx_importance);
 
   float bsdf_importance[4];
   bsdf_importance[0] = luminance(diffuse_importance + sheen_importance) * (1.0 - c.metallic);
   bsdf_importance[1] = luminance(specular_refl_importance);
-  bsdf_importance[2] = clearcoat_importance;
+  bsdf_importance[2] = luminance(clearcoat_importance);
   bsdf_importance[3] = luminance(transmission_importance);
 
   float bsdf_cdf[4];
