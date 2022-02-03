@@ -19,12 +19,12 @@ export async function loadSceneFromBlobs(files: [string, File][], autoscale: boo
 
   async function createJSONDocument(uris: [string, File][]) {
     const binaries: { [id: string]: ArrayBuffer; } = {};
-    let json: any = {} 
+    let json: any = {}
 
     for (let [path, file] of uris) {
       const buffer = await file.arrayBuffer();
       const ext = getFileExtension(file.name);
-     
+
       if (ext == "gltf") {
         const data = await file.text();
         json = JSON.parse(data);
@@ -41,7 +41,7 @@ export async function loadSceneFromBlobs(files: [string, File][], autoscale: boo
   }
 
   let doc = {} as Document
-  for(let f of files) {
+  for (let f of files) {
     const file = f[1];
     if (getFileExtension(file.name) === "glb") {
       const buffer = await file.arrayBuffer();
@@ -63,11 +63,76 @@ export async function loadSceneFromBlobs(files: [string, File][], autoscale: boo
   return loadScene(processed_glb, autoscale);
 }
 
+function precompute1DPdfAndCdf(data: Float32Array, pdf: Float32Array,
+  cdf: Float32Array, row: number, num: number) {
+
+  const rowIdx = row * num;
+  let sum = 0;
+  for (let i = 0; i < num; i++) {
+    sum += data[rowIdx + i];
+  }
+
+  if (sum == 0)
+    sum = 1;
+
+  for (let i = 0; i < num; i++) {
+    pdf[rowIdx + i] = data[rowIdx + i] / sum;
+  }
+
+  cdf[rowIdx] = pdf[rowIdx];
+  for (let i = 1; i < num; i++) {
+    cdf[rowIdx + i] = cdf[rowIdx + i - 1] + pdf[rowIdx + i];
+  }
+
+  cdf[rowIdx + num - 1] = 1;
+  return sum;
+}
+
+async function precomputeIBLImportanceSamplingData(texture: any) {
+  const image = texture.image;
+  const w = image.width;
+  const h = image.height;
+  console.log("Precomputing IBL importance sampling data...");
+
+  const f = new Float32Array(w * h);
+  const sumX = new Float32Array(h);
+
+  const pcPDF = new Float32Array(w * h);
+  const pcCDF = new Float32Array(w * h);
+  const yPDF = new Float32Array(h);
+  const yCDF = new Float32Array(h);
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w * 3; x++) {
+      // relative luminance of rbg pixel value
+      const rgbIdx = (x + y * w) * 3;
+      f[x + y * w] = image.data[rgbIdx] * 0.299 + image.data[rgbIdx + 1] * 0.587 + image.data[rgbIdx + 2] * 0.114
+    }
+  }
+
+  for (let y = 0; y < h; y++) {
+    precompute1DPdfAndCdf(f, pcPDF, pcCDF, y, w);
+    sumX[y] = 0.0;
+    for (let x = 0; x < w; x++) {
+      sumX[y] += f[x + y * w];
+    }
+  }
+
+  const totalSum = precompute1DPdfAndCdf(sumX, yPDF, yCDF, 0, h);
+
+  texture["pcPDF"] = pcPDF;
+  texture["pcCDF"] = pcCDF;
+  texture["yPDF"] = yPDF;
+  texture["yCDF"] = yCDF;
+  texture["totalSum"] = totalSum;
+}
+
 export function loadIBL(ibl: string) {
   return new Promise((resolve) => {
     new RGBELoader()
       .setDataType(THREE.FloatType)
       .load(ibl, (texture) => {
+        precomputeIBLImportanceSamplingData(texture);
         resolve(texture);
       });
   });
@@ -96,9 +161,9 @@ function loadScene(glb: ArrayBuffer, autoscale: boolean) {
 
       if (!scene) {
         // Valid, but not supported by this viewer.
-        throw new Error(
+        reject(new Error(
           'This model contains no scene, and cannot be viewed.'
-        );
+        ));
       }
 
       var bbox = new THREE.Box3().setFromObject(scene);

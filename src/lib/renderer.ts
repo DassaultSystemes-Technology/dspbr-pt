@@ -22,7 +22,7 @@ import { mergeBufferGeometries } from 'three/examples/jsm/utils/BufferGeometryUt
 import { SimpleTriangleBVH } from './bvh';
 import { MaterialData, TexInfo, MaterialTextureInfo } from './material';
 
-type DebugMode = "None" | "Albedo" | "Metalness" | "Roughness" | "Normals" | "Tangents" | "Bitangents" | "Transparency" | "UV0" | "Clearcoat";
+type DebugMode = "None" | "Albedo" | "Metalness" | "Roughness" | "Normals" | "Tangents" | "Bitangents" | "Transparency" | "UV0" | "Clearcoat" | "IBL PDF" | "IBL CDF";
 type TonemappingMode = "None" | "Reinhard" | "Cineon" | "AcesFilm";
 type SheenMode = "Charlie" | "Ashikhmin";
 
@@ -33,6 +33,15 @@ class Light {
   pad = 0;
 }
 
+class IBLImportanceSamplingData {
+  pdf: WebGLTexture | null = null;
+  cdf: WebGLTexture | null = null;
+  yPdf: WebGLTexture | null = null;
+  yCdf: WebGLTexture | null = null;
+  width: number = 0;
+  height: number = 0;
+  totalSum: number = 0;
+}
 
 export interface PathtracingRendererParameters {
   canvas?: HTMLCanvasElement;
@@ -47,6 +56,7 @@ export class PathtracingRenderer {
   private texArrayDict: { [idx: string]: any; } = {};
 
   private ibl: WebGLTexture | null = null;
+  private iblImportanceSamplingData: IBLImportanceSamplingData = new IBLImportanceSamplingData();
   private renderBuffer: WebGLTexture | null = null;
   private copyBuffer: WebGLTexture | null = null;
   private copyFbo: WebGLFramebuffer | null = null;
@@ -72,7 +82,7 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
-  public debugModes = ["None", "Albedo", "Metalness", "Roughness", "Normals", "Tangents", "Bitangents", "Transparency", "UV0", "Clearcoat"];
+  public debugModes = ["None", "Albedo", "Metalness", "Roughness", "Normals", "Tangents", "Bitangents", "Transparency", "UV0", "Clearcoat", "IBL PDF", "IBL CDF"];
   private _debugMode: DebugMode = "None";
   public get debugMode() {
     return this._debugMode;
@@ -156,7 +166,7 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
-  private _iblSampling = false;
+  private _iblSampling = true;
   public get iblSampling() {
     return this._iblSampling;
   }
@@ -198,7 +208,7 @@ export class PathtracingRenderer {
 
   constructor(parameters: PathtracingRendererParameters = {}) {
     this.canvas = parameters.canvas ? parameters.canvas : document.createElementNS('http://www.w3.org/1999/xhtml', 'canvas');
-    this.gl = parameters.context ? parameters.context : this.canvas.getContext('webgl2', {alpha: true, powerPreference:"high-performance"});
+    this.gl = parameters.context ? parameters.context : this.canvas.getContext('webgl2', { alpha: true, powerPreference: "high-performance" });
     this.gl.getExtension('EXT_color_buffer_float');
     this.gl.getExtension('OES_texture_float_linear');
 
@@ -254,7 +264,27 @@ export class PathtracingRenderer {
 
       gl.activeTexture(gl.TEXTURE0 + numTextureSlots)
       gl.bindTexture(gl.TEXTURE_2D, this.ibl);
-      gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_samplerCube_EnvMap"),
+      gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_sampler_EnvMap"),
+        numTextureSlots++);
+
+      gl.activeTexture(gl.TEXTURE0 + numTextureSlots)
+      gl.bindTexture(gl.TEXTURE_2D, this.iblImportanceSamplingData.pdf);
+      gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_sampler_EnvMap_pdf"),
+        numTextureSlots++);
+
+      gl.activeTexture(gl.TEXTURE0 + numTextureSlots)
+      gl.bindTexture(gl.TEXTURE_2D, this.iblImportanceSamplingData.cdf);
+      gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_sampler_EnvMap_cdf"),
+        numTextureSlots++);
+
+      gl.activeTexture(gl.TEXTURE0 + numTextureSlots)
+      gl.bindTexture(gl.TEXTURE_2D, this.iblImportanceSamplingData.yPdf);
+      gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_sampler_EnvMap_yPdf"),
+        numTextureSlots++);
+
+      gl.activeTexture(gl.TEXTURE0 + numTextureSlots)
+      gl.bindTexture(gl.TEXTURE_2D, this.iblImportanceSamplingData.yCdf);
+      gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_sampler_EnvMap_yCdf"),
         numTextureSlots++);
 
       let filmHeight = Math.tan(camera.fov * 0.5 * Math.PI / 180.0) * camera.near;
@@ -282,6 +312,8 @@ export class PathtracingRenderer {
         this._backgroundColor);
       gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_int_maxBounces"),
         this._maxBounces);
+      gl.uniform2i(gl.getUniformLocation(this.ptProgram, "u_ivec2_IblResolution"),
+        this.iblImportanceSamplingData.width, this.iblImportanceSamplingData.height);
       gl.uniform2f(gl.getUniformLocation(this.ptProgram, "u_vec2_InverseResolution"),
         1.0 / this.renderRes[0], 1.0 / this.renderRes[1]);
       gl.uniform1f(gl.getUniformLocation(this.ptProgram, "u_float_FocalLength"),
@@ -489,7 +521,7 @@ export class PathtracingRenderer {
       matInfo.normalScale = mat.normalScale.x;
     }
 
-    if(mat.emissive) {
+    if (mat.emissive) {
       matInfo.emission = mat.emissive.toArray();
       if (mat.emissiveMap) {
         matTexInfo.emissionTexture = this.parseTexture(mat.emissiveMap);
@@ -512,7 +544,7 @@ export class PathtracingRenderer {
     }
 
     matInfo.specular = (mat.specularIntensity === undefined) ? 1.0 : mat.specularIntensity;
-    if(mat.specularTint)
+    if (mat.specularTint)
       matInfo.specularTint = mat.specularTint.toArray();
     if (mat.specularIntensityMap) {
       matTexInfo.specularTexture = this.parseTexture(mat.specularIntensityMap);
@@ -522,14 +554,14 @@ export class PathtracingRenderer {
     }
 
     // KHR_materials_volume
-    if(mat.thickness)
+    if (mat.thickness)
       matInfo.thinWalled = mat.thickness == 0.01 ? 1 : 0; //hack: three.js defaults thickness to 0.01 when volume extensions doesn't exist.
-      if(mat.attenuationTint)
+    if (mat.attenuationTint)
       matInfo.attenuationColor = mat.attenuationTint.toArray();
 
     matInfo.attenuationDistance = mat.attenuationDistance || matInfo.attenuationDistance;
 
-    if(matInfo.attenuationDistance == 0.0)
+    if (matInfo.attenuationDistance == 0.0)
       matInfo.attenuationDistance = Number.MAX_VALUE;
 
     // KHR_materials_ior
@@ -658,26 +690,32 @@ export class PathtracingRenderer {
 
   setIBL(texture: any) {
     let gl = this.gl;
-    if (this.ibl !== undefined)
+    if (this.ibl !== undefined) {
       this.gl.deleteTexture(this.ibl);
+      this.gl.deleteTexture(this.iblImportanceSamplingData.pdf);
+      this.gl.deleteTexture(this.iblImportanceSamplingData.cdf);
+      this.gl.deleteTexture(this.iblImportanceSamplingData.yCdf);
+      this.gl.deleteTexture(this.iblImportanceSamplingData.yPdf);
+    }
 
-    this.ibl = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, this.ibl);
-    // gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, texture.image.width, texture.image.height,
-      0, gl.RGB, gl.FLOAT, texture.image.data);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-    gl.bindTexture(gl.TEXTURE_2D, null);
+    this.ibl = glu.createTexture(gl, gl.TEXTURE_2D, gl.RGB32F, texture.image.width, 
+      texture.image.height, gl.RGB, gl.FLOAT, texture.image.data, 0);
+    this.iblImportanceSamplingData.width = texture.image.width;
+    this.iblImportanceSamplingData.height = texture.image.height;
+
+    //Importance sampling buffers
+    this.iblImportanceSamplingData.pdf = glu.createTexture(gl, gl.TEXTURE_2D, gl.R32F, texture.image.width, texture.image.height, gl.RED, gl.FLOAT, texture.pcPDF, 0);
+    this.iblImportanceSamplingData.cdf = glu.createTexture(gl, gl.TEXTURE_2D, gl.R32F, texture.image.width, texture.image.height, gl.RED, gl.FLOAT, texture.pcCDF, 0);
+    this.iblImportanceSamplingData.yPdf = glu.createTexture(gl, gl.TEXTURE_2D, gl.R32F, texture.image.height, 1, gl.RED, gl.FLOAT, texture.yPDF, 0);
+    this.iblImportanceSamplingData.yCdf = glu.createTexture(gl, gl.TEXTURE_2D, gl.R32F, texture.image.height, 1, gl.RED, gl.FLOAT, texture.yCDF, 0);
+    this.iblImportanceSamplingData.totalSum = texture.totalSum;
 
     this.resetAccumulation();
   }
 
   setScene(scene: THREE.Group, gltf?: GLTF) {
     this.stopRendering();
-    
+
     return new Promise<void>((resolve) => {
       this.createPathTracingScene(scene, gltf).then(() => {
         this.resetAccumulation();
@@ -770,7 +808,7 @@ export class PathtracingRenderer {
 
       if (!geo.attributes.normal)
         geo.computeVertexNormals();
-      if (geo.attributes.uv  && !geo.attributes.tangent)
+      if (geo.attributes.uv && !geo.attributes.tangent)
         geo.computeTangents();
 
       const numVertices = geo.attributes.position.count;
@@ -935,7 +973,7 @@ export class PathtracingRenderer {
       let pos = lightList[0].position;
       let em = lightList[0].emission;
       shaderChunks['pathtracing_lights'] = `
-                #define HAS_LIGHTS 1
+                #define HAS_POINT_LIGHT 1
                 const vec3 cPointLightPosition = vec3(${pos[0]}, ${pos[1]}, ${pos[2]});
                 const vec3 cPointLightEmission = vec3(${em[0]}, ${em[1]}, ${em[2]});
                 `
@@ -1020,6 +1058,7 @@ export class PathtracingRenderer {
     shaderChunks['pathtracing_material'] = await <Promise<string>>filePromiseLoader('./shader/material.glsl');
     shaderChunks['pathtracing_dspbr'] = await <Promise<string>>filePromiseLoader('./shader/dspbr.glsl');
     shaderChunks['pathtracing_rt_kernel'] = await <Promise<string>>filePromiseLoader('./shader/rt_kernel.glsl');
+    shaderChunks['lighting'] = await <Promise<string>>filePromiseLoader('./shader/lighting.glsl');
 
     shaderChunks['pathtracing_defines'] = `
           const float PI =               3.14159265358979323;

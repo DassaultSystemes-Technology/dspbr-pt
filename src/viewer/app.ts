@@ -110,7 +110,7 @@ class App {
 
     this.renderer.pixelRatio = 0.5; 
     // this.renderer.iblRotation = 180.0;
-    this.renderer.exposure = 1.5;
+    // this.renderer.exposure = Assets.getIBL(0).intensity || 1.4;
     this.renderer.maxBounces = 8;
 
     window.addEventListener('resize', () => {
@@ -275,23 +275,26 @@ class App {
     }).setValue(Assets.getScene(0).name);
     
     this._gui.add(this, 'autoScaleScene').name('Autoscale Scene');
+   
+    this._gui.add(this.renderer, 'exposure').name('Display Exposure').min(0).max(10).step(0.01).onChange((value) => {
+      this.three_renderer.exposure = value;
+    }).listen();
 
     this._gui.add(this, "ibl", Assets.ibl_names).name('IBL').onChange((value) => {
       const iblInfo = Assets.getIBLByName(value);
       console.log(`Loading ${iblInfo.name}`);
       Loader.loadIBL(iblInfo.url).then((ibl) => {
         this.renderer.setIBL(ibl);
+        // if(iblInfo.intensity)
+        this.renderer.exposure = iblInfo.intensity ?? 1.0;
+        this.renderer.iblRotation = iblInfo.rotation ?? 0.0;
         this.three_renderer.setIBL(ibl);
         this.setIBLInfo(iblInfo);
       });
     }).setValue(Assets.getIBL(0).name);
 
-    this._gui.add(this.renderer, 'iblRotation').name('IBL Rotation').min(-180.0).max(180.0).step(0.1);
-    // this._gui.add(_this.renderer, 'iblSampling').name('IBL Sampling');
-
-    this._gui.add(this.renderer, 'exposure').name('Display Exposure').min(0).max(3).step(0.01).onChange((value) => {
-      this.three_renderer.exposure = value;
-    });
+    this._gui.add(this.renderer, 'iblRotation').name('IBL Rotation').min(-180.0).max(180.0).step(0.1).listen();
+    this._gui.add(this.renderer, 'iblSampling').name('IBL Sampling');
 
     this._gui.add(this, 'autoRotate').name('Auto Rotate').onChange((value) => {
       this.controls.autoRotate = value;

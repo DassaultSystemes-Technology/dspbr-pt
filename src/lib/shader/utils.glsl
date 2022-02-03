@@ -129,7 +129,7 @@ Geometry calculateBasis(vec3 n, vec4 t) {
 }
 
 float computeTheta(vec3 dir) {
-  return acos(max(-1.0, min(1.0, -dir.y)));
+  return acos(max(-1.0, min(1.0, dir.y)));
 }
 
 float computePhi(vec3 dir) {
@@ -141,30 +141,36 @@ float computePhi(vec3 dir) {
 }
 
 vec3 fromThetaPhi(float theta, float phi) {
-  return vec3(sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta));
+  return vec3(sin(theta) * cos(phi), cos(theta), sin(theta) * sin(phi));
 }
 
-vec2 mapDirToUV(vec3 dir) {
+vec2 mapDirToUV(vec3 dir, out float pdf) {
   float theta = computeTheta(dir);
-  float u = (computePhi(dir)) / (2.0 * PI);
+  float u = computePhi(dir) / (2.0 * PI);
   float v = (PI - theta) / PI;
-  // pdf = 1.0 / (2.0 * PI * PI * max(EPS_COS, sin(theta)));
+  pdf = 1.0 / (2.0 * PI * PI * max(EPS_COS, sin(theta)));
   return vec2(u, v);
 }
 
 vec3 mapUVToDir(vec2 uv, out float pdf) {
-  float theta = (uv.y * PI) - PI;
-  float phi = (uv.x * (2.0f * PI));
+  float theta = uv.y * PI;
+  float phi = uv.x * (2.0f*PI) + PI;
   pdf = 1.0 / (2.0 * PI * PI * max(EPS_COS, sin(theta)));
   return fromThetaPhi(theta, phi);
 }
 
-vec3 sampleIBL(in vec3 dir) {
-  vec3 sampleDir = mat3(cos(u_float_iblRotation), 0.0, sin(u_float_iblRotation), 0.0, 1.0, 0.0,
-                        -sin(u_float_iblRotation), 0.0, cos(u_float_iblRotation)) *
-                   dir;
+vec3 transformIBLDir(vec3 dir, bool inverse) {
+  float angle = inverse ? -u_float_iblRotation : u_float_iblRotation;
+  return mat3(cos(angle), 0.0, sin(angle), 0.0, 1.0, 0.0,
+              -sin(angle), 0.0, cos(angle)) * dir;
+}
+
+vec3 evaluateIBL(in vec3 dir) {
   if (u_bool_UseIBL) {
-    return texture(u_samplerCube_EnvMap, mapDirToUV(sampleDir)).xyz;
+    float pdf;
+    vec3 sampleDir = transformIBLDir(dir, false);
+    vec2 uv = mapDirToUV(sampleDir, pdf);
+    return texture(u_sampler_EnvMap, vec2(uv.x, 1.0-uv.y)).xyz;
   }
   return vec3(0);
 }
@@ -221,4 +227,62 @@ ivec2 getStructParameterTexCoord(uint structIdx, uint paramIdx, uint structStrid
 
 vec3 to_linear_rgb(vec3 srgb) {
   return pow(srgb.xyz, vec3(2.2));
+}
+
+int findLowerBound(sampler2D data, int row, int size, float value)
+{
+  int idx;
+  int step;
+  int count = size;
+  int first = 0;
+  while (count > 0)
+  {
+    idx = first;
+    step = count / 2;
+    idx += step;
+    float v = texelFetch(data, ivec2(idx, row), 0).x;
+    if (v < value)
+    {
+      first = ++idx;
+      count -= step + 1;
+    }
+    else
+      count = step;
+  }
+  return first;
+}
+
+int binsearchCDF(sampler2D cdf, int row, int size, float value) {
+  if (!(value >= 0.0))
+    return 0;
+  if (!(value <= 1.0))
+    return size - 1;
+
+  return findLowerBound(cdf, row, size, value + 0.00000001);
+}
+
+// Performs a binsearch in the given array with the given number and resacles the input random number
+int binsearchCDF_rescale(sampler2D cdf, int row, int size, inout float v, out float invProp)
+{
+  int idx = binsearchCDF(cdf, row, size, v);
+  // rescale r0 to get again a random number between [0,1); here we need to keep numerical accuracy in mind but
+  // it is necessary to preserve a possible stratification from the random numbers
+  if (idx == 0)
+  {
+    invProp = 1.0 / texelFetch(cdf, ivec2(0, row), 0).x;
+    v = v * invProp;
+  }
+  else
+  {
+    float c0 = texelFetch(cdf, ivec2(idx, row), 0).x;
+    float c1 = texelFetch(cdf, ivec2(idx-1, row), 0).x;
+    invProp = 1.0 / (c0 - c1);
+    v = (v - c1) * invProp;
+  }
+
+  return idx;
+}
+
+float misBalanceHeuristic(float a, float b) {
+	return a / (a + b);
 }

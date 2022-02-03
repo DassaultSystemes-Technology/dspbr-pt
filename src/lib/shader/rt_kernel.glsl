@@ -258,8 +258,8 @@ bool isVisible(const in vec3 p0, const in vec3 p1) {
   return !intersectScene_Nearest(r, hit); //!!TOOPT: add an early hit function here
 }
 
-bool isEnvVisible(const in vec3 p0, const in vec3 dir) {
+bool isOccluded(const in vec3 p0, const in vec3 dir) {
   Ray r = createRay(normalize(dir), p0, TFAR_MAX);
   HitInfo hit;
-  return !intersectScene_Nearest(r, hit); //!!TOOPT: add an early hit function here
+  return intersectScene_Nearest(r, hit); //!!TOOPT: add an early hit function here
 }
