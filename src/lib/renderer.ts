@@ -526,7 +526,7 @@ export class PathtracingRenderer {
     let matTexInfo = new MaterialTextureInfo();
 
     matInfo.albedo = mat.color.toArray();
-
+    // console.log(mat);
     if (mat.map) {
       matTexInfo.albedoTexture = this.parseTexture(mat.map);
     }
@@ -621,27 +621,36 @@ export class PathtracingRenderer {
         return (name in obj) ? obj[name] : default_value;
       };
 
+      if ('gltfExtensions' in mat.userData) {
+        if ('KHR_materials_emissive_strength' in mat.userData.gltfExtensions) {
+          let ext = mat.userData.gltfExtensions["KHR_materials_emissive_strength"];
+          const emissiveStrength = get_param("emissiveStrength", ext, 1.0);
+          matInfo.emission = matInfo.emission.map(x => x * emissiveStrength);
+        }
+        if ('KHR_materials_anisotropy' in mat.userData.gltfExtensions) {
+          let ext = mat.userData.gltfExtensions["KHR_materials_anisotropy"];
+          matInfo.anisotropy = get_param("anisotropyFactor", ext, matInfo.anisotropy);
+          matInfo.anisotropyRotation = get_param("anisotropyRotationFactor", ext, matInfo.anisotropyRotation);
+        }
+        if ('KHR_materials_translucency' in mat.userData.gltfExtensions) {
+          let ext = mat.userData.gltfExtensions["KHR_materials_translucency"];
+          matInfo.translucency = get_param("translucencyFactor", ext, matInfo.transparency);
+          // if ("translucencyTexture" in ext) {
+          //   await this._gltf.parser.getDependency('texture', ext.translucencyTexture.index)
+          //     .then((tex) => {
+          //       matTexInfo.translucencyTexture = this.parseTexture(tex);
+          //       setTextureTransformFromExt(matTexInfo.translucencyTexture, ext.translucencyTexture);
+          //     });
+          // }
+        }
+      }
+
       if ('3DS_materials_anisotropy' in mat.userData) {
         let ext = mat.userData["3DS_materials_anisotropy"];
         matInfo.anisotropy = get_param("anisotropyFactor", ext, matInfo.anisotropy);
         matInfo.anisotropyRotation = get_param("anisotropyRotationFactor", ext, matInfo.anisotropyRotation);
       }
-      if ('KHR_materials_anisotropy' in mat.userData) {
-        let ext = mat.userData["KHR_materials_anisotropy"];
-        matInfo.anisotropy = get_param("anisotropyFactor", ext, matInfo.anisotropy);
-        matInfo.anisotropyRotation = get_param("anisotropyRotationFactor", ext, matInfo.anisotropyRotation);
-      }
-      if ('KHR_materials_translucency' in mat.userData) {
-        let ext = mat.userData["KHR_materials_translucency"];
-        matInfo.translucency = get_param("translucencyFactor", ext, matInfo.transparency);
-        // if ("translucencyTexture" in ext) {
-        //   await this._gltf.parser.getDependency('texture', ext.translucencyTexture.index)
-        //     .then((tex) => {
-        //       matTexInfo.translucencyTexture = this.parseTexture(tex);
-        //       setTextureTransformFromExt(matTexInfo.translucencyTexture, ext.translucencyTexture);
-        //     });
-        // }
-      }
+
       if ('3DS_materials_translucency' in mat.userData) {
         let ext = mat.userData["3DS_materials_translucency"];
         matInfo.translucency = get_param("translucencyFactor", ext, matInfo.transparency);
