@@ -102,11 +102,12 @@ async function precomputeIBLImportanceSamplingData(texture: any) {
   const yPDF = new Float32Array(h);
   const yCDF = new Float32Array(h);
 
+  const numChannels = 4;
   for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w * 3; x++) {
+    for (let x = 0; x < w * numChannels; x++) {
       // relative luminance of rbg pixel value
-      const rgbIdx = (x + y * w) * 3;
-      f[x + y * w] = image.data[rgbIdx] * 0.299 + image.data[rgbIdx + 1] * 0.587 + image.data[rgbIdx + 2] * 0.114
+      const rgbIdx = (x + y * w) * numChannels;
+      f[x + y * w] = image.data[rgbIdx] * 0.299 + image.data[rgbIdx + 1] * 0.587 + image.data[rgbIdx + 2] * 0.114;
     }
   }
 
@@ -171,7 +172,7 @@ function loadScene(glb: ArrayBuffer, autoscale: boolean) {
       const maxValue = Math.max(bbox.max.x, Math.max(bbox.max.y, bbox.max.z));
       const deltaValue = maxValue - minValue;
       let scale = 1.0 / deltaValue;
-      // Normalize scene dimensions (needed for easy rt precision control) 
+      // Normalize scene dimensions (needed for easy rt precision control)
       if (autoscale) {
         scene.scale.set(scale, scale, scale);
       }

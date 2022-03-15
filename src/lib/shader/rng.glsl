@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-uvec2 rng_state; 
+uvec2 rng_state;
 
 uint george_marsaglia_rng() {
     rng_state.x = 36969u * (rng_state.x & 65535u) + (rng_state.x >> 16u);
@@ -33,4 +33,3 @@ void init_RNG(int seed) {
     rng_state ^= uvec2(32.9875*(gl_FragCoord.yx+offset));
 }
 ///////////////////////////////////////////////////////////////////////////////
-

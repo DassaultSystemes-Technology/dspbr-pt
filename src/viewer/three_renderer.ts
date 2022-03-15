@@ -67,10 +67,10 @@ export class ThreeRenderer {
   useIBL(val) {
     if (val) {
       this.scene.environment = this.ibl;
-      this.showBackground(true);
+      this.showBackground = true ;
     } else {
       this.scene.environment = null;
-      this.showBackground(false);
+      this.showBackground = false ;
     }
   }
 
@@ -82,7 +82,7 @@ export class ThreeRenderer {
     this.renderer = new THREE.WebGLRenderer(parameters);
     // this.renderer.setSize(canvas.width, canvas.height);'
     this.renderer.toneMapping = THREE.LinearToneMapping;
-    this.renderer.outputEncoding = THREE.GammaEncoding;
+    this.renderer.outputEncoding = THREE.sRGBEncoding;
     this.renderer.physicallyCorrectLights = true;
 
     this.pmremGenerator = new THREE.PMREMGenerator(this.renderer);

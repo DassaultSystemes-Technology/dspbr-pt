@@ -20,7 +20,7 @@ import { ThreeRenderer } from './three_renderer';
 import { PathtracingRenderer, Loader } from '../lib/index';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import * as Assets from '../../assets/asset_index';
+import * as Assets from './assets/asset_index';
 
 if (!window.File || !window.FileReader || !window.FileList || !window.Blob) {
   alert('The File APIs are not fully supported in this browser.');
@@ -81,7 +81,7 @@ class App {
 
     let aspect = window.innerWidth / window.innerHeight;
     this.camera = new THREE.PerspectiveCamera(45, aspect, 0.01, 1000);
-    
+
     this.controls = new OrbitControls(this.camera, this.canvas);
     this.controls.screenSpacePanning = true;
 
@@ -108,15 +108,15 @@ class App {
     this.renderer = new PathtracingRenderer({ canvas: this.canvas_pt});
     this.three_renderer = new ThreeRenderer({ canvas: this.canvas_three, powerPreference: "high-performance", alpha: true });
 
-    this.renderer.pixelRatio = 0.5; 
+    this.renderer.pixelRatio = 0.5;
     // this.renderer.iblRotation = 180.0;
     // this.renderer.exposure = Assets.getIBL(0).intensity || 1.4;
-    this.renderer.maxBounces = 8;
+    this.renderer.maxBounces = 32;
 
     window.addEventListener('resize', () => {
       this.resize();
     }, false);
-  
+
     const input = document.createElement('input');
     const dropCtrl = new SimpleDropzone(this.canvas, input);
     dropCtrl.on('drop', ({ files }) => this.load(files));
@@ -134,7 +134,7 @@ class App {
   }
 
    private load(fileMap) {
-     const files : [string, File][] = Array.from(fileMap) 
+     const files : [string, File][] = Array.from(fileMap)
      if (files.length == 1 && files[0][1].name.match(/\.hdr$/)) {
       console.log("loading HDR...");
       // const url = URL.createObjectURL(e.dataTransfer.getData('text/html'));
@@ -213,7 +213,7 @@ class App {
 
   private updateCameraFromBoundingBox() {
     this.controls.reset();
-    let diag = this.sceneBoundingBox.max.distanceTo(this.sceneBoundingBox.min); 
+    let diag = this.sceneBoundingBox.max.distanceTo(this.sceneBoundingBox.min);
     let dist = diag * 2 / Math.tan(45.0 * Math.PI / 180.0);
 
     let center = new THREE.Vector3();
@@ -236,7 +236,7 @@ class App {
     Promise.all([scenePromise, iblPromise]).then(([gltf, ibl]) => {
       this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
       this.updateCameraFromBoundingBox();
-      
+
       this.renderer.setIBL(ibl);
       this.renderer.setScene(gltf.scene, gltf).then(() => {
         if (this.pathtracing)
@@ -266,16 +266,16 @@ class App {
         this.startPathtracing();
       }
     });
-  
+
     this._gui.add(this, "scene", Assets.scene_names).name('Scene').onChange((value) => {
       const sceneInfo = Assets.getSceneByName(value);
       console.log(`Loading ${sceneInfo.name}`);
       this.loadScene(sceneInfo.url);
       this.setSceneInfo(sceneInfo);
     }).setValue(Assets.getScene(0).name);
-    
+
     this._gui.add(this, 'autoScaleScene').name('Autoscale Scene');
-   
+
     this._gui.add(this.renderer, 'exposure').name('Display Exposure').min(0).max(10).step(0.01).onChange((value) => {
       this.three_renderer.exposure = value;
     }).listen();
@@ -302,11 +302,12 @@ class App {
     });
 
     this._gui.add(this.renderer, 'debugMode', this.renderer.debugModes).name('Debug Mode');
+    this._gui.add(this.renderer, 'renderMode', this.renderer.renderModes).name('Integrator');
     this._gui.add(this.renderer, 'tonemapping', this.renderer.tonemappingModes).name('Tonemapping').onChange(val => {
         this.three_renderer.tonemapping = val;
     });
     this._gui.add(this.renderer, 'enableGamma').name('Gamma');
-    
+
     this._gui.add(this.renderer, 'pixelRatio').name('Pixel Ratio').min(0.1).max(1.0);
     this._gui.add(this, 'interactionScale').name('Interaction Ratio').min(0.1).max(1.0).step(0.1);
 
@@ -373,7 +374,7 @@ class App {
 
   setIBLInfo(ibl: any) {
     const html = `
-      IBL: ${ibl.name} by ${ibl.author} 
+      IBL: ${ibl.name} by ${ibl.author}
       from <a href="${ibl.source_url}"> ${ibl.source} </a>
       <a href="${ibl.license_url}">(${ibl.license})</a>
       `;
@@ -382,7 +383,7 @@ class App {
 
   setSceneInfo(scene: any) {
     const html = `
-      Scene: ${scene.name} by ${scene.author} 
+      Scene: ${scene.name} by ${scene.author}
       from <a href="${scene.source_url}"> ${scene.source} </a>
       <a href="${scene.license_url}">(${scene.license})</a>
       `;

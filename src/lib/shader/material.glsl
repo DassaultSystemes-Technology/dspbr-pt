@@ -215,7 +215,7 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
   // remember whether we hit from backside
   vec3 wi = rs.wi;
   c.backside = fix_normals(c.n, c.ng, wi);
-  
+
   // apply aniso rotation
   c.t = rotation_to_tangent(matData.anisotropyRotation, c.n, c.t);
 

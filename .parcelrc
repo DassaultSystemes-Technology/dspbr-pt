@@ -1,0 +1,7 @@
+{
+  "extends": "@parcel/config-default",
+  "transformers": {
+    "*.{hdr}": ["@parcel/transformer-raw"],
+    "*.{glsl|vert|frag}": ["...", "@parcel/transformer-glsl"]
+  }
+}

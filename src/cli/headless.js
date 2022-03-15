@@ -14,8 +14,7 @@
  */
 
 import 'regenerator-runtime/runtime'
-import {PathtracingRenderer, PerspectiveCamera} from '../lib/renderer';
-import * as loader from '../lib/scene_loader';
+import {PathtracingRenderer, PerspectiveCamera, Loader} from '../lib/index';
 
 const {ipcRenderer} = window.require('electron');
 var path = window.require('path');
@@ -32,42 +31,47 @@ function startRenderer() {
   renderer.iblRotation = args.ibl_rotation;
   renderer.maxBounces = args.bounces;
 
-  loader.loadSceneFromUrl(args.gltf_path, false).then(gltf => {
-    let cameras = [];
-    const scene = gltf.scene || gltf.scenes[0];
-    gltf.scene.traverse((child) => {
-      if (child.isCamera) {
-        child.position.applyMatrix4(child.matrixWorld);
-        cameras.push(child);
-      }
-    });
+  try {
+    Loader.loadSceneFromUrl(args.gltf_path, false).then(gltf => {
+      let cameras = [];
+      const scene = gltf.scene || gltf.scenes[0];
+      gltf.scene.traverse((child) => {
+        if (child.isCamera) {
+          child.position.applyMatrix4(child.matrixWorld);
+          cameras.push(child);
+        }
+      });
 
-    if (cameras.length > 0) {
-      var camera = cameras[0];
-    } else {
-      var camera =
-          new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-      this.camera.position.set(0, 0, 3);
-    }
-
-    renderer.setScene(gltf.scene, gltf).then(() => {
-      if (args.ibl === "None") {
-        renderer.render(camera, args.samples, () => {}, (result) => {
-          console.log("icpRenderer Ready");
-          ipcRenderer.send('rendererReady');
-        });
+      if (cameras.length > 0) {
+        var camera = cameras[0];
       } else {
-        loader.loadIBL(args.ibl).then((ibl) => {
-          console.log("loaded ibl" + args.ibl);
-          renderer.setIBL(ibl);
+        var camera =
+            new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        this.camera.position.set(0, 0, 3);
+      }
+
+      renderer.setScene(gltf.scene, gltf).then(() => {
+        if (args.ibl === "None") {
           renderer.render(camera, args.samples, () => {}, (result) => {
             console.log("icpRenderer Ready");
             ipcRenderer.send('rendererReady');
           });
-        });
-      }
+        } else {
+          Loader.loadIBL(args.ibl).then((ibl) => {
+            console.log("loaded ibl" + args.ibl);
+            renderer.setIBL(ibl);
+            renderer.render(camera, args.samples, () => {}, (result) => {
+              console.log("icpRenderer Ready");
+              ipcRenderer.send('rendererReady');
+            });
+          });
+        }
+      });
     });
-  });
+  } catch(error) {
+    console.log(error);
+    console.log("Skipping scene...");
+  }
 }
 
 window.onload = function() { startRenderer(); };

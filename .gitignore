@@ -2,9 +2,11 @@ node_modules/
 dist/
 .cache/
 *.png
-package 
+package
 EnterprisePBRShadingModel/
 validation*/
 debug.log
 .vscode/settings.json
 tmp/
+assets/
+.parcel-cache

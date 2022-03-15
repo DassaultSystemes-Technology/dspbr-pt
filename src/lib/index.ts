@@ -1,3 +1,6 @@
 export { PerspectiveCamera, Box3 } from 'three';
-export * as Loader from './scene_loader';
+import * as LoaderTmp from './scene_loader';
+export const Loader = {
+  ...LoaderTmp
+}
 export {PathtracingRenderer} from './renderer';

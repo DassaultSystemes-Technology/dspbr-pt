@@ -1,62 +1,51 @@
 {
   "name": "dspbr-pt",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "A WebGL2 Enterprise PBR sample renderer",
-  "types": "./dist/index.d.ts",
-  "main": "./dist/index.js",
   "dependencies": {
     "@gltf-transform/core": "^1.2.1",
     "@gltf-transform/extensions": "^1.2.1",
     "@gltf-transform/functions": "^1.2.1",
     "@types/three": "^0.131.0",
-    "three": "^0.132.2"
+    "three": "^0.138.3"
   },
   "devDependencies": {
-    "simple-dropzone": "^0.8.1",
-    "dat.gui": "^0.7.7",
-    "parcel": "^1.12.3",
-    "parcel-plugin-static-files-copy": "^2.6.0",
-    "shx": "^0.3.3",
-    "@babel/plugin-transform-runtime": "^7.15.0",
-    "@babel/runtime": "^7.15.4",
+    "@babel/plugin-transform-runtime": "^7.17.0",
+    "@babel/runtime": "^7.17.2",
+    "@parcel/packager-ts": "^2.3.2",
+    "@parcel/transformer-glsl": "^2.3.2",
+    "@parcel/transformer-typescript-types": "^2.3.2",
     "argparse": "^2.0.1",
+    "buffer": "^6.0.3",
     "copyfiles": "^2.4.1",
+    "dat.gui": "^0.7.9",
     "electron": "^8.5.5",
+    "parcel": "^2.3.2",
     "replace-in-files-cli": "^1.0.0",
-    "typescript": "^4.3.5"
+    "shx": "^0.3.4",
+    "simple-dropzone": "^0.8.1",
+    "typescript": "^4.6.2"
   },
   "browserslist": [
     "last 1 Chrome version"
   ],
   "scripts": {
-    "render": "electron src/cli/offscreen.js --enable-logging",
     "clean": "shx rm -rf dist/*",
-    "build-viewer": "npm run clean && parcel build src/viewer/index.html --out-dir dist --public-url ./ --no-source-maps",
-    "build-lib": "npm run clean && tsc && npm run copy-lib-files",
-    "dev": "npm run clean && parcel src/viewer/index.html --port 3000 --open",
+    "dev": "npm run clean && npm run copy-assets && parcel src/viewer/index.html --port 3000 --public-url / --open",
+    "build-lib": "npm run clean && parcel build src/lib/index.ts --public-url / --no-source-maps && npm run copy-libs",
+    "build-viewer": "npm run clean && parcel build src/viewer/index.html --public-url / --no-source-maps && npm run copy-assets",
+    "build-cli": "npm run clean && parcel build src/cli/headless.html --no-optimize --public-url ./",
+    "copy-assets": "shx cp -R src/viewer/assets dist/",
+    "copy-libs": "copyfiles -u 2 src/lib/bvh.js src/lib/bvh.d.ts src/lib/index.d.ts dist/",
     "validation": "npm run build-cli && python scripts/run_validation.py",
-    "build-cli": "npm run clean && parcel build src/cli/headless.html --public-url ./",
-    "copy-lib-files": "copyfiles -u 2 src/lib/bvh.js src/lib/bvh.d.ts src/lib/shader/* dist/",
     "prepublishOnly": "shx mv README.md src/viewer/README.md && shx cp src/lib/README.md README.md",
-    "postpublish": "shx mv src/viewer/README.md README.md"
-  },
-  "staticFiles": {
-    "staticPath": [
-      {
-        "staticPath": "assets",
-        "staticOutDir": "assets"
-      },
-      {
-        "staticPath": "src/lib/shader",
-        "staticOutDir": "shader"
-      }
-    ],
-    "watcherGlob": "**"
+    "postpublish": "shx mv src/viewer/README.md README.md",
+    "render": "electron src/cli/offscreen.js --enable-logging"
   },
   "files": [
     "/dist",
-    "!/src/lib",
-    "!/src/lib/shader",
+    "!/src/",
+    "!/node_modules/",
     "!.DS_Store"
   ],
   "repository": {

@@ -42,9 +42,9 @@ function createShader(gl: WebGL2RenderingContext, type: number, source: string) 
       return shader;
     } else {
       const errorLog = gl.getShaderInfoLog(shader);
-      const errorPos = errorLog.indexOf("ERROR: ");
-      let errorSnippet = errorLog.substring(errorPos, errorPos+20);
-      const errorLineNumber = errorSnippet.match(/(:\d+)/)[0].substring(1); 
+      const errorPos = errorLog?.indexOf("ERROR: ") ?? 0;
+      let errorSnippet = errorLog?.substring(errorPos, errorPos+20);
+      const errorLineNumber = errorSnippet?.match(/(:\d+)/)![0].substring(1) ?? "0";
       const sourceLines = source.split(/\r?\n/);
       console.log(sourceLines[parseInt(errorLineNumber)-1]);
       throw Error("shader compile error: " + errorLog);

@@ -52,6 +52,7 @@ uniform ivec2 u_ivec2_IblResolution;
 #include <pathtracing_lights>
 
 uniform int u_int_DebugMode;
+uniform int u_int_RenderMode;
 uniform bool u_bool_UseIBL;
 uniform bool u_bool_ShowBackground;
 uniform vec3 u_vec3_BackgroundColor;
@@ -129,7 +130,8 @@ struct MaterialClosure {
   vec3 n;
   vec3 ng;
   vec4 t;
-  int eventType;
+  int event_type;
+  float bsdf_selection_pdf;
 };
 
 // struct Light {
@@ -164,10 +166,16 @@ struct TexInfo {
 #include <pathtracing_utils>
 #include <pathtracing_tex_array_lookup>
 #include <pathtracing_material>
-#include <pathtracing_dspbr>
 #include <pathtracing_rt_kernel>
+
+
+#include <pathtracing_dspbr>
 #include <lighting>
 
+
+const int RM_PT = 0;
+const int RM_PTDL = 1;
+const int RM_MISPTDL = 2;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Pathtracing Integrator
@@ -192,6 +200,11 @@ void fillRenderState(const in Ray r, const in HitInfo hit, out RenderState rs) {
 
   uint matIdx = getMaterialIndex(triIdx);
   configure_material(matIdx, rs, rs.closure, vertexColor);
+
+  float bsdf_selection_pdf;
+  float rr_brdf = rng_NextFloat();
+  importanceSampleBsdf(rs.closure, rr_brdf, rs.wi, bsdf_selection_pdf);
+  rs.closure.bsdf_selection_pdf = bsdf_selection_pdf;
 }
 
 vec4 traceDebug(const Ray r) {
@@ -203,8 +216,20 @@ vec4 traceDebug(const Ray r) {
     RenderState rs;
     fillRenderState(r, hit, rs);
 
-    if (u_int_DebugMode == 1)
-      contrib = rs.closure.albedo;
+    if (u_int_DebugMode == 1) {
+      vec3 sampleDir = normalize(vec3(rng_NextFloat(), rng_NextFloat(),rng_NextFloat()));
+      float pdf;
+      vec3 c;
+      sampleAndEvaluateEnvironmentLight(rs, rng_NextFloat(), rng_NextFloat(), sampleDir, c, pdf);
+      float pdf2 = sampleEnvironmentLightPdf(sampleDir);
+      contrib = vec3(abs(pdf-pdf2));//rs.closure.albedo;
+
+      // float pdf, pdf2;
+      // vec2 uv = mapDirToUV(sampleDir, pdf);
+      // vec3 dir = mapUVToDir(uv, pdf2);
+      // contrib = vec3(abs(pdf-pdf2));
+      // contrib = abs(dir-sampleDir);
+    }
     if (u_int_DebugMode == 2)
       contrib = vec3(rs.closure.metallic);
     if (u_int_DebugMode == 3)
@@ -226,6 +251,15 @@ vec4 traceDebug(const Ray r) {
     }
     if (u_int_DebugMode == 9) {
       contrib = vec3(rs.closure.clearcoat);
+    }
+    if (u_int_DebugMode == 12) {
+      contrib = vec3(rs.closure.specular);
+    }
+    if (u_int_DebugMode == 13) {
+      contrib = rs.closure.specular_tint;
+    }
+    if (u_int_DebugMode == 14) {
+      contrib = fresnel_schlick(rs.closure.specular_f0, rs.closure.specular_f90, dot(rs.closure.n, rs.wi));
     }
     color = vec4(contrib, 1.0);
   } else { // direct background hit
@@ -251,72 +285,31 @@ vec4 traceDebug(const Ray r) {
   return color;
 }
 
-vec3 sampleAndEvaluateDirectLight(const in RenderState rs) {
-  // Light light;
-  // unpackLightData(0u, light);
-  float pointSamplePdf = 1.0;
-  vec3 contribution = vec3(0);
-  
-  contribution += sampleAndEvaluatePointLight(rs, pointSamplePdf); 
 
-  if (u_bool_iblSampling) {
-    float iblSamplePdf = 1.0;
-    contribution += sampleAndEvaluateEnvironmentLight(rs, rng_NextFloat(), rng_NextFloat(), iblSamplePdf);
-  }
+bool sampleBSDFBounce(inout RenderState rs, out vec3 sampleWeight, out float pdf) {
+  bool ignoreBackfaces = false;//(!rs.closure.double_sided && rs.closure.backside);
 
-  return contribution;
-}
-
-int sampleBSDFBounce(inout RenderState rs, inout vec3 bounceWeight, out vec3 directLightContribution, inout float pdf) {
-  // float rr_cutout = rng_NextFloat();
-  // bool ignoreBackfaces = false;//(!rs.closure.double_sided && rs.closure.backside);
-  // if (rr_cutout > rs.closure.cutout_opacity || ignoreBackfaces) {
-  //   rs.closure.eventType |= E_SINGULAR;
-  //   rs.wo = -rs.wi;
-  //   Ray r = createRay(rs.wo, rs.hitPos + fix_normal(rs.geometryNormal, rs.wo) * u_float_rayEps, TFAR_MAX);
-  //   HitInfo hit;
-  //   if (intersectScene_Nearest(r, hit)) {
-  //     fillRenderState(r, hit, rs);
-  //     return 1;
-  //   }
-  //   pdf = 1.0;
-  // } else {
-    float brdf_selection_p = 1.0;
-    float rr_brdf_selection = rng_NextFloat();
-    importanceSampleBsdf(rs.closure, rr_brdf_selection, rs.wi, brdf_selection_p);
-
-    if(!bool(rs.closure.eventType & E_SINGULAR))
-      directLightContribution = sampleAndEvaluateDirectLight(rs) * bounceWeight;
-
-    float sample_pdf = 1.0;
-    vec3 bsdf_weight = vec3(1.0);
-    rs.wo = sample_dspbr(rs.closure, rs.wi, 
-                          vec3(rng_NextFloat(), rng_NextFloat(), rng_NextFloat()), 
-                          bsdf_weight, sample_pdf);
-
-    if (sample_pdf > EPS_PDF) {
-      bounceWeight *= bsdf_weight / (sample_pdf*brdf_selection_p);
-      pdf = sample_pdf*brdf_selection_p; 
-    } else {
-      return -1; // teminate path
-    }
-
+  if (rng_NextFloat() > rs.closure.cutout_opacity || ignoreBackfaces) {
+    rs.closure.event_type |= E_SINGULAR;
+    rs.wo = -rs.wi;
     Ray r = createRay(rs.wo, rs.hitPos + fix_normal(rs.geometryNormal, rs.wo) * u_float_rayEps, TFAR_MAX);
     HitInfo hit;
-    if (intersectScene_Nearest(r, hit)) {
-      fillRenderState(r, hit, rs);
+    pdf = 1.0;
+    sampleWeight = vec3(1.0);
+  }
+  else {
+    rs.wo = sample_dspbr(rs.closure, rs.wi,
+                          vec3(rng_NextFloat(), rng_NextFloat(), rng_NextFloat()),
+                          sampleWeight, pdf);
 
-      // Absorption
-      if(rs.closure.backside) { //&& !rs.closure.thin_walled) {
-        vec3 absorptionCoefficient = -log(rs.closure.attenuationColor) / rs.closure.attenuationDistance;
-        bounceWeight *= exp(-absorptionCoefficient*hit.tfar);
-      }
-
-      return 1;
+    if (pdf < EPS_PDF) {
+      sampleWeight = vec3(0.0);
+      pdf = 0.0;
+      return false; // teminate path
     }
-  // }
+  }
 
-  return 0;
+  return true;
 }
 
 
@@ -334,7 +327,6 @@ vec4 trace(const Ray r) {
   vec4 color = vec4(0);
 
   if (intersectScene_Nearest(r, hit)) { // primary camera ray
-    // return vec4(1,0,0,1);
     vec3 contrib = vec3(0);
 
     RenderState rs;
@@ -342,47 +334,78 @@ vec4 trace(const Ray r) {
     bool lastBounceSpecular = false;
 
     int i = 0;
-    while (i < u_int_maxBounces || lastBounceSpecular) {
-      // start russion roulette path termination for bounce depth > 2
-      if (i > 2 && rng_NextFloat() > RR_TERMINATION_PROB) {
-        if (u_bool_forceIBLEval) {
-          contrib += evaluateIBL(rs.wo) * pathWeight;
+    while (i <= u_int_maxBounces || lastBounceSpecular) {
+
+      //start russion roulette path termination for bounce depth > 2
+      if (i > RR_START_DEPTH) {
+        float rr = rng_NextFloat();
+        if(rr <= RR_TERMINATION_PROB) {
+          break;
         }
-        break;
+        pathWeight *= 1.0 / (1.0 - RR_TERMINATION_PROB);
       }
 
       contrib += rs.closure.emission * pathWeight;
 
-      float brdf_sample_p_w;
-      vec3 directLightContribution = vec3(0.0);
-      int bounceType = sampleBSDFBounce(rs, pathWeight, directLightContribution, brdf_sample_p_w);
-      lastBounceSpecular = bool(rs.closure.eventType & E_SINGULAR);
+      lastBounceSpecular = bool(rs.closure.event_type & E_SINGULAR);
 
+      bool hasDirectLightContribution = false;
+      if(u_int_RenderMode != RM_PT ) {
+        contrib += sampleAndEvaluatePointLight(rs);
 
-      if (i > 2) {
-        pathWeight *= 1.0 / RR_TERMINATION_PROB;
+        float iblSamplePdf;
+        vec3 iblDir;
+        vec3 iblContribution;
+
+        if(sampleAndEvaluateEnvironmentLight(rs, rng_NextFloat(),
+              rng_NextFloat(), iblDir, iblContribution, iblSamplePdf))
+        {
+          if(u_int_RenderMode == RM_PTDL) {
+            contrib += iblContribution * pathWeight / iblSamplePdf;
+          }
+          else { // RM_MISPTDL
+            float brdfSamplePdf = dspbr_pdf(rs.closure, rs.wi, iblDir) * rs.closure.bsdf_selection_pdf;
+            if(iblSamplePdf > EPS_PDF && brdfSamplePdf > EPS_PDF) {
+              float misWeight = misBalanceHeuristic(iblSamplePdf, brdfSamplePdf);
+              contrib += iblContribution * pathWeight * misWeight;
+            }
+          }
+        }
       }
 
-      if (bounceType == -1)
-        break; // absorbed
+      // Next bounce
+      vec3 bounceWeight;
+      float lastBouncePdf;
+      if(!sampleBSDFBounce(rs, bounceWeight, lastBouncePdf)) {
+        break; //absorped
+      }
 
-      // if (bounceType > 0)
-      //   contrib += directLightContribution;
+      pathWeight *= bounceWeight / rs.closure.bsdf_selection_pdf;
 
-      bool isPathEnd = (i == (u_int_maxBounces - 1));
-      bool forcedIBLSampleOnPathEnd = (isPathEnd && u_bool_forceIBLEval);
-      if (bounceType == 0 || forcedIBLSampleOnPathEnd) { // background sample
-        float ibl_sample_p_w = sampleEnvironmentLightPdf(rs.wo);
-        float misWeight = 1.0;
-        if(!lastBounceSpecular && ibl_sample_p_w > EPS_PDF) 
-          misWeight = misBalanceHeuristic(brdf_sample_p_w, ibl_sample_p_w);
-        // contrib += vec3(sampleEnvironmentLightPdf(rs.closure.n));
-        contrib += evaluateIBL(rs.wo) * pathWeight;// * misWeight;
+      Ray r = createRay(rs.wo, rs.hitPos + fix_normal(rs.geometryNormal, rs.wo) * u_float_rayEps, TFAR_MAX);
+      HitInfo hit;
+
+      if (intersectScene_Nearest(r, hit)) {
+        fillRenderState(r, hit, rs);
+
+        // Absorption
+        if(rs.closure.backside) { //&& !rs.closure.thin_walled) {
+          vec3 absorptionCoefficient = -log(rs.closure.attenuationColor) / rs.closure.attenuationDistance;
+          pathWeight *= exp(-absorptionCoefficient*hit.tfar);
+        }
+      } else { // environment hit
+        if(u_int_RenderMode == RM_PT || (u_int_RenderMode == RM_PTDL)) {
+          contrib += evaluateIBL(rs.wo) * pathWeight;
+        }
+        else if(u_int_RenderMode == RM_MISPTDL){
+          float iblSamplePdf = sampleEnvironmentLightPdf(rs.wo);
+          float misWeight = misBalanceHeuristic(
+              lastBouncePdf * rs.closure.bsdf_selection_pdf, iblSamplePdf);
+          contrib += evaluateIBL(rs.wo) * pathWeight * misWeight;
+        }
         break;
-      } 
+      }
 
-      // All clear. next sample has properly been generated and intersection was found.
-      // Render state contains new intersection info.
       i++;
     }
 
@@ -391,7 +414,7 @@ vec4 trace(const Ray r) {
     if (u_bool_ShowBackground) {
       color = vec4(evaluateIBL(r.dir), 1.0);
     } else {
-      color = vec4(pow(u_vec3_BackgroundColor, vec3(2.2)), 0);
+      color = vec4(pow(u_vec3_BackgroundColor, vec3(2.2)), 0.0);
     }
   }
 
@@ -414,7 +437,7 @@ Ray calcuateViewRay(float r0, float r1) {
 }
 
 void main() {
-  init_RNG(u_int_FrameCount);
+  init_RNG(u_int_FrameCount * u_int_maxBounces);
 
   Ray r = calcuateViewRay(rng_NextFloat(), rng_NextFloat());
 

@@ -22,9 +22,26 @@ import { mergeBufferGeometries } from 'three/examples/jsm/utils/BufferGeometryUt
 import { SimpleTriangleBVH } from './bvh';
 import { MaterialData, TexInfo, MaterialTextureInfo } from './material';
 
-type DebugMode = "None" | "Albedo" | "Metalness" | "Roughness" | "Normals" | "Tangents" | "Bitangents" | "Transparency" | "UV0" | "Clearcoat" | "IBL PDF" | "IBL CDF";
+import displayFragmentShader from '/src/lib/shader/display.frag';
+import pathtracing_rng from '/src/lib/shader/rng.glsl';
+import pathtracing_utils from '/src/lib/shader/utils.glsl';
+import pathtracing_material from '/src/lib/shader/material.glsl';
+import pathtracing_dspbr from '/src/lib/shader/dspbr.glsl';
+import pathtracing_rt_kernel from '/src/lib/shader/rt_kernel.glsl';
+import lighting from '/src/lib/shader/lighting.glsl';
+import diffuse from '/src/lib/shader/bsdfs/diffuse.glsl';
+import microfacet from '/src/lib/shader/bsdfs/microfacet.glsl';
+import sheen from '/src/lib/shader/bsdfs/sheen.glsl';
+import fresnel from '/src/lib/shader/bsdfs/fresnel.glsl';
+
+import vertexShader from '/src/lib/shader/pt.vert';
+import fragmentShader from '/src/lib/shader/pt.frag';
+
+
+type DebugMode = "None" | "Albedo" | "Metalness" | "Roughness" | "Normals" | "Tangents" | "Bitangents" | "Transparency" | "UV0" | "Clearcoat" | "IBL PDF" | "IBL CDF" | "Specular" | "SpecularTint" | "Fresnel_Schlick" ;
 type TonemappingMode = "None" | "Reinhard" | "Cineon" | "AcesFilm";
 type SheenMode = "Charlie" | "Ashikhmin";
+type RenderMode = "PT" | "PTDL" | "MISPTDL";
 
 class Light {
   position = [1, 1, 1];
@@ -82,13 +99,23 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
-  public debugModes = ["None", "Albedo", "Metalness", "Roughness", "Normals", "Tangents", "Bitangents", "Transparency", "UV0", "Clearcoat", "IBL PDF", "IBL CDF"];
+  public debugModes = ["None", "Albedo", "Metalness", "Roughness", "Normals", "Tangents", "Bitangents", "Transparency", "UV0", "Clearcoat", "IBL PDF", "IBL CDF", "Specular", "SpecularTint", "Fresnel_Schlick"];
   private _debugMode: DebugMode = "None";
   public get debugMode() {
     return this._debugMode;
   }
   public set debugMode(val) {
     this._debugMode = val;
+    this.resetAccumulation();
+  }
+
+  public renderModes = ["PT", "PTDL", "MISPTDL"];
+  private _renderMode: RenderMode = "MISPTDL";
+  public get renderMode() {
+    return this._renderMode;
+  }
+  public set renderMode(val) {
+    this._renderMode = val;
     this.resetAccumulation();
   }
 
@@ -112,7 +139,7 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
-  private _maxBounces = 4;
+  private _maxBounces = 8;
   public get maxBounces() {
     return this._maxBounces;
   }
@@ -235,10 +262,10 @@ export class PathtracingRenderer {
   };
 
   render(camera: THREE.PerspectiveCamera, num_samples: number, frameFinishedCB: (frameCount: number) => void, renderingFinishedCB: () => void) {
-    if (camera instanceof THREE.Camera === false) {
-      console.error('PathtracingRenderer.render: camera is not an instance of THREE.Camera.');
-      return;
-    }
+    // if (camera instanceof THREE.PerspectiveCamera === false) {
+    //   console.error('PathtracingRenderer.render: camera is not an instance of THREE.Camera.');
+    //   return;
+    // }
 
     this._isRendering = true;
     this.resetAccumulation();
@@ -322,6 +349,8 @@ export class PathtracingRenderer {
         this._forceIBLEval);
       gl.uniform1f(gl.getUniformLocation(this.ptProgram, "u_float_rayEps"),
         this._rayEps);
+      gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_int_RenderMode"),
+      this.renderModes.indexOf(this._renderMode));
 
       gl.bindVertexArray(this.quadVao);
       gl.viewport(0, 0, this.renderRes[0], this.renderRes[1]);
@@ -420,7 +449,7 @@ export class PathtracingRenderer {
         gl_Position = position;
       }`;
 
-    let copyFragmentShader = `#version 300 es
+      let copyFragmentShader = `#version 300 es
       precision highp float;
       precision highp int;
       precision highp sampler2D;
@@ -434,8 +463,7 @@ export class PathtracingRenderer {
         // out_FragColor = texelFetch(tex, ivec2(gl_FragCoord.xy), 0);
         out_FragColor = texture(tex, uv);
       }`;
-
-    let displayFragmentShader = await <Promise<string>>filePromiseLoader('./shader/display.frag');
+    // let displayFragmentShader = await <Promise<string>>filePromiseLoader('./shader/display.frag');
     this.copyProgram = glu.createProgramFromSource(gl, vertexShader, copyFragmentShader);
     this.displayProgram = glu.createProgramFromSource(gl, vertexShader, displayFragmentShader);
 
@@ -544,20 +572,30 @@ export class PathtracingRenderer {
     }
 
     matInfo.specular = (mat.specularIntensity === undefined) ? 1.0 : mat.specularIntensity;
-    if (mat.specularTint)
-      matInfo.specularTint = mat.specularTint.toArray();
+    if (mat.specularColor)
+      matInfo.specularTint = mat.specularColor.toArray();
     if (mat.specularIntensityMap) {
       matTexInfo.specularTexture = this.parseTexture(mat.specularIntensityMap);
     }
-    if (mat.specularTintMap) {
-      matTexInfo.specularColorTexture = this.parseTexture(mat.specularTintMap);
+    if (mat.specularColorMap) {
+      matTexInfo.specularColorTexture = this.parseTexture(mat.specularColorMap);
+    }
+
+    if (mat.sheenColor)
+      matInfo.sheenColor = mat.sheenColor.toArray();
+    if (mat.sheenColorMap) {
+      matTexInfo.sheenColorTexture = this.parseTexture(mat.sheenColorMap);
+    }
+    matInfo.sheenRoughness = (mat.sheenRoughness === undefined) ? 0.0 : mat.sheenRoughness;
+    if (mat.sheenRoughnessMap) {
+      matTexInfo.sheenRoughnessTexture = this.parseTexture(mat.sheenRoughnessMap);
     }
 
     // KHR_materials_volume
     if (mat.thickness)
       matInfo.thinWalled = mat.thickness == 0.01 ? 1 : 0; //hack: three.js defaults thickness to 0.01 when volume extensions doesn't exist.
-    if (mat.attenuationTint)
-      matInfo.attenuationColor = mat.attenuationTint.toArray();
+    if (mat.attenuationColor)
+      matInfo.attenuationColor = mat.attenuationColor.toArray();
 
     matInfo.attenuationDistance = mat.attenuationDistance || matInfo.attenuationDistance;
 
@@ -578,111 +616,55 @@ export class PathtracingRenderer {
         }
       };
 
-      if ("gltfExtensions" in mat.userData) {
 
-        let get_param = function (name: string, obj: any, default_value: any) {
-          return (name in obj) ? obj[name] : default_value;
-        };
+      let get_param = function (name: string, obj: any, default_value: any) {
+        return (name in obj) ? obj[name] : default_value;
+      };
 
-        let extensions = mat.userData.gltfExtensions;
-
-        if ('3DS_materials_anisotropy' in extensions) {
-          let ext = extensions["3DS_materials_anisotropy"];
-          matInfo.anisotropy = get_param("anisotropyFactor", ext, matInfo.anisotropy);
-          matInfo.anisotropyRotation = get_param("anisotropyRotationFactor", ext, matInfo.anisotropyRotation);
-        }
-        if ('KHR_materials_anisotropy' in extensions) {
-          let ext = extensions["KHR_materials_anisotropy"];
-          matInfo.anisotropy = get_param("anisotropyFactor", ext, matInfo.anisotropy);
-          matInfo.anisotropyRotation = get_param("anisotropyRotationFactor", ext, matInfo.anisotropyRotation);
-        }
-        if ('3DS_materials_transparency' in extensions) {
-          let ext = extensions["3DS_materials_transparency"];
-          matInfo.transparency = get_param("transparencyFactor", ext, matInfo.transparency);
-        }
-        if ('3DS_materials_specular' in extensions) {
-          let ext = extensions["3DS_materials_specular"];
-          matInfo.specular = get_param("specularFactor", ext, matInfo.specular);
-          matInfo.specularTint = get_param("specularColorFactor", ext, matInfo.specularTint);
-
-          if ("specularTexture" in ext) {
-            await gltf.parser.getDependency('texture', ext.specularTexture.index)
-              .then((tex: THREE.Texture) => {
-                matTexInfo.specularTexture = this.parseTexture(tex);
-                setTextureTransformFromExt(matTexInfo.specularTexture, ext.specularTexture);
-              });
-          }
-          if ("specularColorTexture" in ext) {
-            await gltf.parser.getDependency('texture', ext.specularColorTexture.index)
-              .then((tex: THREE.Texture) => {
-                matTexInfo.specularColorTexture = this.parseTexture(tex);
-                setTextureTransformFromExt(matTexInfo.specularColorTexture, ext.specularColorTexture);
-              });
-          }
-        }
-        if ('3DS_materials_ior' in extensions) {
-          matInfo.ior = get_param("ior", extensions["3DS_materials_ior"], matInfo.ior);
-        }
-        if ('3DS_materials_clearcoat' in extensions) {
-          let ext = extensions["3DS_materials_clearcoat"];
-          matInfo.clearcoat = get_param("clearcoatFactor", ext, matInfo.clearcoat);
-          matInfo.clearcoatRoughness = get_param("clearcoatRoughnessFactor", ext, matInfo.clearcoatRoughness);
-        }
-        if ('KHR_materials_sheen' in extensions) {
-          let ext = extensions["KHR_materials_sheen"];
-          matInfo.sheenColor = get_param("sheenColorFactor", ext, matInfo.sheenColor);
-          matInfo.sheenRoughness = get_param("sheenRoughnessFactor", ext, matInfo.sheenRoughness);
-
-          if ("sheenColorTexture" in ext) {
-            await gltf.parser.getDependency('texture', ext.sheenColorTexture.index)
-              .then((tex: THREE.Texture) => {
-                matTexInfo.sheenColorTexture = this.parseTexture(tex);
-                setTextureTransformFromExt(matTexInfo.sheenColorTexture, ext.sheenColorTexture);
-              });
-          }
-          if ("sheenRoughnessTexture" in ext) {
-            await gltf.parser.getDependency('texture', ext.sheenRoughnessTexture.index)
-              .then((tex: THREE.Texture) => {
-                matTexInfo.sheenRoughnessTexture = this.parseTexture(tex);
-                setTextureTransformFromExt(matTexInfo.sheenRoughnessTexture, ext.sheenRoughnessTexture);
-              });
-          }
-        }
-        if ('KHR_materials_translucency' in extensions) {
-          let ext = extensions["KHR_materials_translucency"];
-          matInfo.translucency = get_param("translucencyFactor", ext, matInfo.transparency);
-          // if ("translucencyTexture" in ext) {
-          //   await this._gltf.parser.getDependency('texture', ext.translucencyTexture.index)
-          //     .then((tex) => {
-          //       matTexInfo.translucencyTexture = this.parseTexture(tex);
-          //       setTextureTransformFromExt(matTexInfo.translucencyTexture, ext.translucencyTexture);
-          //     });
-          // }
-        }
-        if ('3DS_materials_translucency' in extensions) {
-          let ext = extensions["3DS_materials_translucency"];
-          matInfo.translucency = get_param("translucencyFactor", ext, matInfo.transparency);
-          // if ("translucencyTexture" in ext) {
-          //   await this._gltf.parser.getDependency('texture', ext.translucencyTexture.index)
-          //     .then((tex) => {
-          //       matTexInfo.translucencyTexture = this.parseTexture(tex);
-          //       setTextureTransformFromExt(matTexInfo.translucencyTexture, ext.translucencyTexture);
-          //     });
-          // }
-        }
-        if ('3DS_materials_volume' in extensions) {
-          let ext = extensions["3DS_materials_volume"];
-          matInfo.thinWalled = get_param("thinWalled", ext, matInfo.thinWalled);
-          matInfo.attenuationColor = get_param("attenuationColor", ext, matInfo.attenuationColor);
-          matInfo.attenuationDistance = get_param("attenuationDistance", ext, matInfo.attenuationDistance);
-          matInfo.subsurfaceColor = get_param("subsurfaceColor", ext, matInfo.subsurfaceColor);
-        }
-        // if ('KHR_materials_sss' in extensions) {
-        //   let ext = extensions["KHR_materials_sss"];
-        //   matInfo.scatterColor = get_param("scatterColor", ext, matInfo.scatterColor);
-        //   matInfo.scatterDistance = get_param("scatterDistance", ext, matInfo.scatterDistance);
+      if ('3DS_materials_anisotropy' in mat.userData) {
+        let ext = mat.userData["3DS_materials_anisotropy"];
+        matInfo.anisotropy = get_param("anisotropyFactor", ext, matInfo.anisotropy);
+        matInfo.anisotropyRotation = get_param("anisotropyRotationFactor", ext, matInfo.anisotropyRotation);
+      }
+      if ('KHR_materials_anisotropy' in mat.userData) {
+        let ext = mat.userData["KHR_materials_anisotropy"];
+        matInfo.anisotropy = get_param("anisotropyFactor", ext, matInfo.anisotropy);
+        matInfo.anisotropyRotation = get_param("anisotropyRotationFactor", ext, matInfo.anisotropyRotation);
+      }
+      if ('KHR_materials_translucency' in mat.userData) {
+        let ext = mat.userData["KHR_materials_translucency"];
+        matInfo.translucency = get_param("translucencyFactor", ext, matInfo.transparency);
+        // if ("translucencyTexture" in ext) {
+        //   await this._gltf.parser.getDependency('texture', ext.translucencyTexture.index)
+        //     .then((tex) => {
+        //       matTexInfo.translucencyTexture = this.parseTexture(tex);
+        //       setTextureTransformFromExt(matTexInfo.translucencyTexture, ext.translucencyTexture);
+        //     });
         // }
       }
+      if ('3DS_materials_translucency' in mat.userData) {
+        let ext = mat.userData["3DS_materials_translucency"];
+        matInfo.translucency = get_param("translucencyFactor", ext, matInfo.transparency);
+        // if ("translucencyTexture" in ext) {
+        //   await this._gltf.parser.getDependency('texture', ext.translucencyTexture.index)
+        //     .then((tex) => {
+        //       matTexInfo.translucencyTexture = this.parseTexture(tex);
+        //       setTextureTransformFromExt(matTexInfo.translucencyTexture, ext.translucencyTexture);
+        //     });
+        // }
+      }
+      if ('3DS_materials_volume' in mat.userData) {
+        let ext = mat.userData["3DS_materials_volume"];
+        matInfo.thinWalled = get_param("thinWalled", ext, matInfo.thinWalled);
+        matInfo.attenuationColor = get_param("attenuationColor", ext, matInfo.attenuationColor);
+        matInfo.attenuationDistance = get_param("attenuationDistance", ext, matInfo.attenuationDistance);
+        matInfo.subsurfaceColor = get_param("subsurfaceColor", ext, matInfo.subsurfaceColor);
+      }
+      // if ('KHR_materials_sss' in extensions) {
+      //   let ext = extensions["KHR_materials_sss"];
+      //   matInfo.scatterColor = get_param("scatterColor", ext, matInfo.scatterColor);
+      //   matInfo.scatterDistance = get_param("scatterDistance", ext, matInfo.scatterDistance);
+      // }
     }
 
     return [matInfo, matTexInfo];
@@ -698,8 +680,8 @@ export class PathtracingRenderer {
       this.gl.deleteTexture(this.iblImportanceSamplingData.yPdf);
     }
 
-    this.ibl = glu.createTexture(gl, gl.TEXTURE_2D, gl.RGB32F, texture.image.width, 
-      texture.image.height, gl.RGB, gl.FLOAT, texture.image.data, 0);
+    this.ibl = glu.createTexture(gl, gl.TEXTURE_2D, gl.RGBA32F, texture.image.width,
+      texture.image.height, gl.RGBA, gl.FLOAT, texture.image.data, 0);
     this.iblImportanceSamplingData.width = texture.image.width;
     this.iblImportanceSamplingData.height = texture.image.height;
 
@@ -708,7 +690,7 @@ export class PathtracingRenderer {
     this.iblImportanceSamplingData.cdf = glu.createTexture(gl, gl.TEXTURE_2D, gl.R32F, texture.image.width, texture.image.height, gl.RED, gl.FLOAT, texture.pcCDF, 0);
     this.iblImportanceSamplingData.yPdf = glu.createTexture(gl, gl.TEXTURE_2D, gl.R32F, texture.image.height, 1, gl.RED, gl.FLOAT, texture.yPDF, 0);
     this.iblImportanceSamplingData.yCdf = glu.createTexture(gl, gl.TEXTURE_2D, gl.R32F, texture.image.height, 1, gl.RED, gl.FLOAT, texture.yCDF, 0);
-    this.iblImportanceSamplingData.totalSum = texture.totalSum;
+    // this.iblImportanceSamplingData.totalSum = texture.totalSum;
 
     this.resetAccumulation();
   }
@@ -928,13 +910,13 @@ export class PathtracingRenderer {
 
     let flatBVHData = bvh.createAndCopyToFlattenedArray_StandardFormat();
 
-    let flatMaterialParamList = materialBuffer.map((matInfo) => {
+    let flatMaterialParamList = materialBuffer.map((matInfo: MaterialData) => {
       return Object.values(matInfo.data);
     });
 
     let flatTextureParamList = materialTextureInfoBuffer.map(matTexInfo => {
       let texInfos = Object.values(matTexInfo);
-      return texInfos.map(texInfo => {
+      return texInfos.map((texInfo: TexInfo) => {
         return flattenArray(texInfo.data);
       });
     });
@@ -1050,15 +1032,16 @@ export class PathtracingRenderer {
 
     shaderChunks['pathtracing_tex_array_lookup'] = tex_array_shader_snippet;
 
-    let vertexShader = await <Promise<string>>filePromiseLoader('./shader/pt.vert');
-    let fragmentShader = await <Promise<string>>filePromiseLoader('./shader/pt.frag');
-
-    shaderChunks['pathtracing_rng'] = await <Promise<string>>filePromiseLoader('./shader/rng.glsl');
-    shaderChunks['pathtracing_utils'] = await <Promise<string>>filePromiseLoader('./shader/utils.glsl');
-    shaderChunks['pathtracing_material'] = await <Promise<string>>filePromiseLoader('./shader/material.glsl');
-    shaderChunks['pathtracing_dspbr'] = await <Promise<string>>filePromiseLoader('./shader/dspbr.glsl');
-    shaderChunks['pathtracing_rt_kernel'] = await <Promise<string>>filePromiseLoader('./shader/rt_kernel.glsl');
-    shaderChunks['lighting'] = await <Promise<string>>filePromiseLoader('./shader/lighting.glsl');
+    shaderChunks['pathtracing_rng'] = pathtracing_rng;//await <Promise<string>>filePromiseLoader('shader/rng.glsl');
+    shaderChunks['pathtracing_utils'] = pathtracing_utils;//await <Promise<string>>filePromiseLoader('./shader/utils.glsl');
+    shaderChunks['pathtracing_material'] = pathtracing_material;//await <Promise<string>>filePromiseLoader('./shader/material.glsl');
+    shaderChunks['pathtracing_dspbr'] = pathtracing_dspbr;//await <Promise<string>>filePromiseLoader('./shader/dspbr.glsl');
+    shaderChunks['pathtracing_rt_kernel'] = pathtracing_rt_kernel;//await <Promise<string>>filePromiseLoader('./shader/rt_kernel.glsl');
+    shaderChunks['lighting'] = lighting;//await <Promise<string>>filePromiseLoader('./shader/lighting.glsl');
+    shaderChunks['diffuse'] = diffuse;//await <Promise<string>>filePromiseLoader('./shader/bsdfs/diffuse.glsl');
+    shaderChunks['microfacet'] = microfacet;//await <Promise<string>>filePromiseLoader('./shader/bsdfs/microfacet.glsl');
+    shaderChunks['sheen'] = sheen;//await <Promise<string>>filePromiseLoader('./shader/bsdfs/sheen.glsl');
+    shaderChunks['fresnel'] = fresnel;//await <Promise<string>>filePromiseLoader('./shader/bsdfs/fresnel.glsl');
 
     shaderChunks['pathtracing_defines'] = `
           const float PI =               3.14159265358979323;
@@ -1079,12 +1062,13 @@ export class PathtracingRenderer {
           const float MINIMUM_ROUGHNESS = 0.0001;
           const float TFAR_MAX = 100000.0;
 
-          const float RR_TERMINATION_PROB = 0.9;
+          const int RR_START_DEPTH = 2;
+          const float RR_TERMINATION_PROB = 0.1;
 
           const uint MATERIAL_SIZE = 9u;
           const uint MATERIAL_TEX_INFO_SIZE = 11u;
           const uint TEX_INFO_SIZE = 2u;
-          
+
           const uint VERTEX_STRIDE = 5u;
           const uint TRIANGLE_STRIDE = 3u*VERTEX_STRIDE;
           const uint POSITION_OFFSET = 0u;
@@ -1118,12 +1102,13 @@ export class PathtracingRenderer {
   }
 }
 
-const fileLoader = new THREE.FileLoader();
-function filePromiseLoader(url: string, onProgress?: () => void) {
-  return new Promise<string | ArrayBuffer>((resolve, reject) => {
-    fileLoader.load(url, resolve, onProgress, reject);
-  });
-};
+// const fileLoader = new THREE.FileLoader();
+// function filePromiseLoader(url: string, onProgress?: () => void) {
+//   return new Promise<string | ArrayBuffer>((resolve, reject) => {
+//     // console.log("Loading file: " + url);
+//     fileLoader.load(url, resolve, onProgress, reject);
+//   });
+// };
 
 function flattenArray(arr: any, result: number[] = []) {
   for (let i = 0, length = arr.length; i < length; i++) {

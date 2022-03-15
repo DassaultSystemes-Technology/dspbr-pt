@@ -41,6 +41,10 @@ vec3 flip(vec3 v, vec3 n) {
   return normalize(v - 2.0 * n * abs(dot(v, n)));
 }
 
+float luminance(vec3 rgb) {
+  return 0.2126 * rgb.x + 0.7152 * rgb.y + 0.0722 * rgb.z;
+}
+
 bool isNan(float val) {
   return (val <= 0.0 || 0.0 <= val) ? false : true;
 }
@@ -133,9 +137,9 @@ float computeTheta(vec3 dir) {
 }
 
 float computePhi(vec3 dir) {
-  float temp = atan(dir.z, dir.x) + PI;
+  float temp = atan(dir.z, dir.x);
   if (temp < 0.0)
-    return (2.0 * PI) + temp;
+    return TWO_PI + temp;
   else
     return temp;
 }
@@ -146,42 +150,34 @@ vec3 fromThetaPhi(float theta, float phi) {
 
 vec2 mapDirToUV(vec3 dir, out float pdf) {
   float theta = computeTheta(dir);
-  float u = computePhi(dir) / (2.0 * PI);
-  float v = (PI - theta) / PI;
+  float u = computePhi(dir) / TWO_PI;
+  float v = theta / PI;
   pdf = 1.0 / (2.0 * PI * PI * max(EPS_COS, sin(theta)));
   return vec2(u, v);
 }
 
 vec3 mapUVToDir(vec2 uv, out float pdf) {
   float theta = uv.y * PI;
-  float phi = uv.x * (2.0f*PI) + PI;
+  float phi = uv.x * TWO_PI;
   pdf = 1.0 / (2.0 * PI * PI * max(EPS_COS, sin(theta)));
   return fromThetaPhi(theta, phi);
 }
 
-vec3 transformIBLDir(vec3 dir, bool inverse) {
-  float angle = inverse ? -u_float_iblRotation : u_float_iblRotation;
-  return mat3(cos(angle), 0.0, sin(angle), 0.0, 1.0, 0.0,
-              -sin(angle), 0.0, cos(angle)) * dir;
-}
-
-vec3 evaluateIBL(in vec3 dir) {
-  if (u_bool_UseIBL) {
-    float pdf;
-    vec3 sampleDir = transformIBLDir(dir, false);
-    vec2 uv = mapDirToUV(sampleDir, pdf);
-    return texture(u_sampler_EnvMap, vec2(uv.x, 1.0-uv.y)).xyz;
-  }
-  return vec3(0);
-}
-
 vec3 sampleHemisphereCosine(vec2 uv, out float pdf) {
-  float phi = uv.y * 2.0 * PI;
-  float cos_theta = sqrt(1.0 - uv.x);
-  float sin_theta = sqrt(1.0 - cos_theta * cos_theta);
-  pdf = cos_theta * ONE_OVER_PI;
-  return vec3(cos(phi) * sin_theta, sin(phi) * sin_theta, cos_theta);
+  float phi = uv.y * TWO_PI;
+  float cosTheta = sqrt(1.0 - uv.x);
+  float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+  pdf = cosTheta * ONE_OVER_PI;
+  return vec3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
 }
+
+vec3 sampleHemisphereUniform(vec2 uv, out float pdf) {
+  float phi = uv.y * TWO_PI;
+  float cosTheta = 1.0 - uv.x;
+  float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+  pdf = ONE_OVER_TWO_PI;
+  return vec3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
+  }
 
 // mat3 get_onb2(vec3 n) {
 //     // http://orbit.dtu.dk/files/126824972/onb_frisvad_jgt2012_v2.pdf

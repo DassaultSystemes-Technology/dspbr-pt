@@ -135,7 +135,7 @@ export class MaterialData {
   public set clearcoatRoughness(val: number) {
     this._data[25] = val;
   }
-  public get clearcoastRougness() {
+  public get clearcoatRoughness() {
     return this.data[25];
   }
 
