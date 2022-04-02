@@ -3,9 +3,9 @@
   "version": "0.3.5",
   "description": "A WebGL2 Enterprise PBR sample renderer",
   "dependencies": {
-    "@gltf-transform/core": "^1.2.1",
-    "@gltf-transform/extensions": "^1.2.1",
-    "@gltf-transform/functions": "^1.2.1",
+    "@gltf-transform/core": "^1.2.4",
+    "@gltf-transform/extensions": "^1.2.4",
+    "@gltf-transform/functions": "^1.2.4",
     "@types/three": "^0.131.0",
     "three": "^0.138.3"
   },
@@ -33,7 +33,7 @@
     "clean": "shx rm -rf dist/*",
     "dev": "npm run clean && npm run copy-assets && parcel src/viewer/index.html --port 3000 --public-url / --open",
     "build-lib": "npm run clean && parcel build src/lib/index.ts --public-url / --no-source-maps && npm run copy-libs",
-    "build-viewer": "npm run clean && parcel build src/viewer/index.html --public-url / --no-source-maps && npm run copy-assets",
+    "build-viewer": "npm run clean && parcel build src/viewer/index.html --public-url ./ --no-source-maps && npm run copy-assets",
     "build-cli": "npm run clean && parcel build src/cli/headless.html --no-optimize --public-url ./",
     "copy-assets": "shx cp -R src/viewer/assets dist/",
     "copy-libs": "copyfiles -u 2 src/lib/bvh.js src/lib/bvh.d.ts src/lib/index.d.ts dist/",

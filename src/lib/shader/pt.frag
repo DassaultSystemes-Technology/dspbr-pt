@@ -101,6 +101,10 @@ struct MaterialData {
   // 9
   vec3 subsurfaceColor;
   bool thinWalled;
+
+  // 10
+  vec3 anisotropyDirection;
+  float pad;
 };
 
 struct MaterialClosure {
@@ -217,18 +221,19 @@ vec4 traceDebug(const Ray r) {
     fillRenderState(r, hit, rs);
 
     if (u_int_DebugMode == 1) {
-      vec3 sampleDir = normalize(vec3(rng_NextFloat(), rng_NextFloat(),rng_NextFloat()));
-      float pdf;
-      vec3 c;
-      sampleAndEvaluateEnvironmentLight(rs, rng_NextFloat(), rng_NextFloat(), sampleDir, c, pdf);
-      float pdf2 = sampleEnvironmentLightPdf(sampleDir);
-      contrib = vec3(abs(pdf-pdf2));//rs.closure.albedo;
+      contrib = vec3(rs.closure.albedo);
+      // vec3 sampleDir = normalize(vec3(rng_NextFloat(), rng_NextFloat(),rng_NextFloat()));
+      // float pdf;
+      // vec3 c;
+      // sampleAndEvaluateEnvironmentLight(rs, rng_NextFloat(), rng_NextFloat(), sampleDir, c, pdf);
+      // float pdf2 = sampleEnvironmentLightPdf(sampleDir);
+      // contrib = vec3(abs(pdf-pdf2));//rs.closure.albedo;
 
-      // float pdf, pdf2;
-      // vec2 uv = mapDirToUV(sampleDir, pdf);
-      // vec3 dir = mapUVToDir(uv, pdf2);
-      // contrib = vec3(abs(pdf-pdf2));
-      // contrib = abs(dir-sampleDir);
+      // // float pdf, pdf2;
+      // // vec2 uv = mapDirToUV(sampleDir, pdf);
+      // // vec3 dir = mapUVToDir(uv, pdf2);
+      // // contrib = vec3(abs(pdf-pdf2));
+      // // contrib = abs(dir-sampleDir);
     }
     if (u_int_DebugMode == 2)
       contrib = vec3(rs.closure.metallic);

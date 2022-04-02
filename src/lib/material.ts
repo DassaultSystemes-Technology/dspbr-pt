@@ -1,5 +1,5 @@
 export class MaterialData {
-  private _data = new Float32Array(36);
+  private _data = new Float32Array(40);
 
   public get data() {
     return this._data;
@@ -27,42 +27,42 @@ export class MaterialData {
   public get roughness() {
     return this.data[4];
   }
-  
+
   public set anisotropy(val: number) {
     this._data[5] = val;
   }
   public get anisotropy() {
     return this.data[5];
   }
-  
+
   public set anisotropyRotation(val: number) {
     this._data[6] = val;
   }
   public get anisotropyRotation() {
     return this.data[6];
   }
-  
+
   public set transparency(val: number) {
     this._data[7] = val;
   }
   public get transparency() {
     return this.data[7];
   }
-  
+
   public set cutoutOpacity(val: number) {
     this._data[8] = val;
   }
   public get cutoutOpacity() {
     return this.data[8];
   }
-  
+
   public set doubleSided(val: number) {
     this._data[9] = val;
   }
   public get doubleSided() {
     return this.data[9];
   }
-  
+
   public set normalScale(val: number) {
     this._data[10] = val;
   }
@@ -185,17 +185,26 @@ export class MaterialData {
     return this.data[35];
   }
 
+  public set anisotropyDirection(val: number[]) {
+    this._data[36] = val[0];
+    this._data[37] = val[1];
+    this._data[38] = val[2];
+  }
+  public get anisotropyDirection() {
+    return [...this._data.slice(36, 39)];
+  }
+
   constructor() {
     this.albedo = [1, 1, 1];
     this.metallic = 0;
 
     this.roughness = 0;
-    this.anisotropy = 0;
+    this.anisotropy = 0.0;
     this.anisotropyRotation = 0;
     this.transparency = 0;
 
     this.cutoutOpacity = 1;
-    this.doubleSided = 1; 
+    this.doubleSided = 1;
     this.normalScale = 1;
     this.ior = 1.49;
 
@@ -218,6 +227,8 @@ export class MaterialData {
 
     this.subsurfaceColor = [1, 1, 1];
     this.thinWalled = 1;
+
+    this.anisotropyDirection = [1,0,0];
   }
 }
 
@@ -227,7 +238,7 @@ export class TexInfo {
   public get data() {
     return this._data;
   }
-  
+
   public set texArrayIdx(val: number) {
     this._data[0] = val;
   }
@@ -250,7 +261,7 @@ export class TexInfo {
     this.texArrayIdx = -1;
     this.texIdx = -1;
     this.texCoordSet = -1;
-    this.texOffset = [0, 0]; 
+    this.texOffset = [0, 0];
     this.texScale = [1, 1];
   }
 }
@@ -268,4 +279,6 @@ export class MaterialTextureInfo {
   // clearcoatNormalTexture = new TexInfo();
   sheenColorTexture = new TexInfo();
   sheenRoughnessTexture = new TexInfo();
+  anisotropyTexture = new TexInfo();
+  anisotropyDirectionTexture = new TexInfo();
 }

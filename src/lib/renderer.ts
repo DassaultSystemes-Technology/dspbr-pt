@@ -629,8 +629,22 @@ export class PathtracingRenderer {
         }
         if ('KHR_materials_anisotropy' in mat.userData.gltfExtensions) {
           let ext = mat.userData.gltfExtensions["KHR_materials_anisotropy"];
-          matInfo.anisotropy = get_param("anisotropyFactor", ext, matInfo.anisotropy);
-          matInfo.anisotropyRotation = get_param("anisotropyRotationFactor", ext, matInfo.anisotropyRotation);
+          matInfo.anisotropy = get_param("anisotropy", ext, matInfo.anisotropy);
+          matInfo.anisotropyDirection = get_param("anisotropyDirection", ext, matInfo.anisotropyDirection);
+          if ("anisotropyTexture" in ext) {
+            await gltf.parser.getDependency('texture', ext.anisotropyTexture.index)
+              .then((tex) => {
+                matTexInfo.anisotropyTexture = this.parseTexture(tex);
+                setTextureTransformFromExt(matTexInfo.anisotropyTexture, ext.anisotropyTexture);
+            });
+          }
+          if ("anisotropyDirectionTexture" in ext) {
+            await gltf.parser.getDependency('texture', ext.anisotropyDirectionTexture.index)
+              .then((tex) => {
+                matTexInfo.anisotropyDirectionTexture = this.parseTexture(tex);
+                setTextureTransformFromExt(matTexInfo.anisotropyDirectionTexture, ext.anisotropyDirectionTexture);
+            });
+          }
         }
         if ('KHR_materials_translucency' in mat.userData.gltfExtensions) {
           let ext = mat.userData.gltfExtensions["KHR_materials_translucency"];
@@ -643,12 +657,18 @@ export class PathtracingRenderer {
           //     });
           // }
         }
+        // if ('KHR_materials_sss' in extensions) {
+        //   let ext = extensions["KHR_materials_sss"];
+        //   matInfo.scatterColor = get_param("scatterColor", ext, matInfo.scatterColor);
+        //   matInfo.scatterDistance = get_param("scatterDistance", ext, matInfo.scatterDistance);
+        // }
       }
 
       if ('3DS_materials_anisotropy' in mat.userData) {
         let ext = mat.userData["3DS_materials_anisotropy"];
         matInfo.anisotropy = get_param("anisotropyFactor", ext, matInfo.anisotropy);
-        matInfo.anisotropyRotation = get_param("anisotropyRotationFactor", ext, matInfo.anisotropyRotation);
+        let anisotropyRotation = get_param("anisotropyRotationFactor", ext, matInfo.anisotropyRotation) * 2.0 * Math.PI;
+        matInfo.anisotropyDirection = [Math.cos(anisotropyRotation), Math.sin(anisotropyRotation), 0];
       }
 
       if ('3DS_materials_translucency' in mat.userData) {
@@ -669,11 +689,6 @@ export class PathtracingRenderer {
         matInfo.attenuationDistance = get_param("attenuationDistance", ext, matInfo.attenuationDistance);
         matInfo.subsurfaceColor = get_param("subsurfaceColor", ext, matInfo.subsurfaceColor);
       }
-      // if ('KHR_materials_sss' in extensions) {
-      //   let ext = extensions["KHR_materials_sss"];
-      //   matInfo.scatterColor = get_param("scatterColor", ext, matInfo.scatterColor);
-      //   matInfo.scatterDistance = get_param("scatterDistance", ext, matInfo.scatterDistance);
-      // }
     }
 
     return [matInfo, matTexInfo];
@@ -1028,11 +1043,11 @@ export class PathtracingRenderer {
 
     tex_array_shader_snippet += "\n";
     tex_array_shader_snippet += "vec4 evaluateMaterialTextureValue(const in TexInfo texInfo, const in vec2 texCoord) { \n";
-
+    tex_array_shader_snippet += `  if(texInfo.texArrayIdx < 0) return vec4(1.0);\n`
     for (let i = 0; i < this.texArrayList.length; i++) {
-      tex_array_shader_snippet += `   if(texInfo.texArrayIdx == ${i}) {\n`
-      tex_array_shader_snippet += `       vec2 tuv = texCoord * texInfo.texScale + texInfo.texOffset;`
-      tex_array_shader_snippet += `       return texture(u_sampler2DArray_MaterialTextures_${i}, vec3(tuv, texInfo.texIdx));\n`
+      tex_array_shader_snippet += `    if(texInfo.texArrayIdx == ${i}) {\n`
+      tex_array_shader_snippet += `        vec2 tuv = texCoord * texInfo.texScale + texInfo.texOffset;`
+      tex_array_shader_snippet += `        return texture(u_sampler2DArray_MaterialTextures_${i}, vec3(tuv, texInfo.texIdx));\n`
       tex_array_shader_snippet += "   }\n";
     }
 
@@ -1074,8 +1089,8 @@ export class PathtracingRenderer {
           const int RR_START_DEPTH = 2;
           const float RR_TERMINATION_PROB = 0.1;
 
-          const uint MATERIAL_SIZE = 9u;
-          const uint MATERIAL_TEX_INFO_SIZE = 11u;
+          const uint MATERIAL_SIZE = 10u;
+          const uint MATERIAL_TEX_INFO_SIZE = 13u;
           const uint TEX_INFO_SIZE = 2u;
 
           const uint VERTEX_STRIDE = 5u;
