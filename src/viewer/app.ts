@@ -346,7 +346,7 @@ class App {
     interator.add(this.renderer, 'debugMode', this.renderer.debugModes).name('Debug Mode');
     interator.add(this.renderer, 'renderMode', this.renderer.renderModes).name('Integrator');
     interator.add(this.renderer, 'maxBounces').name('Bounce Depth').min(0).max(32).step(1);
-    interator.add(this.renderer, 'sheenG', this.renderer.sheenGModes).name('Sheen G');
+    // interator.add(this.renderer, 'sheenG', this.renderer.sheenGModes).name('Sheen G');
     interator.add(this.renderer, 'rayEps').name('Ray Offset');
     interator.open();
 
