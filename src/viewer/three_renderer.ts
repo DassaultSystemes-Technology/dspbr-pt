@@ -23,9 +23,9 @@ export class ThreeRenderer {
   }
 
   private tonemappingModes = {
-    "None": THREE.LinearToneMapping, 
-    "Reinhard": THREE.ReinhardToneMapping, 
-    "Cineon": THREE.CineonToneMapping, 
+    "None": THREE.LinearToneMapping,
+    "Reinhard": THREE.ReinhardToneMapping,
+    "Cineon": THREE.CineonToneMapping,
     "AcesFilm": THREE.ACESFilmicToneMapping
   };
 
@@ -53,18 +53,24 @@ export class ThreeRenderer {
   }
 
   private setBackground() {
+    if (!this.scene) {
+      return;
+    }
     if(this._showBackground) {
       this.scene.background = this.ibl;
     }
     else {
       this.scene.background = new THREE.Color(
-        this._backgroundColor[0] * this.renderer.toneMappingExposure, 
-        this._backgroundColor[1] * this.renderer.toneMappingExposure, 
+        this._backgroundColor[0] * this.renderer.toneMappingExposure,
+        this._backgroundColor[1] * this.renderer.toneMappingExposure,
         this._backgroundColor[2] * this.renderer.toneMappingExposure);
     }
   }
 
   useIBL(val) {
+    if (!this.scene) {
+      return;
+    }
     if (val) {
       this.scene.environment = this.ibl;
       this.showBackground = true ;
@@ -77,7 +83,7 @@ export class ThreeRenderer {
   setPixelRatio(val: number) {
     this.renderer.setPixelRatio(val);
   }
- 
+
   constructor(parameters?: THREE.WebGLRendererParameters) {
     this.renderer = new THREE.WebGLRenderer(parameters);
     // this.renderer.setSize(canvas.width, canvas.height);'

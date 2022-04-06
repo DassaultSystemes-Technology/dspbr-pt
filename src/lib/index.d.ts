@@ -3,7 +3,7 @@ import { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 type DebugMode = "None" | "Albedo" | "Metalness" | "Roughness" | "Normals" | "Tangents" | "Bitangents" | "Transparency" | "UV0" | "Clearcoat" | "IBL PDF" | "IBL CDF" | "Specular" | "SpecularTint" | "Fresnel_Schlick";
 type TonemappingMode = "None" | "Reinhard" | "Cineon" | "AcesFilm";
 type SheenMode = "Charlie" | "Ashikhmin";
-type RenderMode = "PT" | "PTDL" | "MISPTDL";
+type RenderMode = "PT" | "MISPTDL";
 interface PathtracingRendererParameters {
     canvas?: HTMLCanvasElement;
     context?: WebGL2RenderingContext;

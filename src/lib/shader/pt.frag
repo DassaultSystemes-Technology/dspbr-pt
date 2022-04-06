@@ -33,7 +33,6 @@ uniform mat4 u_mat4_ViewMatrix;
 uniform int u_int_maxBounces;
 uniform bool u_bool_forceIBLEval;
 uniform float u_float_iblRotation;
-uniform bool u_bool_iblSampling;
 uniform float u_float_rayEps;
 
 uniform sampler2D u_sampler2D_PreviousTexture;
@@ -55,7 +54,7 @@ uniform int u_int_DebugMode;
 uniform int u_int_RenderMode;
 uniform bool u_bool_UseIBL;
 uniform bool u_bool_ShowBackground;
-uniform vec3 u_vec3_BackgroundColor;
+uniform vec4 u_BackgroundColor;
 
 layout(location = 0) out vec4 out_FragColor;
 
@@ -188,8 +187,8 @@ struct TexInfo {
 
 
 const int RM_PT = 0;
-const int RM_PTDL = 1;
-const int RM_MISPTDL = 2;
+const int RM_MISPTDL = 1;
+const int RM_PTDL = 2;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Pathtracing Integrator
@@ -372,7 +371,7 @@ vec4 trace(const Ray r) {
         vec3 iblDir;
         vec3 iblContribution;
 
-        if(sampleAndEvaluateEnvironmentLight(rs, rng_NextFloat(),
+        if(u_bool_UseIBL && sampleAndEvaluateEnvironmentLight(rs, rng_NextFloat(),
               rng_NextFloat(), iblDir, iblContribution, iblSamplePdf))
         {
           if(u_int_RenderMode == RM_PTDL) {
@@ -409,14 +408,17 @@ vec4 trace(const Ray r) {
           pathWeight *= exp(-absorptionCoefficient*hit.tfar);
         }
       } else { // environment hit
-        if(u_int_RenderMode == RM_PT || (u_int_RenderMode == RM_PTDL)) {
-          contrib += evaluateIBL(rs.wo) * pathWeight;
-        }
-        else if(u_int_RenderMode == RM_MISPTDL){
-          float iblSamplePdf = sampleEnvironmentLightPdf(rs.wo);
-          float misWeight = lastBounceSpecular ? 1.0 : misBalanceHeuristic(
-              lastBouncePdf * rs.closure.bsdf_selection_pdf, iblSamplePdf);
-          contrib += evaluateIBL(rs.wo) * pathWeight * misWeight;
+        if(u_bool_UseIBL)
+        {
+          if(u_int_RenderMode == RM_PT || (u_int_RenderMode == RM_PTDL)) {
+            contrib += evaluateIBL(rs.wo) * pathWeight;
+          }
+          else if(u_int_RenderMode == RM_MISPTDL){
+            float iblSamplePdf = sampleEnvironmentLightPdf(rs.wo);
+            float misWeight = lastBounceSpecular ? 1.0 : misBalanceHeuristic(
+                lastBouncePdf * rs.closure.bsdf_selection_pdf, iblSamplePdf);
+            contrib += evaluateIBL(rs.wo) * pathWeight * misWeight;
+          }
         }
         break;
       }
@@ -429,7 +431,7 @@ vec4 trace(const Ray r) {
     if (u_bool_ShowBackground) {
       color = vec4(evaluateIBL(r.dir), 1.0);
     } else {
-      color = vec4(pow(u_vec3_BackgroundColor, vec3(2.2)), 0.0);
+      color = vec4(pow(u_BackgroundColor.xyz, vec3(2.2)), u_BackgroundColor.w);
     }
   }
 

@@ -52,7 +52,7 @@ class App {
 
   constructor() {
     this.scene = Assets.getScene(0).name;
-    this.ibl = Assets.getIBL(0).name;
+    this.ibl = Assets.getIBL(1).name;
 
     this.container = document.createElement('div');
     document.body.appendChild(this.container);
@@ -109,9 +109,9 @@ class App {
     this.three_renderer = new ThreeRenderer({ canvas: this.canvas_three, powerPreference: "high-performance", alpha: true });
 
     this.renderer.pixelRatio = 0.5;
+    this.renderer.maxBounces = 8;
     // this.renderer.iblRotation = 180.0;
     // this.renderer.exposure = Assets.getIBL(0).intensity || 1.4;
-    this.renderer.maxBounces = 8;
 
     window.addEventListener('resize', () => {
       this.resize();
@@ -259,76 +259,6 @@ class App {
     this._gui.domElement.classList.add("hidden");
     this._gui.width = 300;
 
-    this._gui.add(this, 'pathtracing').name('Use Pathtracing').onChange((value) => {
-      if (value == false) {
-        this.startRasterizer();
-      } else {
-        this.startPathtracing();
-      }
-    });
-
-    this._gui.add(this, "scene", Assets.scene_names).name('Scene').onChange((value) => {
-      const sceneInfo = Assets.getSceneByName(value);
-      console.log(`Loading ${sceneInfo.name}`);
-      this.loadScene(sceneInfo.url);
-      this.setSceneInfo(sceneInfo);
-    }).setValue(Assets.getScene(0).name);
-
-    this._gui.add(this, 'autoScaleScene').name('Autoscale Scene');
-
-    this._gui.add(this.renderer, 'exposure').name('Display Exposure').min(0).max(10).step(0.01).onChange((value) => {
-      this.three_renderer.exposure = value;
-    }).listen();
-
-    this._gui.add(this, "ibl", Assets.ibl_names).name('IBL').onChange((value) => {
-      const iblInfo = Assets.getIBLByName(value);
-      console.log(`Loading ${iblInfo.name}`);
-      Loader.loadIBL(iblInfo.url).then((ibl) => {
-        this.renderer.setIBL(ibl);
-        // if(iblInfo.intensity)
-        this.renderer.exposure = iblInfo.intensity ?? 1.0;
-        this.renderer.iblRotation = iblInfo.rotation ?? 0.0;
-        this.three_renderer.setIBL(ibl);
-        this.setIBLInfo(iblInfo);
-      });
-    }).setValue(Assets.getIBL(0).name);
-
-    this._gui.add(this.renderer, 'iblRotation').name('IBL Rotation').min(-180.0).max(180.0).step(0.1).listen();
-    this._gui.add(this.renderer, 'iblSampling').name('IBL Sampling');
-
-    this._gui.add(this, 'autoRotate').name('Auto Rotate').onChange((value) => {
-      this.controls.autoRotate = value;
-      this.renderer.resetAccumulation();
-    });
-
-    this._gui.add(this.renderer, 'debugMode', this.renderer.debugModes).name('Debug Mode');
-    this._gui.add(this.renderer, 'renderMode', this.renderer.renderModes).name('Integrator');
-    this._gui.add(this.renderer, 'tonemapping', this.renderer.tonemappingModes).name('Tonemapping').onChange(val => {
-        this.three_renderer.tonemapping = val;
-    });
-    this._gui.add(this.renderer, 'enableGamma').name('Gamma');
-
-    this._gui.add(this.renderer, 'pixelRatio').name('Pixel Ratio').min(0.1).max(1.0);
-    this._gui.add(this, 'interactionScale').name('Interaction Ratio').min(0.1).max(1.0).step(0.1);
-
-    this._gui.add(this.renderer, 'useIBL').name('Use IBL').onChange((value) => {
-      this.three_renderer.useIBL(value);
-    });
-    this._gui.add(this.renderer, 'showBackground').name('Show Background').onChange((value) => {
-      this.three_renderer.showBackground = value;
-    });
-
-    this.backgroundColor = [0, 0, 0];
-    this._gui.addColor(this, 'backgroundColor').name('Background Color').onChange((value) => {
-      this.renderer.backgroundColor = [value[0]/255.0, value[1]/255.0, value[2]/255.0];
-      this.three_renderer.backgroundColor = [value[0]/255.0, value[1]/255.0, value[2]/255.0];
-    });
-
-    this._gui.add(this.renderer, 'forceIBLEval').name('Force IBL Eval');
-    this._gui.add(this.renderer, 'maxBounces').name('Bounce Depth').min(0).max(32).step(1);
-    this._gui.add(this.renderer, 'sheenG', this.renderer.sheenGModes).name('Sheen G');
-    this._gui.add(this.renderer, 'rayEps').name('Ray Offset');
-
     let reload_obj = {
       reload: () => {
         console.log("Reload");
@@ -362,6 +292,88 @@ class App {
       }
     };
     this._gui.add(save_img, 'save_img').name('Save PNG');
+
+    let scene = this._gui.addFolder('Scene');
+    scene.add(this, "scene", Assets.scene_names).name('Scene').onChange((value) => {
+      const sceneInfo = Assets.getSceneByName(value);
+      console.log(`Loading ${sceneInfo.name}`);
+      this.loadScene(sceneInfo.url);
+      this.setSceneInfo(sceneInfo);
+    }).setValue(Assets.getScene(0).name);
+
+    // this._gui.add(this, 'autoScaleScene').name('Autoscale Scene');
+
+    scene.add(this, 'autoRotate').name('Auto Rotate').onChange((value) => {
+      this.controls.autoRotate = value;
+      this.renderer.resetAccumulation();
+    });
+
+    let lighting = this._gui.addFolder('Lighting');
+    lighting.add(this, "ibl", Assets.ibl_names).name('IBL').onChange((value) => {
+      const iblInfo = Assets.getIBLByName(value);
+      console.log(`Loading ${iblInfo.name}`);
+      this.setIBLInfo(iblInfo);
+      if(iblInfo.name == "None") {
+        this.renderer.useIBL = false;
+        this.three_renderer.showBackground = false;
+        this.renderer.showBackground = false;
+      } else {
+        Loader.loadIBL(iblInfo.url).then((ibl) => {
+          this.renderer.setIBL(ibl);
+          this.renderer.exposure = iblInfo.intensity ?? 1.0;
+          this.renderer.iblRotation = iblInfo.rotation ?? 180.0;
+          this.three_renderer.setIBL(ibl);
+          this.renderer.useIBL = true;
+          this.three_renderer.showBackground = true;
+          this.renderer.showBackground = true;
+        });
+      }
+    }).setValue(Assets.getIBL(1).name);
+
+    lighting.add(this.renderer, 'iblRotation').name('IBL Rotation').min(-180.0).max(180.0).step(0.1).listen();
+    // lighting.add(this.renderer, 'forceIBLEval').name('Force IBL Eval');
+    lighting.open();
+
+    let interator = this._gui.addFolder('Integrator');
+    interator.add(this, 'pathtracing').name('Use Pathtracing').onChange((value) => {
+      if (value == false) {
+        this.startRasterizer();
+      } else {
+        this.startPathtracing();
+      }
+    });
+
+    interator.add(this.renderer, 'debugMode', this.renderer.debugModes).name('Debug Mode');
+    interator.add(this.renderer, 'renderMode', this.renderer.renderModes).name('Integrator');
+    interator.add(this.renderer, 'maxBounces').name('Bounce Depth').min(0).max(32).step(1);
+    interator.add(this.renderer, 'sheenG', this.renderer.sheenGModes).name('Sheen G');
+    interator.add(this.renderer, 'rayEps').name('Ray Offset');
+    interator.open();
+
+    let display = this._gui.addFolder('Display');
+    display.add(this.renderer, 'exposure').name('Display Exposure').min(0).max(10).step(0.01).onChange((value) => {
+      this.three_renderer.exposure = value;
+    }).listen();
+
+    display.add(this.renderer, 'tonemapping', this.renderer.tonemappingModes).name('Tonemapping').onChange(val => {
+      this.three_renderer.tonemapping = val;
+    });
+    display.add(this.renderer, 'enableGamma').name('Gamma');
+
+    display.add(this.renderer, 'pixelRatio').name('Pixel Ratio').min(0.1).max(1.0);
+    display.add(this, 'interactionScale').name('Interaction Ratio').min(0.1).max(1.0).step(0.1);
+    display.open();
+
+    let background = this._gui.addFolder('Background');
+    background.add(this.renderer, 'showBackground').name('Background from IBL').onChange((value) => {
+      this.three_renderer.showBackground = value;
+    });
+
+    background.color = [0, 0, 0];
+    background.addColor(background, 'color').name('Background Color').onChange((value) => {
+      this.renderer.backgroundColor = [value[0]/255.0, value[1]/255.0, value[2]/255.0, 1.0];
+      this.three_renderer.backgroundColor = [value[0]/255.0, value[1]/255.0, value[2]/255.0];
+    });
   }
 
   showSpinner() {

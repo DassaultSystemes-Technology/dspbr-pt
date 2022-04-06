@@ -42,7 +42,7 @@ import fragmentShader from '/src/lib/shader/pt.frag';
 type DebugMode = "None" | "Albedo" | "Metalness" | "Roughness" | "Normals" | "Tangents" | "Bitangents" | "Transparency" | "UV0" | "Clearcoat" | "IBL PDF" | "IBL CDF" | "Specular" | "SpecularTint" | "Fresnel_Schlick" ;
 type TonemappingMode = "None" | "Reinhard" | "Cineon" | "AcesFilm";
 type SheenMode = "Charlie" | "Ashikhmin";
-type RenderMode = "PT" | "PTDL" | "MISPTDL";
+type RenderMode = "PT" | "MISPTDL";
 
 class Light {
   position = [1, 1, 1];
@@ -110,7 +110,7 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
-  public renderModes = ["PT", "PTDL", "MISPTDL"];
+  public renderModes = ["PT", "MISPTDL"];
   private _renderMode: RenderMode = "MISPTDL";
   public get renderMode() {
     return this._renderMode;
@@ -164,6 +164,7 @@ export class PathtracingRenderer {
   }
   public set showBackground(val) {
     this._showBackground = val;
+    this.initFramebuffers(this.renderRes[0], this.renderRes[1]);
     this.resetAccumulation();
   }
 
@@ -194,15 +195,6 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
-  private _iblSampling = true;
-  public get iblSampling() {
-    return this._iblSampling;
-  }
-  public set iblSampling(val) {
-    this._iblSampling = val;
-    this.resetAccumulation();
-  }
-
   private _pixelRatio = 1.0;
   public get pixelRatio() {
     return this._pixelRatio;
@@ -213,7 +205,7 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
-  private _backgroundColor = [0.0, 0.0, 0.0];
+  private _backgroundColor = [0.0, 0.0, 0.0, 1.0];
   public get backgroundColor() {
     return this._backgroundColor;
   }
@@ -332,11 +324,9 @@ export class PathtracingRenderer {
         this._useIBL);
       gl.uniform1f(gl.getUniformLocation(this.ptProgram, "u_float_iblRotation"),
         this._iblRotation);
-      gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_bool_iblSampling"),
-        this._iblSampling);
       gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_bool_ShowBackground"),
         this._showBackground);
-      gl.uniform3fv(gl.getUniformLocation(this.ptProgram, "u_vec3_BackgroundColor"),
+      gl.uniform4fv(gl.getUniformLocation(this.ptProgram, "u_BackgroundColor"),
         this._backgroundColor);
       gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_int_maxBounces"),
         this._maxBounces);
