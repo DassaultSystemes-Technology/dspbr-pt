@@ -22,7 +22,6 @@ const int E_TRANSMISSION = 1 << 3;
 const int E_COATING = 1 << 4;
 const int E_STRAIGHT = 1 << 5;
 
-#include <fresnel>
 #include <diffuse>
 #include <microfacet>
 #include <sheen>
@@ -41,15 +40,16 @@ vec3 coating_layer(out float base_weight, float clearcoat, float clearcoat_alpha
   return clearcoat * coating;
 }
 
+
 vec3 eval_dspbr(const in MaterialClosure c, vec3 wi, vec3 wo) {
   vec3 wh = normalize(wi + wo);
   Geometry g = calculateBasis(c.n, c.t);
 
   vec3 base = diffuse_bsdf_eval(c, wi, wo, g);
-  base += eval_brdf_microfacet_ggx_smith(c.specular_f0, c.specular_f90, c.alpha, wi, wo, wh, g);
+  base += eval_brdf_microfacet_ggx_smith_iridescence(c.specular_f0, c.specular_f90, c.alpha, c.iridescence_fresnel, c.iridescence, wi, wo, wh, g);
   base += eval_brdf_microfacet_ggx_smith_ms(c.specular_f0, c.specular_f90, c.alpha, wi, wo, g);
 
-  base += eval_bsdf_microfacet_ggx_smith(c.specular_f0, c.specular_f90, c.alpha, wi, wo, g);
+  base += eval_bsdf_microfacet_ggx_smith_iridescence(c.specular_f0, c.specular_f90, c.alpha, c.iridescence_fresnel, c.iridescence, wi, wo, g);
 
   float sheen_base_weight;
   vec3 sheen = sheen_layer(sheen_base_weight, c.sheen_color, c.sheen_roughness, wi, wo, wh, g);
@@ -214,7 +214,8 @@ vec3 sample_dspbr(inout MaterialClosure c, vec3 wi, in vec3 uvw, inout vec3 bsdf
     wo = sample_brdf_microfacet_ggx_smith(c.alpha, wi, g, uvw.xy, pdf);
     vec3 wh = normalize(wi + wo);
 
-    bsdf_over_pdf *= eval_brdf_microfacet_ggx_smith(c.specular_f0, c.specular_f90, c.alpha, wi, wo, wh, g) / pdf;
+    // bsdf_over_pdf *= eval_brdf_microfacet_ggx_smith(c.specular_f0, c.specular_f90, c.alpha, wi, wo, wh, g) / pdf;
+    bsdf_over_pdf *= eval_brdf_microfacet_ggx_smith_iridescence(c.specular_f0, c.specular_f90, c.alpha, c.iridescence_fresnel, c.iridescence, wi, wo, wh, g) / pdf;
     bsdf_over_pdf += eval_brdf_microfacet_ggx_smith_ms(c.specular_f0, c.specular_f90, c.alpha, wi, wo, g);
 
     float sheen_base_weight;
@@ -231,6 +232,7 @@ vec3 sample_dspbr(inout MaterialClosure c, vec3 wi, in vec3 uvw, inout vec3 bsdf
   else if (bool(c.event_type & E_TRANSMISSION)) { // microfacet bsdf
     int event = 0;
     wo = sample_bsdf_microfacet_ggx_smith(c, wi, g, uvw, pdf, bsdf_over_pdf, event);
+
     // bsdf_over_pdf *= pdf > EPS_PDF ? pdf : 1.0;
     // bsdf_over_pdf /= pdf;
     if (bool(event & E_REFLECTION)) {

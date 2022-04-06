@@ -1,5 +1,5 @@
 export class MaterialData {
-  private _data = new Float32Array(40);
+  private _data = new Float32Array(44);
 
   public get data() {
     return this._data;
@@ -194,13 +194,41 @@ export class MaterialData {
     return [...this._data.slice(36, 39)];
   }
 
+  public set iridescence(val: number) {
+    this._data[40] = val;
+  }
+  public get iridescence() {
+    return this._data[40];
+  }
+
+  public set iridescenceIOR(val: number) {
+    this._data[41] = val;
+  }
+  public get iridescenceIOR() {
+    return this._data[41];
+  }
+
+  public set iridescenceThicknessMinimum(val: number) {
+    this._data[42] = val;
+  }
+  public get iridescenceThicknessMinimum() {
+    return this._data[42];
+  }
+
+  public set iridescenceThicknessMaximum(val: number) {
+    this._data[43] = val;
+  }
+  public get iridescenceThicknessMaximum() {
+    return this._data[43];
+  }
+
   constructor() {
     this.albedo = [1, 1, 1];
     this.metallic = 0;
 
     this.roughness = 0;
     this.anisotropy = 0.0;
-    this.anisotropyRotation = 0;
+    this.anisotropyRotation = 0; // not used
     this.transparency = 0;
 
     this.cutoutOpacity = 1;
@@ -229,6 +257,12 @@ export class MaterialData {
     this.thinWalled = 1;
 
     this.anisotropyDirection = [1,0,0];
+    // this.pad = 0.0; //not used
+
+    this.iridescence = 0.0;
+    this.iridescenceIOR = 1.3;
+    this.iridescenceThicknessMinimum = 100.0;
+    this.iridescenceThicknessMaximum = 400.0;
   }
 }
 
@@ -281,4 +315,6 @@ export class MaterialTextureInfo {
   sheenRoughnessTexture = new TexInfo();
   anisotropyTexture = new TexInfo();
   anisotropyDirectionTexture = new TexInfo();
+  iridescenceTexture = new TexInfo();
+  iridescenceThicknessTexture = new TexInfo();
 }

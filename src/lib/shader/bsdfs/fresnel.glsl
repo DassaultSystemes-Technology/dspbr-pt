@@ -21,3 +21,12 @@ vec3 fresnel_schlick_dielectric(float cos_theta, vec3 f0, vec3 f90, float ni, fl
 
   return tir ? vec3(1.0) : fresnel_schlick(f0, f90, cos_theta);
 }
+
+
+vec3 schlick_to_f0(vec3 f, vec3 f90, float VdotH) {
+    float x = clamp(1.0 - VdotH, 0.0, 1.0);
+    float x2 = x * x;
+    float x5 = clamp(x * x2 * x2, 0.0, 0.9999);
+
+    return (f - f90 * x5) / (1.0 - x5);
+}

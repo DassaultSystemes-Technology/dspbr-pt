@@ -105,6 +105,12 @@ struct MaterialData {
   // 10
   vec3 anisotropyDirection;
   float pad;
+
+  // 11
+  float iridescence;
+  float iridescenceIor;
+  float iridescenceThicknessMinimum;
+  float iridescenceThicknessMaximum;
 };
 
 struct MaterialClosure {
@@ -136,6 +142,10 @@ struct MaterialClosure {
   vec4 t;
   int event_type;
   float bsdf_selection_pdf;
+  float iridescence;
+  float iridescence_ior;
+  float iridescence_thickness;
+  vec3 iridescence_fresnel;
 };
 
 // struct Light {
@@ -355,7 +365,7 @@ vec4 trace(const Ray r) {
       lastBounceSpecular = bool(rs.closure.event_type & E_SINGULAR);
 
       bool hasDirectLightContribution = false;
-      if(u_int_RenderMode != RM_PT ) {
+      if(!lastBounceSpecular && u_int_RenderMode != RM_PT ) {
         contrib += sampleAndEvaluatePointLight(rs);
 
         float iblSamplePdf;
@@ -404,7 +414,7 @@ vec4 trace(const Ray r) {
         }
         else if(u_int_RenderMode == RM_MISPTDL){
           float iblSamplePdf = sampleEnvironmentLightPdf(rs.wo);
-          float misWeight = misBalanceHeuristic(
+          float misWeight = lastBounceSpecular ? 1.0 : misBalanceHeuristic(
               lastBouncePdf * rs.closure.bsdf_selection_pdf, iblSamplePdf);
           contrib += evaluateIBL(rs.wo) * pathWeight * misWeight;
         }

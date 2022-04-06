@@ -33,6 +33,7 @@ import diffuse from '/src/lib/shader/bsdfs/diffuse.glsl';
 import microfacet from '/src/lib/shader/bsdfs/microfacet.glsl';
 import sheen from '/src/lib/shader/bsdfs/sheen.glsl';
 import fresnel from '/src/lib/shader/bsdfs/fresnel.glsl';
+import iridescence from '/src/lib/shader/bsdfs/iridescence.glsl';
 
 import vertexShader from '/src/lib/shader/pt.vert';
 import fragmentShader from '/src/lib/shader/pt.frag';
@@ -646,17 +647,38 @@ export class PathtracingRenderer {
             });
           }
         }
-        if ('KHR_materials_translucency' in mat.userData.gltfExtensions) {
-          let ext = mat.userData.gltfExtensions["KHR_materials_translucency"];
-          matInfo.translucency = get_param("translucencyFactor", ext, matInfo.transparency);
-          // if ("translucencyTexture" in ext) {
-          //   await this._gltf.parser.getDependency('texture', ext.translucencyTexture.index)
-          //     .then((tex) => {
-          //       matTexInfo.translucencyTexture = this.parseTexture(tex);
-          //       setTextureTransformFromExt(matTexInfo.translucencyTexture, ext.translucencyTexture);
-          //     });
-          // }
+        if ('KHR_materials_iridescence' in mat.userData.gltfExtensions) {
+          let ext = mat.userData.gltfExtensions["KHR_materials_iridescence"];
+          matInfo.iridescence = get_param("iridescence", ext, matInfo.iridescence);
+          matInfo.iridescenceIOR = get_param("iridescenceIOR", ext, matInfo.iridescenceIOR);
+          matInfo.iridescenceThicknessMinimum = get_param("iridescenceThicknessMinimum", ext, matInfo.iridescenceThicknessMinimum);
+          matInfo.iridescenceThicknessMaximum = get_param("iridescenceThicknessMaximum", ext, matInfo.iridescenceThicknessMaximum);
+          if ("iridescenceTexture" in ext) {
+            await gltf.parser.getDependency('texture', ext.iridescenceTexture.index)
+              .then((tex) => {
+                matTexInfo.iridescenceTexture = this.parseTexture(tex);
+                setTextureTransformFromExt(matTexInfo.iridescenceTexture, ext.iridescenceTexture);
+            });
+          }
+          if ("iridescenceThicknessTexture" in ext) {
+            await gltf.parser.getDependency('texture', ext.iridescenceThicknessTexture.index)
+              .then((tex) => {
+                matTexInfo.iridescenceThicknessTexture = this.parseTexture(tex);
+                setTextureTransformFromExt(matTexInfo.iridescenceThicknessTexture, ext.iridescenceThicknessTexture);
+            });
+          }
         }
+        // if ('KHR_materials_translucency' in mat.userData.gltfExtensions) {
+        //   let ext = mat.userData.gltfExtensions["KHR_materials_translucency"];
+        //   matInfo.translucency = get_param("translucencyFactor", ext, matInfo.transparency);
+        //   if ("translucencyTexture" in ext) {
+        //     await this._gltf.parser.getDependency('texture', ext.translucencyTexture.index)
+        //       .then((tex) => {
+        //         matTexInfo.translucencyTexture = this.parseTexture(tex);
+        //         setTextureTransformFromExt(matTexInfo.translucencyTexture, ext.translucencyTexture);
+        //       });
+        //   }
+        // }
         // if ('KHR_materials_sss' in extensions) {
         //   let ext = extensions["KHR_materials_sss"];
         //   matInfo.scatterColor = get_param("scatterColor", ext, matInfo.scatterColor);
@@ -671,17 +693,17 @@ export class PathtracingRenderer {
         matInfo.anisotropyDirection = [Math.cos(anisotropyRotation), Math.sin(anisotropyRotation), 0];
       }
 
-      if ('3DS_materials_translucency' in mat.userData) {
-        let ext = mat.userData["3DS_materials_translucency"];
-        matInfo.translucency = get_param("translucencyFactor", ext, matInfo.transparency);
-        // if ("translucencyTexture" in ext) {
-        //   await this._gltf.parser.getDependency('texture', ext.translucencyTexture.index)
-        //     .then((tex) => {
-        //       matTexInfo.translucencyTexture = this.parseTexture(tex);
-        //       setTextureTransformFromExt(matTexInfo.translucencyTexture, ext.translucencyTexture);
-        //     });
-        // }
-      }
+      // if ('3DS_materials_translucency' in mat.userData) {
+      //   let ext = mat.userData["3DS_materials_translucency"];
+      //   matInfo.translucency = get_param("translucencyFactor", ext, matInfo.transparency);
+      //   // if ("translucencyTexture" in ext) {
+      //   //   await this._gltf.parser.getDependency('texture', ext.translucencyTexture.index)
+      //   //     .then((tex) => {
+      //   //       matTexInfo.translucencyTexture = this.parseTexture(tex);
+      //   //       setTextureTransformFromExt(matTexInfo.translucencyTexture, ext.translucencyTexture);
+      //   //     });
+      //   // }
+      // }
       if ('3DS_materials_volume' in mat.userData) {
         let ext = mat.userData["3DS_materials_volume"];
         matInfo.thinWalled = get_param("thinWalled", ext, matInfo.thinWalled);
@@ -1056,16 +1078,17 @@ export class PathtracingRenderer {
 
     shaderChunks['pathtracing_tex_array_lookup'] = tex_array_shader_snippet;
 
-    shaderChunks['pathtracing_rng'] = pathtracing_rng;//await <Promise<string>>filePromiseLoader('shader/rng.glsl');
-    shaderChunks['pathtracing_utils'] = pathtracing_utils;//await <Promise<string>>filePromiseLoader('./shader/utils.glsl');
-    shaderChunks['pathtracing_material'] = pathtracing_material;//await <Promise<string>>filePromiseLoader('./shader/material.glsl');
-    shaderChunks['pathtracing_dspbr'] = pathtracing_dspbr;//await <Promise<string>>filePromiseLoader('./shader/dspbr.glsl');
-    shaderChunks['pathtracing_rt_kernel'] = pathtracing_rt_kernel;//await <Promise<string>>filePromiseLoader('./shader/rt_kernel.glsl');
-    shaderChunks['lighting'] = lighting;//await <Promise<string>>filePromiseLoader('./shader/lighting.glsl');
-    shaderChunks['diffuse'] = diffuse;//await <Promise<string>>filePromiseLoader('./shader/bsdfs/diffuse.glsl');
-    shaderChunks['microfacet'] = microfacet;//await <Promise<string>>filePromiseLoader('./shader/bsdfs/microfacet.glsl');
-    shaderChunks['sheen'] = sheen;//await <Promise<string>>filePromiseLoader('./shader/bsdfs/sheen.glsl');
-    shaderChunks['fresnel'] = fresnel;//await <Promise<string>>filePromiseLoader('./shader/bsdfs/fresnel.glsl');
+    shaderChunks['pathtracing_rng'] = pathtracing_rng;
+    shaderChunks['pathtracing_utils'] = pathtracing_utils;
+    shaderChunks['pathtracing_material'] = pathtracing_material;
+    shaderChunks['pathtracing_dspbr'] = pathtracing_dspbr;
+    shaderChunks['pathtracing_rt_kernel'] = pathtracing_rt_kernel;
+    shaderChunks['lighting'] = lighting;
+    shaderChunks['diffuse'] = diffuse;
+    shaderChunks['microfacet'] = microfacet;
+    shaderChunks['sheen'] = sheen;
+    shaderChunks['fresnel'] = fresnel;
+    shaderChunks['iridescence'] = iridescence;
 
     shaderChunks['pathtracing_defines'] = `
           const float PI =               3.14159265358979323;
@@ -1089,8 +1112,8 @@ export class PathtracingRenderer {
           const int RR_START_DEPTH = 2;
           const float RR_TERMINATION_PROB = 0.1;
 
-          const uint MATERIAL_SIZE = 10u;
-          const uint MATERIAL_TEX_INFO_SIZE = 13u;
+          const uint MATERIAL_SIZE = 11u;
+          const uint MATERIAL_TEX_INFO_SIZE = 15u;
           const uint TEX_INFO_SIZE = 2u;
 
           const uint VERTEX_STRIDE = 5u;

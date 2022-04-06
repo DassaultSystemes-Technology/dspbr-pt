@@ -111,7 +111,7 @@ class App {
     this.renderer.pixelRatio = 0.5;
     // this.renderer.iblRotation = 180.0;
     // this.renderer.exposure = Assets.getIBL(0).intensity || 1.4;
-    this.renderer.maxBounces = 32;
+    this.renderer.maxBounces = 8;
 
     window.addEventListener('resize', () => {
       this.resize();

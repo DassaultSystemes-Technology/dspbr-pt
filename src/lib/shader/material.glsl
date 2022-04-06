@@ -12,6 +12,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <fresnel>
+#include <iridescence>
 
 struct MaterialTextureInfo {
   TexInfo albedoTexture;
@@ -28,6 +30,8 @@ struct MaterialTextureInfo {
   TexInfo sheenRoughnessTexture;
   TexInfo anisotropyTexture;
   TexInfo anisotropyDirectionTexture;
+  TexInfo iridescenceTexture;
+  TexInfo iridescenceThicknessTexture;
 };
 
 void unpackMaterialData(in uint idx, out MaterialData matData) {
@@ -76,6 +80,12 @@ void unpackMaterialData(in uint idx, out MaterialData matData) {
 
   val = texelFetch(u_sampler2D_MaterialData, getStructParameterTexCoord(idx, 9u, MATERIAL_SIZE), 0);
   matData.anisotropyDirection = val.xyz;
+
+  val = texelFetch(u_sampler2D_MaterialData, getStructParameterTexCoord(idx, 10u, MATERIAL_SIZE), 0);
+  matData.iridescence = val.x;
+  matData.iridescenceIor = val.y;
+  matData.iridescenceThicknessMinimum = val.z;
+  matData.iridescenceThicknessMaximum = val.w;
 }
 
 TexInfo getTextureInfo(ivec2 texInfoIdx, ivec2 transformInfoIdx) {
@@ -153,6 +163,14 @@ void unpackMaterialTexInfo(in uint idx, out MaterialTextureInfo matTexInfo) {
   ivec2 anisotropyDirectionTexInfoIdx = getStructParameterTexCoord(idx, 24u, tex_info_stride);
   ivec2 anisotropyDirectionTexTransformsIdx = getStructParameterTexCoord(idx, 25u, tex_info_stride);
   matTexInfo.anisotropyDirectionTexture = getTextureInfo(anisotropyDirectionTexInfoIdx, anisotropyDirectionTexTransformsIdx);
+
+  ivec2 iridescenceTexInfoIdx = getStructParameterTexCoord(idx, 26u, tex_info_stride);
+  ivec2 iridescenceTexTransformsIdx = getStructParameterTexCoord(idx, 27u, tex_info_stride);
+  matTexInfo.iridescenceTexture = getTextureInfo( iridescenceTexInfoIdx, iridescenceTexTransformsIdx);
+
+  ivec2 iridescenceThicknessTexInfoIdx = getStructParameterTexCoord(idx, 28u, tex_info_stride);
+  ivec2 iridescenceThicknessTexTransformsIdx = getStructParameterTexCoord(idx, 29u, tex_info_stride);
+  matTexInfo.iridescenceThicknessTexture = getTextureInfo( iridescenceThicknessTexInfoIdx,  iridescenceThicknessTexTransformsIdx);
 }
 
 // Convert from roughness and anisotropy to 2d anisotropy.
@@ -172,13 +190,14 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
 
   vec4 albedo = evaluateMaterialTextureValue(matTexInfo.albedoTexture, uv);
   c.albedo = matData.albedo * to_linear_rgb(albedo.xyz);
+  float opacity = albedo.w;
 
   if (length(vertexColor) > 0.0) {
     c.albedo *= vertexColor.xyz;
-    albedo.w *= vertexColor.w;
+    opacity *= vertexColor.w;
   }
 
-  c.cutout_opacity = matData.cutoutOpacity * albedo.w;
+  c.cutout_opacity = matData.cutoutOpacity * opacity;
   if (matData.alphaCutoff > 0.0) { // MASK
     c.cutout_opacity = step(matData.alphaCutoff, c.cutout_opacity);
   }
@@ -261,4 +280,10 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
 
   c.attenuationColor =  matData.attenuationColor;
   c.attenuationDistance = matData.attenuationDistance;
+
+  c.iridescence = matData.iridescence * evaluateMaterialTextureValue(matTexInfo.iridescenceTexture, uv).x;
+  c.iridescence_ior = matData.iridescenceIor;
+  c.iridescence_thickness = mix(matData.iridescenceThicknessMinimum, matData.iridescenceThicknessMaximum, evaluateMaterialTextureValue(matTexInfo.iridescenceThicknessTexture, uv).y);
+
+  c.iridescence_fresnel = evalIridescence(1.0, c.iridescence_ior, abs(dot(wi, c.n)), c.iridescence_thickness, c.specular_f0);
 }
