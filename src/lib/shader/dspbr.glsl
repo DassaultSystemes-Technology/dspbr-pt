@@ -46,10 +46,10 @@ vec3 eval_dspbr(const in MaterialClosure c, vec3 wi, vec3 wo) {
   Geometry g = calculateBasis(c.n, c.t);
 
   vec3 base = diffuse_bsdf_eval(c, wi, wo, g);
-  base += eval_brdf_microfacet_ggx_smith_iridescence(c.specular_f0, c.specular_f90, c.alpha, c.iridescence_fresnel, c.iridescence, wi, wo, wh, g);
+  base += eval_brdf_microfacet_ggx_smith_iridescence(c.specular_f0, c.specular_f90, c.alpha, c.iridescence, c.iridescence_ior, c.iridescence_thickness, wi, wo, wh, g);
   base += eval_brdf_microfacet_ggx_smith_ms(c.specular_f0, c.specular_f90, c.alpha, wi, wo, g);
 
-  base += eval_bsdf_microfacet_ggx_smith_iridescence(c.specular_f0, c.specular_f90, c.alpha, c.iridescence_fresnel, c.iridescence, wi, wo, g);
+  base += eval_bsdf_microfacet_ggx_smith_iridescence(c.specular_f0, c.specular_f90, c.alpha, c.iridescence, c.iridescence_ior, c.iridescence_thickness, wi, wo, g);
 
   float sheen_base_weight;
   vec3 sheen = sheen_layer(sheen_base_weight, c.sheen_color, c.sheen_roughness, wi, wo, wh, g);
@@ -215,7 +215,7 @@ vec3 sample_dspbr(inout MaterialClosure c, vec3 wi, in vec3 uvw, inout vec3 bsdf
     vec3 wh = normalize(wi + wo);
 
     // bsdf_over_pdf *= eval_brdf_microfacet_ggx_smith(c.specular_f0, c.specular_f90, c.alpha, wi, wo, wh, g) / pdf;
-    bsdf_over_pdf *= eval_brdf_microfacet_ggx_smith_iridescence(c.specular_f0, c.specular_f90, c.alpha, c.iridescence_fresnel, c.iridescence, wi, wo, wh, g) / pdf;
+    bsdf_over_pdf *= eval_brdf_microfacet_ggx_smith_iridescence(c.specular_f0, c.specular_f90, c.alpha, c.iridescence, c.iridescence_ior, c.iridescence_thickness, wi, wo, wh, g) / pdf;
     bsdf_over_pdf += eval_brdf_microfacet_ggx_smith_ms(c.specular_f0, c.specular_f90, c.alpha, wi, wo, g);
 
     float sheen_base_weight;

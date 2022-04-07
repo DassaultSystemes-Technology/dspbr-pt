@@ -144,7 +144,6 @@ struct MaterialClosure {
   float iridescence;
   float iridescence_ior;
   float iridescence_thickness;
-  vec3 iridescence_fresnel;
 };
 
 // struct Light {

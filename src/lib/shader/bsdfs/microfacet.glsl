@@ -146,14 +146,16 @@ vec3 eval_brdf_microfacet_ggx_smith(vec3 f0, vec3 f90, vec2 alpha, vec3 wi, vec3
   return (f * g * d) / abs(4.0 * dot(wi, geo.n) * dot(wo, geo.n));
 }
 
-vec3 eval_brdf_microfacet_ggx_smith_iridescence(vec3 f0, vec3 f90, vec2 alpha, vec3 iridescence_fresnel, float iridescence, vec3 wi, vec3 wo, vec3 wh, Geometry geo) {
+vec3 eval_brdf_microfacet_ggx_smith_iridescence(vec3 f0, vec3 f90, vec2 alpha, float iridescence, float iridescence_ior, float iridescence_thickness, vec3 wi, vec3 wo, vec3 wh, Geometry geo) {
   if (abs(dot(wi, geo.n)) < EPS_PDF || dot(wo, geo.n) < 0.0) {
     return vec3(0.0);
   }
 
   // iridescence_base_weight = 1.0 - vec3(max(max(iridescence_fresnel.r, iridescence_fresnel.g), iridescence_fresnel.b));
+  float cos_theta =  dot(wi, wh);
+  vec3 iridescence_fresnel = evalIridescence(1.0, iridescence_ior, cos_theta, iridescence_thickness, f0);
 
-  vec3 f = mix(iridescence_fresnel, fresnel_schlick(f0, f90, dot(wi, wh)), iridescence);
+  vec3 f = mix(fresnel_schlick(f0, f90, cos_theta), iridescence_fresnel, iridescence);
   float d = ggx_eval(alpha, wh, geo);
   float g = ggx_smith_g2(alpha, wi, wo, wh, geo, false);
   return (f * g * d) / abs(4.0 * dot(wi, geo.n) * dot(wo, geo.n));
@@ -172,14 +174,14 @@ vec3 eval_bsdf_microfacet_ggx_smith(vec3 specular_f0, vec3 specular_f90, vec2 al
 }
 
 // TODO Needs proper implementation
-vec3 eval_bsdf_microfacet_ggx_smith_iridescence(vec3 specular_f0, vec3 specular_f90, vec2 alpha, vec3 iridescence_fresnel, float iridescence, const in vec3 wi, in vec3 wo, Geometry geo)
+vec3 eval_bsdf_microfacet_ggx_smith_iridescence(vec3 specular_f0, vec3 specular_f90, vec2 alpha, float iridescence, float iridescence_ior, float iridescence_thickness, const in vec3 wi, in vec3 wo, Geometry geo)
 {
   if (abs(dot(wi, geo.n)) < EPS_PDF || dot(wo, geo.n) > 0.0) {
     return vec3(0.0);
   }
   vec3 wo_f = flip(wo, -geo.n);
   vec3 wh = normalize(wi + wo_f);
-  return eval_brdf_microfacet_ggx_smith_iridescence(specular_f0, specular_f90, alpha, iridescence_fresnel, iridescence, wi, wo_f, wh, geo);
+  return eval_brdf_microfacet_ggx_smith_iridescence(specular_f0, specular_f90, alpha, iridescence, iridescence_ior, iridescence_thickness, wi, wo_f, wh, geo);
 }
 
 float brdf_microfacet_ggx_smith_pdf(MaterialClosure c, Geometry g, vec3 wi, vec3 wo) {
@@ -206,16 +208,18 @@ vec3 fresnel_reflection(MaterialClosure c, float cos_theta, float ni, float nt) 
   vec3 f0 = sqr((ni - nt) / (ni + nt)) * c.specular*c.specular_tint;
   vec3 f90 = vec3(c.specular);
 
+  vec3 iridescence_fresnel = evalIridescence(ni, c.iridescence_ior, cos_theta, c.iridescence_thickness, f0);
   vec3 _metal = fresnel_schlick(c.albedo, vec3(1.0), cos_theta);
   vec3 _plastic = fresnel_schlick(f0, f90, cos_theta);
   vec3 _glass = fresnel_schlick_dielectric(cos_theta, f0, f90, ni, nt, c.thin_walled);
-  return mix(mix(_plastic, _glass, c.transparency), _metal, c.metallic);
+  return mix(mix(mix(_plastic, _glass, c.transparency), _metal, c.metallic), iridescence_fresnel, c.iridescence);
 }
 
 vec3 fresnel_transmission(MaterialClosure c, float cos_theta, float ni, float nt) {
   vec3 f0 = sqr((ni - nt) / (ni + nt)) * c.specular * c.specular_tint;
   vec3 f90 = vec3(c.specular);
-  return (vec3(1.0) - fresnel_schlick_dielectric(cos_theta, f0, f90, ni, nt, c.thin_walled)) * c.albedo * (1.0 - c.metallic) * c.transparency;// max((1.0 - c.metallic), c.transparency);
+  vec3 fr = fresnel_schlick_dielectric(cos_theta, f0, f90, ni, nt, c.thin_walled);
+  return (vec3(1.0) - fr) * c.albedo * (1.0 - c.metallic) * c.transparency;// max((1.0 - c.metallic), c.transparency);
 }
 
 vec3 sample_bsdf_microfacet_ggx_smith(const in MaterialClosure c, vec3 wi, Geometry geo, vec3 uvw, out float pdf, inout vec3 bsdf_weight, inout int event) {
@@ -229,14 +233,13 @@ vec3 sample_bsdf_microfacet_ggx_smith(const in MaterialClosure c, vec3 wi, Geome
 
   float ior_i = 1.0;
   float ior_o = c.ior;
+
   if (c.backside) {
     ior_i = c.ior;
     ior_o = 1.0;
   }
 
   vec3 fr = fresnel_reflection(c, cos_theta_i, ior_i, ior_o);
-  fr = mix(c.iridescence_fresnel, fr, c.iridescence);
-
   vec3 ft = fresnel_transmission(c, cos_theta_i, ior_i, ior_o);
 
   float prob_fr = sum(fr) / (sum(fr) + sum(ft));

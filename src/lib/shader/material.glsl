@@ -284,6 +284,4 @@ void configure_material(const in uint matIdx, inout RenderState rs, out Material
   c.iridescence = matData.iridescence * evaluateMaterialTextureValue(matTexInfo.iridescenceTexture, uv).x;
   c.iridescence_ior = matData.iridescenceIor;
   c.iridescence_thickness = mix(matData.iridescenceThicknessMinimum, matData.iridescenceThicknessMaximum, evaluateMaterialTextureValue(matTexInfo.iridescenceThicknessTexture, uv).y);
-
-  c.iridescence_fresnel = evalIridescence(1.0, c.iridescence_ior, abs(dot(wi, c.n)), c.iridescence_thickness, c.specular_f0);
 }

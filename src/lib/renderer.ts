@@ -639,7 +639,7 @@ export class PathtracingRenderer {
         }
         if ('KHR_materials_iridescence' in mat.userData.gltfExtensions) {
           let ext = mat.userData.gltfExtensions["KHR_materials_iridescence"];
-          matInfo.iridescence = get_param("iridescence", ext, matInfo.iridescence);
+          matInfo.iridescence = get_param("iridescenceFactor", ext, matInfo.iridescence);
           matInfo.iridescenceIOR = get_param("iridescenceIOR", ext, matInfo.iridescenceIOR);
           matInfo.iridescenceThicknessMinimum = get_param("iridescenceThicknessMinimum", ext, matInfo.iridescenceThicknessMinimum);
           matInfo.iridescenceThicknessMaximum = get_param("iridescenceThicknessMaximum", ext, matInfo.iridescenceThicknessMaximum);
