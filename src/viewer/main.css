@@ -68,7 +68,7 @@ a, button, input, select {
 	z-index: 2 !important; /* TODO Solve this in HTML */
 }
 
-#overlay {
+.overlay {
 	position: absolute;
 	z-index: 2;
 	top: 0;
@@ -83,11 +83,11 @@ a, button, input, select {
 	color: #ffffff;
 }
 
-#overlay > div {
+.overlay > div {
 	text-align: center;
 }
 
-#overlay > div > button {
+.overlay > div > button {
 	height: 20px;
 	background: transparent;
 	color: #ffffff;
@@ -96,7 +96,7 @@ a, button, input, select {
 	cursor: pointer;
 }
 
-#overlay > div > p {
+.overlay > div > p {
 	color: #777777;
 	font-size: 30px;
 }
@@ -106,14 +106,12 @@ a, button, input, select {
  * http://tobiasahlin.com/spinkit/
  */
 .spinner {
-  width: 200px;
-  height: 200px;
-  margin: 100px auto;
+  width: 100px;
+  height: 100px;
   background-color: rgb(192, 192, 192);
   position: absolute;
-
-  top: 40%;
-	left: 50%;
+  top: 60%;
+  z-index: 2;
 
   border-radius: 100%;
   -webkit-animation: sk-scaleout 1.0s infinite ease-in-out;

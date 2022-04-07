@@ -34,7 +34,9 @@ class App {
   canvas_pt: HTMLCanvasElement;
   spinner: Element;
   container: HTMLElement | null;
-  overlay: HTMLElement | null;
+  startpage: HTMLElement | null;
+  status: HTMLElement | null;
+  loadscreen: HTMLElement | null;
   scene: string;
   ibl: string;
   camera: THREE.PerspectiveCamera;
@@ -59,7 +61,9 @@ class App {
     document.body.appendChild(this.container);
     this.canvas = document.createElement('canvas');
     this.container.appendChild(this.canvas);
-    this.overlay = document.getElementById("overlay");
+    this.startpage = document.getElementById("startpage");
+    this.loadscreen = document.getElementById("loadscreen");
+    this.status = document.getElementById("status");
     this.spinner = document.getElementsByClassName('spinner')[0];
 
     this.canvas_pt = document.createElement('canvas');
@@ -100,7 +104,7 @@ class App {
       RIGHT: THREE.MOUSE.DOLLY
     }
 
-    this.renderer = new PathtracingRenderer({ canvas: this.canvas_pt});
+    this.renderer = new PathtracingRenderer({ canvas: this.canvas_pt });
     this.three_renderer = new ThreeRenderer({ canvas: this.canvas_three, powerPreference: "high-performance", alpha: true });
 
     this.renderer.pixelRatio = 0.5;
@@ -113,88 +117,78 @@ class App {
     }, false);
 
     const input = document.createElement('input');
-    const dropCtrl = new SimpleDropzone(this.overlay, input);
-    dropCtrl.on('drop', ({ files }) => this.initialLoadFromDrop(files));
-    dropCtrl.on('dropstart', () => this.showSpinner());
-    dropCtrl.on('droperror', () => this.hideSpinner());
+    const dropCtrlOverlay = new SimpleDropzone(this.startpage, input);
+    dropCtrlOverlay.on('dropstart', () => {
+      this.showLoadscreen();
+      this.hideStartpage();
+      GUI.toggleHide();
+    });
+    dropCtrlOverlay.on('drop', ({ files }) => this.load(files));
 
+
+    const dropCtrlCanvas = new SimpleDropzone(this.canvas, input);
+    dropCtrlCanvas.on('drop', ({ files }) => {
+      this.showLoadscreen();
+      this.load(files);
+    });
+    // dropCtrl.on('droperror', () => this.hideSpinner());
     this.container.addEventListener('dragover', function (e) {
       e.stopPropagation();
       e.preventDefault();
       e.dataTransfer.dropEffect = 'copy';
     });
 
-    this.hideSpinner();
-    this.initialLoadFromFile("/assets/scenes/metal-roughness-0.05.gltf");
-  }
-
-  private initialLoadFromFile(url)
-  {
-    this.loadScene(url);
-    const input = document.createElement('input');
-    const dropCtrl = new SimpleDropzone(this.canvas, input);
-    dropCtrl.on('drop', ({ files }) => this.load(files));
-    dropCtrl.on('dropstart', () => this.showSpinner());
-    dropCtrl.on('droperror', () => this.hideSpinner());
-    this.overlay.style.display = 'none';
     this.initUI();
     this.initStats();
-  }
 
-  private initialLoadFromDrop(fileMap) {
-    this.load(fileMap);
-    const input = document.createElement('input');
-    const dropCtrl = new SimpleDropzone(this.canvas, input);
-    dropCtrl.on('drop', ({ files }) => this.load(files));
-    dropCtrl.on('dropstart', () => this.showSpinner());
-    dropCtrl.on('droperror', () => this.hideSpinner());
-    this.overlay.style.display = 'none';
-    this.initUI();
-    this.initStats();
+    // this.hideStartpage();
+    // this.loadScene("/assets/scenes/metal-roughness-0.05.gltf");
   }
 
   private load(fileMap) {
-     const files : [string, File][] = Array.from(fileMap)
-     if (files.length == 1 && files[0][1].name.match(/\.hdr$/)) {
-      console.log("loading HDR...");
+    const files: [string, File][] = Array.from(fileMap)
+    if (files.length == 1 && files[0][1].name.match(/\.hdr$/)) {
+      this.status.innerHTML = "Loading HDR...";
       // const url = URL.createObjectURL(e.dataTransfer.getData('text/html'));
-       Loader.loadIBL(URL.createObjectURL(files[0][1])).then((ibl) => {
+      Loader.loadIBL(URL.createObjectURL(files[0][1])).then((ibl) => {
         this.renderer.setIBL(ibl);
         this.three_renderer.setIBL(ibl);
         const iblNode = document.getElementById("ibl-info");
         iblNode.innerHTML = '';
-        this.hideSpinner();
+        this.hideLoadscreen();
       });
     } else {
-      // this.showSpinner();
+      this.status.innerHTML = "Loading Scene...";
       const scenePromise = Loader.loadSceneFromBlobs(files, this.autoScaleScene);
       const iblPromise = Loader.loadIBL(Assets.getIBLByName(this.ibl).url);
+
       Promise.all([scenePromise, iblPromise]).then(([gltf, ibl]) => {
         this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
         this.updateCameraFromBoundingBox();
         this.renderer.setIBL(ibl);
+        let that = this;
         this.renderer.setScene(gltf.scene, gltf).then(() => {
           this.startPathtracing();
-          this.hideSpinner();
           document.getElementById("scene-info").innerHTML = '';
         });
 
         this.three_renderer.setScene(new THREE.Scene().add(gltf.scene));
         this.three_renderer.setIBL(ibl);
-
         this.centerView();
+
+        this.hideLoadscreen();
       });
     }
   }
 
-  private initStats()
-  {
+  private initStats() {
     this._stats = new (Stats as any)();
     this._stats.domElement.style.position = 'absolute';
     this._stats.domElement.style.top = '0px';
     this._stats.domElement.style.cursor = "default";
     this._stats.domElement.style.webkitUserSelect = "none";
     this._stats.domElement.style.MozUserSelect = "none";
+    this._stats.domElement.style.zIndex = 1;
     this.container.appendChild(this._stats.domElement);
   }
 
@@ -253,8 +247,8 @@ class App {
     this.sceneBoundingBox.getCenter(center);
 
     let pos = center.clone();
-    pos.add(new THREE.Vector3(0,0, dist));
-    pos.add(new THREE.Vector3(0,diag, 0));
+    pos.add(new THREE.Vector3(0, 0, dist));
+    pos.add(new THREE.Vector3(0, diag, 0));
 
     this.camera.position.set(pos.x, pos.y, pos.z);
     this.camera.lookAt(center);
@@ -300,6 +294,7 @@ class App {
       return;
 
     this._gui = new GUI();
+    GUI.toggleHide();
     this._gui.domElement.classList.add("hidden");
     this._gui.width = 300;
 
@@ -348,7 +343,7 @@ class App {
       const iblInfo = Assets.getIBLByName(value);
       console.log(`Loading ${iblInfo.name}`);
       this.setIBLInfo(iblInfo);
-      if(iblInfo.name == "None") {
+      if (iblInfo.name == "None") {
         this.renderer.useIBL = false;
         this.three_renderer.showBackground = false;
         this.renderer.showBackground = false;
@@ -406,17 +401,27 @@ class App {
 
     background.color = [0, 0, 0];
     background.addColor(background, 'color').name('Background Color').onChange((value) => {
-      this.renderer.backgroundColor = [value[0]/255.0, value[1]/255.0, value[2]/255.0, 1.0];
-      this.three_renderer.backgroundColor = [value[0]/255.0, value[1]/255.0, value[2]/255.0];
+      this.renderer.backgroundColor = [value[0] / 255.0, value[1] / 255.0, value[2] / 255.0, 1.0];
+      this.three_renderer.backgroundColor = [value[0] / 255.0, value[1] / 255.0, value[2] / 255.0];
     });
   }
 
-  showSpinner() {
-    this.spinner.style.display = '';
+  showStartpage() {
+    this.startpage.style.visibility = "visible";
   }
 
-  hideSpinner() {
-    this.spinner.style.display = 'none';
+  hideStartpage() {
+    this.startpage.style.visibility = "hidden";
+  }
+
+  showLoadscreen() {
+    this.loadscreen.style.visibility = "visible";
+    this.spinner.style.visibility = "visible";
+  }
+
+  hideLoadscreen() {
+    this.loadscreen.style.visibility = "hidden";
+    this.spinner.style.visibility = "hidden";
   }
 
   setIBLInfo(ibl: any) {

@@ -15,12 +15,20 @@
     <div id="version">v0.3.5</div>
   </div>
 
-  <div id="overlay">
+  <div id="startpage" class="overlay">
     <div>
       <p>Drag&Drop</p>
       <p>[.glb|.gltf+assets|.hdr]</p>
     </div>
   </div>
+
+  <div id="loadscreen" class="overlay" style="visibility: hidden">
+    <div>
+      <p id="status">Loading...</p>
+    </div>
+    <div class="spinner" style="visibility: hidden;"></div>
+  </div>
+
 
   <div id="bottom-info">
   <div id="ibl-info"></div>
@@ -28,7 +36,6 @@
   </div>
 
 
-  <div class="spinner"></div>
   <script src="app.ts" type="module"></script>
 
 </body>
