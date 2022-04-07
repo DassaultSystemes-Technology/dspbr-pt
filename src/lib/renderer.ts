@@ -22,21 +22,35 @@ import { mergeBufferGeometries } from 'three/examples/jsm/utils/BufferGeometryUt
 import { SimpleTriangleBVH } from './bvh';
 import { MaterialData, TexInfo, MaterialTextureInfo } from './material';
 
-import displayFragmentShader from '/src/lib/shader/display.frag';
-import pathtracing_rng from '/src/lib/shader/rng.glsl';
-import pathtracing_utils from '/src/lib/shader/utils.glsl';
-import pathtracing_material from '/src/lib/shader/material.glsl';
-import pathtracing_dspbr from '/src/lib/shader/dspbr.glsl';
-import pathtracing_rt_kernel from '/src/lib/shader/rt_kernel.glsl';
-import lighting from '/src/lib/shader/lighting.glsl';
-import diffuse from '/src/lib/shader/bsdfs/diffuse.glsl';
-import microfacet from '/src/lib/shader/bsdfs/microfacet.glsl';
-import sheen from '/src/lib/shader/bsdfs/sheen.glsl';
-import fresnel from '/src/lib/shader/bsdfs/fresnel.glsl';
-import iridescence from '/src/lib/shader/bsdfs/iridescence.glsl';
+import copy_shader from '/src/lib/shader/copy.glsl';
+import display_shader from '/src/lib/shader/display.frag';
 
-import vertexShader from '/src/lib/shader/pt.vert';
-import fragmentShader from '/src/lib/shader/pt.frag';
+import rng_shader from '/src/lib/shader/rng.glsl';
+import utils_shader from '/src/lib/shader/utils.glsl';
+import material_shader from '/src/lib/shader/material.glsl';
+import dspbr_shader from '/src/lib/shader/dspbr.glsl';
+import rt_kernel_shader from '/src/lib/shader/rt_kernel.glsl';
+import lighting_shader from '/src/lib/shader/lighting.glsl';
+import diffuse_shader from '/src/lib/shader/bsdfs/diffuse.glsl';
+import microfacet_shader from '/src/lib/shader/bsdfs/microfacet.glsl';
+import sheen_shader from '/src/lib/shader/bsdfs/sheen.glsl';
+import fresnel_shader from '/src/lib/shader/bsdfs/fresnel.glsl';
+import iridescence_shader from '/src/lib/shader/bsdfs/iridescence.glsl';
+
+import render_shader from '/src/lib/shader/renderer.frag';
+import debug_integrator_shader from '/src/lib/shader/integrator/debug.glsl';
+import pt_integrator_shader from '/src/lib/shader/integrator/pt.glsl';
+import misptdl_integrator_shader from '/src/lib/shader/integrator/misptdl.glsl';
+
+let vertexShader = ` #version 300 es
+layout(location = 0) in vec4 position;
+out vec2 v_uv;
+
+void main()
+{
+  v_uv = position.xy;
+  gl_Position = position;
+}`;
 
 
 type DebugMode = "None" | "Albedo" | "Metalness" | "Roughness" | "Normals" | "Tangents" | "Bitangents" | "Transparency" | "UV0" | "Clearcoat" | "IBL PDF" | "IBL CDF" | "Specular" | "SpecularTint" | "Fresnel_Schlick" ;
@@ -430,33 +444,8 @@ export class PathtracingRenderer {
     let gl = this.gl;
     // glu.printGLInfo(gl);
 
-    let vertexShader = ` #version 300 es
-      layout(location = 0) in vec4 position;
-      out vec2 uv;
-
-      void main()
-      {
-        uv = (position.xy + vec2(1.0)) * 0.5;
-        gl_Position = position;
-      }`;
-
-      let copyFragmentShader = `#version 300 es
-      precision highp float;
-      precision highp int;
-      precision highp sampler2D;
-
-      uniform sampler2D tex;
-      in vec2 uv;
-      out vec4 out_FragColor;
-
-      void main()
-      {
-        // out_FragColor = texelFetch(tex, ivec2(gl_FragCoord.xy), 0);
-        out_FragColor = texture(tex, uv);
-      }`;
-    // let displayFragmentShader = await <Promise<string>>filePromiseLoader('./shader/display.frag');
-    this.copyProgram = glu.createProgramFromSource(gl, vertexShader, copyFragmentShader);
-    this.displayProgram = glu.createProgramFromSource(gl, vertexShader, displayFragmentShader);
+    this.copyProgram = glu.createProgramFromSource(gl, vertexShader, copy_shader);
+    this.displayProgram = glu.createProgramFromSource(gl, vertexShader, display_shader);
 
     // fullscreen quad position buffer
     const positions = new Float32Array([-1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0]);
@@ -1068,17 +1057,22 @@ export class PathtracingRenderer {
 
     shaderChunks['pathtracing_tex_array_lookup'] = tex_array_shader_snippet;
 
-    shaderChunks['pathtracing_rng'] = pathtracing_rng;
-    shaderChunks['pathtracing_utils'] = pathtracing_utils;
-    shaderChunks['pathtracing_material'] = pathtracing_material;
-    shaderChunks['pathtracing_dspbr'] = pathtracing_dspbr;
-    shaderChunks['pathtracing_rt_kernel'] = pathtracing_rt_kernel;
-    shaderChunks['lighting'] = lighting;
-    shaderChunks['diffuse'] = diffuse;
-    shaderChunks['microfacet'] = microfacet;
-    shaderChunks['sheen'] = sheen;
-    shaderChunks['fresnel'] = fresnel;
-    shaderChunks['iridescence'] = iridescence;
+    shaderChunks['pathtracing_rng'] = rng_shader;
+    shaderChunks['pathtracing_utils'] = utils_shader;
+    shaderChunks['pathtracing_material'] = material_shader;
+    shaderChunks['pathtracing_dspbr'] = dspbr_shader;
+    shaderChunks['pathtracing_rt_kernel'] = rt_kernel_shader;
+    shaderChunks['lighting'] = lighting_shader;
+    shaderChunks['diffuse'] = diffuse_shader;
+    shaderChunks['microfacet'] = microfacet_shader;
+    shaderChunks['sheen'] = sheen_shader;
+    shaderChunks['fresnel'] = fresnel_shader;
+    shaderChunks['iridescence'] = iridescence_shader;
+
+    shaderChunks['debug_integrator'] = debug_integrator_shader;
+    shaderChunks['pt_integrator'] = pt_integrator_shader;
+    shaderChunks['misptdl_integrator'] = misptdl_integrator_shader;
+
 
     shaderChunks['pathtracing_defines'] = `
           const float PI =               3.14159265358979323;
@@ -1118,7 +1112,7 @@ export class PathtracingRenderer {
           const uint MAX_TEXTURE_SIZE = ${glu.getMaxTextureSize(gl)}u;
       `;
 
-    this.ptProgram = glu.createProgramFromSource(gl, vertexShader, fragmentShader, shaderChunks);
+    this.ptProgram = glu.createProgramFromSource(gl, vertexShader, render_shader, shaderChunks);
 
     gl.useProgram(this.ptProgram);
 

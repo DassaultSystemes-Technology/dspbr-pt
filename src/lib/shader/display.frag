@@ -9,7 +9,7 @@ uniform bool gamma;
 uniform int tonemappingMode;
 const vec3 whitePoint = vec3(1.0);
 
-in vec2 uv;
+in vec2 v_uv;
 out vec4 out_FragColor;
 
 #ifndef saturate
@@ -80,6 +80,8 @@ vec3 ACESFilmicToneMapping( vec3 color ) {
 }
 
 void main() {
+  vec2 uv = (v_uv + vec2(1.0)) * 0.5;
+
   vec4 pixel_value = texture(tex, uv);
   vec3 color = pixel_value.xyz;
   float alpha = pixel_value.w;

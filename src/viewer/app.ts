@@ -123,7 +123,7 @@ class App {
     });
 
     this.hideSpinner();
-    // this.initialLoadFromFile("./assets/scenes/IridescenceSuzanne.gltf");
+    // this.initialLoadFromFile("/assets/scenes/metal-roughness-0.05.gltf");
   }
 
   private initialLoadFromFile(url)

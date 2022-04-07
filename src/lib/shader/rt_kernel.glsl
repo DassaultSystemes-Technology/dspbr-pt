@@ -27,7 +27,7 @@ struct HitInfo {
   vec2 uv;
 };
 
-Ray createRay(in vec3 direction, in vec3 origin, in float tfar) {
+Ray rt_kernel_create_ray(in vec3 direction, in vec3 origin, in float tfar) {
   vec3 inv_direction = vec3(1.0) / direction;
 
   return Ray(direction, origin, tfar, inv_direction,
@@ -247,19 +247,19 @@ bool intersectSceneTriangles_Bruteforce(const in Ray r, out HitInfo hit) {
   return hit.triIndex >= 0;
 }
 
-bool intersectScene_Nearest(const in Ray r, out HitInfo hit) {
+bool rt_kernel_intersect_nearest(const in Ray r, out HitInfo hit) {
   // return intersectSceneTriangles_Bruteforce(r, hit);
   return intersectSceneTriangles_BVH(r, hit);
 }
 
 bool isVisible(const in vec3 p0, const in vec3 p1) {
-  Ray r = createRay(normalize(p1 - p0), p0, length(p1 - p0));
+  Ray r = rt_kernel_create_ray(normalize(p1 - p0), p0, length(p1 - p0));
   HitInfo hit;
-  return !intersectScene_Nearest(r, hit); //!!TOOPT: add an early hit function here
+  return !rt_kernel_intersect_nearest(r, hit); //!!TOOPT: add an early hit function here
 }
 
 bool isOccluded(const in vec3 p0, const in vec3 dir) {
-  Ray r = createRay(normalize(dir), p0, TFAR_MAX);
+  Ray r = rt_kernel_create_ray(normalize(dir), p0, TFAR_MAX);
   HitInfo hit;
-  return intersectScene_Nearest(r, hit); //!!TOOPT: add an early hit function here
+  return rt_kernel_intersect_nearest(r, hit); //!!TOOPT: add an early hit function here
 }

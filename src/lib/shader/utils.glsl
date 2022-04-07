@@ -279,6 +279,6 @@ int binsearchCDF_rescale(sampler2D cdf, int row, int size, inout float v, out fl
   return idx;
 }
 
-float misBalanceHeuristic(float a, float b) {
+float mis_balance_heuristic(float a, float b) {
 	return a / (a + b);
 }
