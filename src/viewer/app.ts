@@ -84,8 +84,10 @@ class App {
     });
 
     this.controls.addEventListener('start', () => {
+      this.renderer.interruptFrame();
       this["pixelRatio"] = this.renderer.pixelRatio;
       this.renderer.pixelRatio = this.interactionScale;
+      this.startPathtracing();
     });
 
     this.controls.addEventListener('end', () => {
@@ -123,7 +125,7 @@ class App {
     });
 
     this.hideSpinner();
-    // this.initialLoadFromFile("/assets/scenes/metal-roughness-0.05.gltf");
+    this.initialLoadFromFile("/assets/scenes/metal-roughness-0.05.gltf");
   }
 
   private initialLoadFromFile(url)

@@ -239,6 +239,7 @@ export class PathtracingRenderer {
 
   private _frameCount = 1;
   private _isRendering = false;
+  private _currentAnimationFrameId = -1;
 
   constructor(parameters: PathtracingRendererParameters = {}) {
     this.canvas = parameters.canvas ? parameters.canvas : document.createElementNS('http://www.w3.org/1999/xhtml', 'canvas');
@@ -267,6 +268,10 @@ export class PathtracingRenderer {
   stopRendering() {
     this._isRendering = false;
   };
+
+  interruptFrame() {
+    cancelAnimationFrame(this._currentAnimationFrameId);
+  }
 
   render(camera: THREE.PerspectiveCamera, num_samples: number, frameFinishedCB: (frameCount: number) => void, renderingFinishedCB: () => void) {
     // if (camera instanceof THREE.PerspectiveCamera === false) {
@@ -401,10 +406,11 @@ export class PathtracingRenderer {
       }
 
       frameFinishedCB(this._frameCount);
-      requestAnimationFrame(renderFrame);
+      this._currentAnimationFrameId = requestAnimationFrame(renderFrame);
     };
 
-    requestAnimationFrame(renderFrame); // start render loop
+    this._currentAnimationFrameId = requestAnimationFrame(renderFrame); // start render loop
+    this._renderFunction = renderFrame;
   }
 
   private initFramebuffers(width: number, height: number) {
