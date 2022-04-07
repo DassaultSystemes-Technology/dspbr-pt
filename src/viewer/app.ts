@@ -34,6 +34,7 @@ class App {
   canvas_pt: HTMLCanvasElement;
   spinner: Element;
   container: HTMLElement | null;
+  overlay: HTMLElement | null;
   scene: string;
   ibl: string;
   camera: THREE.PerspectiveCamera;
@@ -58,7 +59,7 @@ class App {
     document.body.appendChild(this.container);
     this.canvas = document.createElement('canvas');
     this.container.appendChild(this.canvas);
-
+    this.overlay = document.getElementById("overlay");
     this.spinner = document.getElementsByClassName('spinner')[0];
 
     this.canvas_pt = document.createElement('canvas');
@@ -70,14 +71,6 @@ class App {
     this.canvas_pt.height = window.innerHeight;
     this.canvas_three.width = window.innerWidth;
     this.canvas_three.height = window.innerHeight;
-
-    this._stats = new (Stats as any)();
-    this._stats.domElement.style.position = 'absolute';
-    this._stats.domElement.style.top = '0px';
-    this._stats.domElement.style.cursor = "default";
-    this._stats.domElement.style.webkitUserSelect = "none";
-    this._stats.domElement.style.MozUserSelect = "none";
-    this.container.appendChild(this._stats.domElement);
 
     let aspect = window.innerWidth / window.innerHeight;
     this.camera = new THREE.PerspectiveCamera(45, aspect, 0.01, 1000);
@@ -118,8 +111,8 @@ class App {
     }, false);
 
     const input = document.createElement('input');
-    const dropCtrl = new SimpleDropzone(this.canvas, input);
-    dropCtrl.on('drop', ({ files }) => this.load(files));
+    const dropCtrl = new SimpleDropzone(this.overlay, input);
+    dropCtrl.on('drop', ({ files }) => this.initialLoadFromDrop(files));
     dropCtrl.on('dropstart', () => this.showSpinner());
     dropCtrl.on('droperror', () => this.hideSpinner());
 
@@ -129,11 +122,36 @@ class App {
       e.dataTransfer.dropEffect = 'copy';
     });
 
-    this.initUI();
     this.hideSpinner();
+    // this.initialLoadFromFile("./assets/scenes/IridescenceSuzanne.gltf");
   }
 
-   private load(fileMap) {
+  private initialLoadFromFile(url)
+  {
+    this.loadScene(url);
+    const input = document.createElement('input');
+    const dropCtrl = new SimpleDropzone(this.canvas, input);
+    dropCtrl.on('drop', ({ files }) => this.load(files));
+    dropCtrl.on('dropstart', () => this.showSpinner());
+    dropCtrl.on('droperror', () => this.hideSpinner());
+    this.overlay.style.display = 'none';
+    this.initUI();
+    this.initStats();
+  }
+
+  private initialLoadFromDrop(fileMap) {
+    this.load(fileMap);
+    const input = document.createElement('input');
+    const dropCtrl = new SimpleDropzone(this.canvas, input);
+    dropCtrl.on('drop', ({ files }) => this.load(files));
+    dropCtrl.on('dropstart', () => this.showSpinner());
+    dropCtrl.on('droperror', () => this.hideSpinner());
+    this.overlay.style.display = 'none';
+    this.initUI();
+    this.initStats();
+  }
+
+  private load(fileMap) {
      const files : [string, File][] = Array.from(fileMap)
      if (files.length == 1 && files[0][1].name.match(/\.hdr$/)) {
       console.log("loading HDR...");
@@ -161,8 +179,21 @@ class App {
 
         this.three_renderer.setScene(new THREE.Scene().add(gltf.scene));
         this.three_renderer.setIBL(ibl);
+
+        this.centerView();
       });
     }
+  }
+
+  private initStats()
+  {
+    this._stats = new (Stats as any)();
+    this._stats.domElement.style.position = 'absolute';
+    this._stats.domElement.style.top = '0px';
+    this._stats.domElement.style.cursor = "default";
+    this._stats.domElement.style.webkitUserSelect = "none";
+    this._stats.domElement.style.MozUserSelect = "none";
+    this.container.appendChild(this._stats.domElement);
   }
 
   private startRasterizer() {
@@ -251,6 +282,17 @@ class App {
     });
   }
 
+  private centerView() {
+    console.log("center view");
+    if (this.controls) {
+      let center = new THREE.Vector3();
+      this.sceneBoundingBox.getCenter(center);
+      this.controls.target = center;
+      this.controls.update();
+      this.renderer.resetAccumulation();
+    }
+  }
+
   initUI() {
     if (this._gui)
       return;
@@ -268,16 +310,7 @@ class App {
     this._gui.add(reload_obj, 'reload').name('Reload');
 
     const center_obj = {
-      centerView: () => {
-        console.log("center view");
-        if (this.controls) {
-          let center = new THREE.Vector3();
-          this.sceneBoundingBox.getCenter(center);
-          this.controls.target = center;
-          this.controls.update();
-          this.renderer.resetAccumulation();
-        }
-      }
+      centerView: this.centerView.bind(this)
     };
     this._gui.add(center_obj, 'centerView').name('Center View');
 
@@ -294,12 +327,12 @@ class App {
     this._gui.add(save_img, 'save_img').name('Save PNG');
 
     let scene = this._gui.addFolder('Scene');
-    scene.add(this, "scene", Assets.scene_names).name('Scene').onChange((value) => {
-      const sceneInfo = Assets.getSceneByName(value);
-      console.log(`Loading ${sceneInfo.name}`);
-      this.loadScene(sceneInfo.url);
-      this.setSceneInfo(sceneInfo);
-    }).setValue(Assets.getScene(0).name);
+    // scene.add(this, "scene", Assets.scene_names).name('Scene').onChange((value) => {
+    //   const sceneInfo = Assets.getSceneByName(value);
+    //   console.log(`Loading ${sceneInfo.name}`);
+    //   this.loadScene(sceneInfo.url);
+    //   this.setSceneInfo(sceneInfo);
+    // }).setValue(Assets.getScene(0).name);
 
     // this._gui.add(this, 'autoScaleScene').name('Autoscale Scene');
 
