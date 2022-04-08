@@ -33,7 +33,7 @@
     "clean": "shx rm -rf dist/*",
     "dev": "npm run clean && npm run copy-assets && parcel src/viewer/index.html --port 3000 --public-url / --open",
     "build-lib": "npm run clean && parcel build src/lib/index.ts --dist-dir dist/ --public-url ./ --no-source-maps",
-    "build-viewer": "shx rm -rf demo/* && parcel build --target viewer",
+    "build-viewer": "shx rm -rf demo/dev && parcel build --target viewer",
     "build-cli": "npm run clean && parcel build --target cli",
     "copy-assets": "shx cp -R src/viewer/assets dist/",
     "validation": "npm run build-cli && python scripts/run_validation.py",
@@ -44,7 +44,7 @@
   "targets": {
     "viewer": {
       "source": "src/viewer/index.html",
-      "distDir": "./demo/v0.3.5",
+      "distDir": "./demo/dev",
       "publicUrl": "./",
       "sourceMap": false
     },
