@@ -29,14 +29,14 @@ npm run build-lib
 * [x] Three.js compatibility
   * The renderer loads the three.js scene group format
   * The interface is similar to WebGLRenderer
-* [x] When fed with [glTF](https://www.khronos.org/gltf/) via three.js GLTFLoader it supports most of the new [glTF](https://www.khronos.org/gltf/) PBR Next material extensions and wip extension proposals (marked as PR below).<br>
-All of the mentioned extensions are implemented in terms of the Enterprise PBR specification. If you're interested in equations head over to the spec repo and check our [latest specification document](https://dassaultsystemes-technology.github.io/EnterprisePBRShadingModel/spec-2021x.md.html). If you're looking for code, [dspbr.glsl](./lib/shader/dspbr.glsl) should give you most of the relevant pieces.
+* [x] When fed with [glTF](https://www.khronos.org/gltf/) via three.js GLTFLoader it supports most of the new glTF PBR Next material extensions [[1],[2]] and wip extension proposals (marked as PR below).<br>
+All of the mentioned extensions are implemented in terms of the Enterprise PBR specification. If you're interested in equations head over to the spec repo and check our [latest specification document](https://dassaultsystemes-technology.github.io/EnterprisePBRShadingModel/spec-2022x.md.html). If you're looking for code, [dspbr.glsl](src/lib/shader/dspbr.glsl) and [shader/bsdf](src/lib/shader/bsdfs) should give you most of the relevant pieces.
 
-  * [KHR_materials_anisotropy PR](https://github.com/KhronosGroup/glTF/pull/2027)
+  * [KHR_materials_anisotropy (PR)](https://github.com/KhronosGroup/glTF/pull/2027)
   * [KHR_materials_clearcoat](https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_materials_clearcoat/README.md)
-  * [KHR_materials_emission_strength PR](https://github.com/KhronosGroup/glTF/pull/1994)
+  * [KHR_materials_emission_strength (PR)](https://github.com/KhronosGroup/glTF/pull/1994)
   * [KHR_materials_ior](https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_ior)
-  * [KHR_materials_iridescence PR](https://github.com/KhronosGroup/glTF/pull/2027)
+  * [KHR_materials_iridescence (PR)](https://github.com/KhronosGroup/glTF/pull/2027)
   * [KHR_materials_sheen](https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_materials_sheen/README.md)
   * [KHR_materials_specular](https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_specular)
   <!-- * [KHR_materials_translucency PR](https://github.com/KhronosGroup/glTF/pull/1825) -->
@@ -52,7 +52,7 @@ All of the mentioned extensions are implemented in terms of the Enterprise PBR s
 > * Plain WebGL2 for accessibility reasons. API limits and required overhead in shader complexity to make "arbitrary" scenes with fully texturable PBR materials work for path-tracing is insane and a major performance drag.
 
 
-## [Demo App](https://dassaultsystemes-technology.github.io/dspbr-pt/)
+## [Demo App](https://dassaultsystemes-technology.github.io/dspbr-pt/demo/dev)
 
 Drag & Drop glTF files to render your scenes.
 
@@ -124,9 +124,11 @@ Promise.all([scenePromise, iblPromise]).then(([gltf, ibl]) => {
   });
 });
 ```
-Please check [src/app.ts](src/viewer/app.ts) and [lib/renderer.ts](src/lib/renderer.ts) for details.
+Please check [app.ts](src/viewer/app.ts) and [renderer.ts](src/lib/renderer.ts) for details.
 
 
 ## License
 * Source code license info in [LICENSE](LICENSE)
 
+[1]: https://www.khronos.org/news/press/khronos-releases-wave-of-new-gltf-pbr-3d-material-capabilities
+[2]: https://www.khronos.org/news/press/new-gltf-extensions-raise-the-bar-on-3d-asset-visual-realism
