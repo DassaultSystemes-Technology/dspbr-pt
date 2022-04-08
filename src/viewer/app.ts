@@ -20,7 +20,7 @@ import { ThreeRenderer } from './three_renderer';
 import { PathtracingRenderer, Loader } from '../lib/index';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import * as Assets from './assets/asset_index';
+import * as Assets from './asset_index';
 
 if (!window.File || !window.FileReader || !window.FileList || !window.Blob) {
   alert('The File APIs are not fully supported in this browser.');
@@ -39,6 +39,7 @@ class App {
   loadscreen: HTMLElement | null;
   scene: string;
   current_ibl: string;
+  current_scene: string;
   camera: THREE.PerspectiveCamera;
   controls: OrbitControls;
 
@@ -56,6 +57,7 @@ class App {
   constructor() {
     // this.scene = Assets.getScene(0).name;
     this.current_ibl = "Artist Workshop";
+    this.current_scene = "";
 
     this.container = document.createElement('div');
     document.body.appendChild(this.container);
@@ -144,7 +146,7 @@ class App {
       const uris = window.location.hash.split("#");
 
       if(uris.length == 2) {
-        this.loadScenario(uris[1], this.currentIblUrl());
+        this.loadScenario(uris[1], this.current_ibl);
         this.hideStartpage();
       }
       if(uris.length == 3) {
@@ -176,18 +178,18 @@ class App {
         this.hideLoadscreen();
       });
     } else {
-      this.status.innerHTML = "Loading Scene...";
+      this.status.innerText = "Loading scene...";
       const scenePromise = Loader.loadSceneFromBlobs(files, this.autoScaleScene);
       const iblPromise = Loader.loadIBL(this.currentIblUrl());
+      this.setIBLInfo(this.current_ibl, Assets.ibls[this.current_ibl].credit)
 
       Promise.all([scenePromise, iblPromise]).then(([gltf, ibl]) => {
         this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
         this.updateCameraFromBoundingBox();
         this.renderer.setIBL(ibl);
-        let that = this;
+
         this.renderer.setScene(gltf.scene, gltf).then(() => {
           this.startPathtracing();
-          document.getElementById("scene-info").innerHTML = '';
         });
 
         this.three_renderer.setScene(new THREE.Scene().add(gltf.scene));
@@ -359,13 +361,13 @@ class App {
     };
     this._gui.add(save_img, 'save_img').name('Save PNG');
 
+    const scene_names = Object.keys(Assets.scenes);
     let scene = this._gui.addFolder('Scene');
-    // scene.add(this, "scene", Assets.scene_names).name('Scene').onChange((value) => {
-    //   const sceneInfo = Assets.getSceneByName(value);
-    //   console.log(`Loading ${sceneInfo.name}`);
-    //   this.loadScene(sceneInfo.url);
-    //   this.setSceneInfo(sceneInfo);
-    // }).setValue(Assets.getScene(0).name);
+    scene.add(this, "current_scene", scene_names).name('Scene').onChange((value) => {
+      const sceneInfo = Assets.scenes[value];
+      this.loadScenario(sceneInfo.url, this.current_ibl);
+      this.setSceneInfo(value, sceneInfo.credit);
+    });
 
     // this._gui.add(this, 'autoScaleScene').name('Autoscale Scene');
 
@@ -379,7 +381,7 @@ class App {
     lighting.add(this, "current_ibl", ibl_names).name('IBL').onChange((value) => {
       const iblInfo = Assets.ibls[value];
       console.log(`Loading ${value}`);
-      this.setIBLInfo(value, iblInfo);
+      this.setIBLInfo(value, iblInfo.credit);
       if (value == "None") {
         this.renderer.useIBL = false;
         this.three_renderer.showBackground = false;

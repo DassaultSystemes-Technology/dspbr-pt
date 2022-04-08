@@ -32,16 +32,32 @@
   "scripts": {
     "clean": "shx rm -rf dist/*",
     "dev": "npm run clean && npm run copy-assets && parcel src/viewer/index.html --port 3000 --public-url / --open",
-    "build-lib": "npm run clean && parcel build src/lib/index.ts --public-url / --no-source-maps && npm run copy-libs",
-    "build-viewer": "npm run clean && parcel build src/viewer/index.html --public-url ./ --no-source-maps && npm run copy-assets",
-    "build-cli": "npm run clean && parcel build src/cli/headless.html --no-optimize --public-url ./",
+    "build-lib": "npm run clean && parcel build src/lib/index.ts --dist-dir dist/ --public-url ./ --no-source-maps",
+    "build-viewer": "shx rm -rf demo/* && parcel build --target viewer",
+    "build-cli": "npm run clean && parcel build --target cli",
     "copy-assets": "shx cp -R src/viewer/assets dist/",
-    "copy-libs": "copyfiles -u 2 src/lib/bvh.js src/lib/bvh.d.ts src/lib/index.d.ts dist/",
     "validation": "npm run build-cli && python scripts/run_validation.py",
     "prepublishOnly": "shx mv README.md src/viewer/README.md && shx cp src/lib/README.md README.md",
     "postpublish": "shx mv src/viewer/README.md README.md",
     "render": "electron src/cli/offscreen.js --enable-logging"
   },
+  "targets": {
+    "viewer": {
+      "source": "src/viewer/index.html",
+      "distDir": "./demo/v0.3.5",
+      "publicUrl": "./",
+      "sourceMap": false
+    },
+    "cli": {
+      "source": "src/cli/headless.html",
+      "distDir": "./dist",
+      "publicUrl": "/",
+      "optimize": false
+    }
+  },
+  "source": "src/lib/index.ts",
+  "types": "dist/index.d.ts",
+  "main": "dist/index.js",
   "files": [
     "/dist",
     "!/src/",
