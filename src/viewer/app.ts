@@ -38,7 +38,7 @@ class App {
   status: HTMLElement | null;
   loadscreen: HTMLElement | null;
   scene: string;
-  ibl: string;
+  current_ibl: string;
   camera: THREE.PerspectiveCamera;
   controls: OrbitControls;
 
@@ -54,8 +54,8 @@ class App {
   sceneBoundingBox: THREE.Box3;
 
   constructor() {
-    this.scene = Assets.getScene(0).name;
-    this.ibl = Assets.getIBL(1).name;
+    // this.scene = Assets.getScene(0).name;
+    this.current_ibl = "Artist Workshop";
 
     this.container = document.createElement('div');
     document.body.appendChild(this.container);
@@ -121,15 +121,14 @@ class App {
     dropCtrlOverlay.on('dropstart', () => {
       this.showLoadscreen();
       this.hideStartpage();
-      GUI.toggleHide();
     });
-    dropCtrlOverlay.on('drop', ({ files }) => this.load(files));
+    dropCtrlOverlay.on('drop', ({ files }) => this.loadDropFiles(files));
 
 
     const dropCtrlCanvas = new SimpleDropzone(this.canvas, input);
     dropCtrlCanvas.on('drop', ({ files }) => {
       this.showLoadscreen();
-      this.load(files);
+      this.loadDropFiles(files);
     });
     // dropCtrl.on('droperror', () => this.hideSpinner());
     this.container.addEventListener('dragover', function (e) {
@@ -141,11 +140,30 @@ class App {
     this.initUI();
     this.initStats();
 
+    if ( window.location.hash ) {
+      const uris = window.location.hash.split("#");
+
+      if(uris.length == 2) {
+        this.loadScenario(uris[1], this.currentIblUrl());
+        this.hideStartpage();
+      }
+      if(uris.length == 3) {
+        this.loadScenario(uris[1], uris[2]);
+        this.hideStartpage();
+        console.log(uris);
+      }
+    }
+
+    // this.loadScenario("https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/DamagedHelmet/glTF/DamagedHelmet.gltf", this.currentIblUrl());
     // this.hideStartpage();
-    // this.loadScene("/assets/scenes/metal-roughness-0.05.gltf");
+
   }
 
-  private load(fileMap) {
+  private currentIblUrl() {
+    return Assets.ibls[this.current_ibl].url;
+  }
+
+  private loadDropFiles(fileMap) {
     const files: [string, File][] = Array.from(fileMap)
     if (files.length == 1 && files[0][1].name.match(/\.hdr$/)) {
       this.status.innerHTML = "Loading HDR...";
@@ -160,7 +178,7 @@ class App {
     } else {
       this.status.innerHTML = "Loading Scene...";
       const scenePromise = Loader.loadSceneFromBlobs(files, this.autoScaleScene);
-      const iblPromise = Loader.loadIBL(Assets.getIBLByName(this.ibl).url);
+      const iblPromise = Loader.loadIBL(this.currentIblUrl());
 
       Promise.all([scenePromise, iblPromise]).then(([gltf, ibl]) => {
         this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
@@ -180,6 +198,46 @@ class App {
       });
     }
   }
+
+  private loadScenario(sceneUrl, iblUrl) {
+    const sceneKey = sceneUrl.replaceAll('%20', ' ');
+    if (sceneKey in Assets.scenes) {
+      const scene = Assets.scenes[sceneKey];
+      this.setSceneInfo(sceneKey, scene.credit);
+      sceneUrl = scene.url;
+    } else {
+      this.setSceneInfo(sceneUrl);
+    }
+    const iblKey = iblUrl.replaceAll('%20', ' ');
+    if (iblKey in Assets.ibls) {
+      const ibl = Assets.ibls[iblKey];
+      this.setIBLInfo(iblKey, ibl.credit);
+      iblUrl = ibl.url;
+    }else {
+      this.setIBLInfo(iblUrl);
+    }
+
+    const scenePromise = Loader.loadSceneFromUrl(sceneUrl, this.autoScaleScene);
+    const iblPromise = Loader.loadIBL(iblUrl);
+
+    Promise.all([scenePromise, iblPromise]).then(([gltf, ibl]) => {
+      this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
+      this.updateCameraFromBoundingBox();
+
+      this.renderer.setIBL(ibl);
+      this.renderer.setScene(gltf.scene, gltf).then(() => {
+        if (this.pathtracing)
+          this.startPathtracing();
+      });
+
+      this.three_renderer.setScene(new THREE.Scene().add(gltf.scene));
+      this.three_renderer.setIBL(ibl);
+      if (!this.pathtracing) {
+        this.startRasterizer();
+      }
+    });
+  }
+
 
   private initStats() {
     this._stats = new (Stats as any)();
@@ -256,28 +314,6 @@ class App {
     this.controls.update();
   }
 
-  private loadScene(sceneUrl) {
-    const scenePromise = Loader.loadSceneFromUrl(sceneUrl, this.autoScaleScene);
-    const iblPromise = Loader.loadIBL(Assets.getIBLByName(this.ibl).url);
-
-    Promise.all([scenePromise, iblPromise]).then(([gltf, ibl]) => {
-      this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
-      this.updateCameraFromBoundingBox();
-
-      this.renderer.setIBL(ibl);
-      this.renderer.setScene(gltf.scene, gltf).then(() => {
-        if (this.pathtracing)
-          this.startPathtracing();
-      });
-
-      this.three_renderer.setScene(new THREE.Scene().add(gltf.scene));
-      this.three_renderer.setIBL(ibl);
-      if (!this.pathtracing) {
-        this.startRasterizer();
-      }
-    });
-  }
-
   private centerView() {
     console.log("center view");
     if (this.controls) {
@@ -298,13 +334,13 @@ class App {
     this._gui.domElement.classList.add("hidden");
     this._gui.width = 300;
 
-    let reload_obj = {
-      reload: () => {
-        console.log("Reload");
-        this.loadScene(Assets.getSceneByName(this.scene).url);
-      }
-    };
-    this._gui.add(reload_obj, 'reload').name('Reload');
+    // let reload_obj = {
+    //   reload: () => {
+    //     console.log("Reload");
+    //     this.loadScenario(this.scene, this.ibl);
+    //   }
+    // };
+    // this._gui.add(reload_obj, 'reload').name('Reload');
 
     const center_obj = {
       centerView: this.centerView.bind(this)
@@ -338,12 +374,13 @@ class App {
       this.renderer.resetAccumulation();
     });
 
+    const ibl_names = Object.keys(Assets.ibls);
     let lighting = this._gui.addFolder('Lighting');
-    lighting.add(this, "ibl", Assets.ibl_names).name('IBL').onChange((value) => {
-      const iblInfo = Assets.getIBLByName(value);
-      console.log(`Loading ${iblInfo.name}`);
-      this.setIBLInfo(iblInfo);
-      if (iblInfo.name == "None") {
+    lighting.add(this, "current_ibl", ibl_names).name('IBL').onChange((value) => {
+      const iblInfo = Assets.ibls[value];
+      console.log(`Loading ${value}`);
+      this.setIBLInfo(value, iblInfo);
+      if (value == "None") {
         this.renderer.useIBL = false;
         this.three_renderer.showBackground = false;
         this.renderer.showBackground = false;
@@ -358,7 +395,7 @@ class App {
           this.renderer.showBackground = true;
         });
       }
-    }).setValue(Assets.getIBL(1).name);
+    });//.setValue(this.current_ibl);
 
     lighting.add(this.renderer, 'iblRotation').name('IBL Rotation').min(-180.0).max(180.0).step(0.1).listen();
     // lighting.add(this.renderer, 'forceIBLEval').name('Force IBL Eval');
@@ -412,6 +449,7 @@ class App {
 
   hideStartpage() {
     this.startpage.style.visibility = "hidden";
+    GUI.toggleHide();
   }
 
   showLoadscreen() {
@@ -424,22 +462,14 @@ class App {
     this.spinner.style.visibility = "hidden";
   }
 
-  setIBLInfo(ibl: any) {
-    const html = `
-      IBL: ${ibl.name} by ${ibl.author}
-      from <a href="${ibl.source_url}"> ${ibl.source} </a>
-      <a href="${ibl.license_url}">(${ibl.license})</a>
-      `;
-    document.getElementById("ibl-info").innerHTML = html;
+  setIBLInfo(name: string, credit?: any) {
+    document.getElementById("ibl-info").innerHTML = `IBL: ${name}`;
+    if(credit) document.getElementById("ibl-info").innerHTML += ` - ${credit}`;
   }
 
-  setSceneInfo(scene: any) {
-    const html = `
-      Scene: ${scene.name} by ${scene.author}
-      from <a href="${scene.source_url}"> ${scene.source} </a>
-      <a href="${scene.license_url}">(${scene.license})</a>
-      `;
-    document.getElementById("scene-info").innerHTML = html;
+  setSceneInfo(name: string, credit?: any) {
+    document.getElementById("scene-info").innerHTML = `Scene: ${name}`;
+    if(credit) document.getElementById("scene-info").innerHTML += ` - ${credit}`;
   }
 }
 
