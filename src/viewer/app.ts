@@ -156,7 +156,7 @@ class App {
       }
     }
 
-    // this.loadScenario("https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/DamagedHelmet/glTF/DamagedHelmet.gltf", this.currentIblUrl());
+    // this.loadScenario("https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/IridescenceSuzanne/glTF/IridescenceSuzanne.gltf", this.current_ibl);
     // this.hideStartpage();
 
   }

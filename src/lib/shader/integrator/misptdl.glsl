@@ -45,7 +45,7 @@ vec4 trace_misptdl(Ray r)
       }
 
       vec3 bounce_weight;
-      if(!sample_bsdf_bounce(rs, bounce_weight, last_bounce_pdf)) break; //absorped
+      if(!sample_bsdf_bounce(rs, bounce_weight, last_bounce_pdf)) return vec4(radiance, 1.0); //absorped
       path_weight *= bounce_weight;
 
       r = rt_kernel_create_ray(rs.wo, rs.hitPos + fix_normal(rs.geometryNormal, rs.wo) * u_float_rayEps, TFAR_MAX);

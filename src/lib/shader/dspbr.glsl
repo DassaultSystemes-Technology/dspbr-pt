@@ -47,6 +47,7 @@ vec3 eval_dspbr(const in MaterialClosure c, vec3 wi, vec3 wo) {
 
   vec3 base = diffuse_bsdf_eval(c, wi, wo, g);
   base += eval_brdf_microfacet_ggx_smith_iridescence(c.specular_f0, c.specular_f90, c.alpha, c.iridescence, c.iridescence_ior, c.iridescence_thickness, wi, wo, wh, g);
+  // base += eval_brdf_microfacet_ggx_smith(c.specular_f0, c.specular_f90, c.alpha, wi, wo, wh, g);
   base += eval_brdf_microfacet_ggx_smith_ms(c.specular_f0, c.specular_f90, c.alpha, wi, wo, g);
 
   base += eval_bsdf_microfacet_ggx_smith_iridescence(c.specular_f0, c.specular_f90, c.alpha, c.iridescence, c.iridescence_ior, c.iridescence_thickness, wi, wo, g);
@@ -86,16 +87,16 @@ float dspbr_pdf(const in MaterialClosure c, vec3 wi, vec3 wo) {
   float pdf = 0.0;
   Geometry g = calculateBasis(c.n, c.t);
 
-  float clearcoat_pdf = dspbr_clearcoat_rho(c, g, wi);
-  float diffuse_pdf = luminance(dspbr_diffuse_rho(c));
-  float reflection_pdf =  luminance(dspbr_microfacet_brdf_ggx_smith_rho(c, g, wi));
-  float transmission_pdf =  luminance(dspbr_microfacet_bsdf_ggx_smith_rho(c, g, wi));
-  float sum_pdf =  clearcoat_pdf + diffuse_pdf + reflection_pdf + transmission_pdf;
+  // float clearcoat_pdf = dspbr_clearcoat_rho(c, g, wi);
+  // float diffuse_pdf = luminance(dspbr_diffuse_rho(c));
+  // float reflection_pdf =  luminance(dspbr_microfacet_brdf_ggx_smith_rho(c, g, wi));
+  // float transmission_pdf =  luminance(dspbr_microfacet_bsdf_ggx_smith_rho(c, g, wi));
+  // float sum_pdf =  clearcoat_pdf + diffuse_pdf + reflection_pdf + transmission_pdf;
 
-  if(bool(c.event_type & E_SINGULAR) || bool(c.event_type & E_STRAIGHT)) {
-    pdf = 1.0;
-  }
-  else if(bool(c.event_type & E_COATING)) {
+  // if(bool(c.event_type & E_SINGULAR) || bool(c.event_type & E_STRAIGHT)) {
+  //   pdf = 1.0;
+  // }
+  if(bool(c.event_type & E_COATING)) {
     pdf = brdf_microfacet_ggx_smith_pdf(c, g, wi, wo);// * clearcoat_pdf / sum_pdf;
   }
   else if (bool(c.event_type & E_DIFFUSE)) {
@@ -214,7 +215,6 @@ vec3 sample_dspbr(inout MaterialClosure c, vec3 wi, in vec3 uvw, inout vec3 bsdf
     wo = sample_brdf_microfacet_ggx_smith(c.alpha, wi, g, uvw.xy, pdf);
     vec3 wh = normalize(wi + wo);
 
-    // bsdf_over_pdf *= eval_brdf_microfacet_ggx_smith(c.specular_f0, c.specular_f90, c.alpha, wi, wo, wh, g) / pdf;
     bsdf_over_pdf *= eval_brdf_microfacet_ggx_smith_iridescence(c.specular_f0, c.specular_f90, c.alpha, c.iridescence, c.iridescence_ior, c.iridescence_thickness, wi, wo, wh, g) / pdf;
     bsdf_over_pdf += eval_brdf_microfacet_ggx_smith_ms(c.specular_f0, c.specular_f90, c.alpha, wi, wo, g);
 

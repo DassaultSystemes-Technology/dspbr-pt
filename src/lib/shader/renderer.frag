@@ -18,7 +18,6 @@ precision highp int;
 precision highp float;
 precision highp sampler2D;
 precision highp sampler2DArray;
-// precision lowp isampler2D;
 
 #include <pathtracing_defines>
 
@@ -152,6 +151,13 @@ struct MaterialClosure {
 //     vec3 emission;
 //     float pad;
 // };
+// void unpackLightData(uint lightIdx, out Light light) {
+//     vec4 val;
+//     val = texelFetch(u_sampler2D_LightData, getStructParameterTexCoord(lightIdx, 0u, LIGHT_SIZE),
+//     0); light.position = val.xyz; light.type = val.w; val = texelFetch(u_sampler2D_LightData,
+//     getStructParameterTexCoord(lightIdx, 1u, LIGHT_SIZE), 0); light.emission = val.xyz;
+// }
+
 
 struct RenderState {
   vec3 hitPos;
@@ -189,7 +195,7 @@ const int RM_MISPTDL = 1;
 const int RM_PTDL = 2;
 
 ///////////////////////////////////////////////////////////////////////////////
-// Pathtracing Integrator
+// Pathtracing Integrator Common
 ///////////////////////////////////////////////////////////////////////////////
 void fillRenderState(const in Ray r, const in HitInfo hit, out RenderState rs) {
   rs.hitPos = r.org + r.dir * hit.tfar;
@@ -256,17 +262,13 @@ bool check_russian_roulette_path_termination(int bounce, inout vec3 path_weight)
   }
 }
 
+
+///////////////////////////////////////////////////////////////////////////////
+// Ray Generation
+///////////////////////////////////////////////////////////////////////////////
 #include <debug_integrator>
 #include <pt_integrator>
 #include <misptdl_integrator>
-
-// void unpackLightData(uint lightIdx, out Light light) {
-//     vec4 val;
-//     val = texelFetch(u_sampler2D_LightData, getStructParameterTexCoord(lightIdx, 0u, LIGHT_SIZE),
-//     0); light.position = val.xyz; light.type = val.w; val = texelFetch(u_sampler2D_LightData,
-//     getStructParameterTexCoord(lightIdx, 1u, LIGHT_SIZE), 0); light.emission = val.xyz;
-// }
-
 
 Ray calcuateViewRay(float r0, float r1) {
   // box filter

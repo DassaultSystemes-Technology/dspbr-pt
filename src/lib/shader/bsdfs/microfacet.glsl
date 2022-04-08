@@ -185,6 +185,8 @@ vec3 eval_bsdf_microfacet_ggx_smith_iridescence(vec3 specular_f0, vec3 specular_
 }
 
 float brdf_microfacet_ggx_smith_pdf(MaterialClosure c, Geometry g, vec3 wi, vec3 wo) {
+  if(dot(wi, g.n) < EPS_PDF) return 0.0;
+
   vec3 wh = normalize(wi + wo);
   float jacobian = 1.0 / (4.0 * abs(dot(wo, wh)));
   return ggx_eval_vndf(c.alpha, wi, wh, g) * jacobian;
@@ -333,7 +335,8 @@ float bsdf_microfacet_ggx_smith_pdf(in MaterialClosure c, Geometry g, vec3 wi, v
     pdf *= sqr(ior_o) * abs(dot(wo, wh)) / denom;
   }
 
-  pdf *= brdf_microfacet_ggx_smith_pdf(c, g, flip(wi, -g.n), wo);
+  if(dot(wi, g.n) < EPS_COS) wi = flip(wi, -g.n);
+  pdf *= brdf_microfacet_ggx_smith_pdf(c, g, wi, wo);
 
   return pdf;
 }
