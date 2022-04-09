@@ -18,7 +18,7 @@ export async function loadSceneFromBlobs(files: [string, File][], autoscale: boo
   }
 
   async function createJSONDocument(uris: [string, File][]) {
-    const binaries: { [id: string]: ArrayBuffer; } = {};
+    const binaries: { [id: string]: Uint8Array; } = {};
     let json: any = {}
 
     for (let [path, file] of uris) {
@@ -29,7 +29,7 @@ export async function loadSceneFromBlobs(files: [string, File][], autoscale: boo
         const data = await file.text();
         json = JSON.parse(data);
       } else {
-        binaries[path.slice(1)] = buffer;
+        binaries[path.slice(1)] = new Uint8Array(buffer);
       }
     }
     const jsonDocument = {
@@ -45,12 +45,12 @@ export async function loadSceneFromBlobs(files: [string, File][], autoscale: boo
     const file = f[1];
     if (getFileExtension(file.name) === "glb") {
       const buffer = await file.arrayBuffer();
-      doc = await io.readBinary(buffer);
+      doc = await io.readBinary(new Uint8Array(buffer));
     }
 
     if (getFileExtension(file.name) === "gltf") {
       const jsonDoc = await createJSONDocument(files);
-      doc = io.readJSON(jsonDoc);
+      doc = await io.readJSON(jsonDoc);
     }
   }
 
@@ -59,8 +59,8 @@ export async function loadSceneFromBlobs(files: [string, File][], autoscale: boo
     weld()
   );
 
-  const processed_glb = io.writeBinary(doc);
-  return loadScene(processed_glb, autoscale);
+  const processed_glb = await io.writeBinary(doc);
+  return loadScene(processed_glb.buffer, autoscale);
 }
 
 function precompute1DPdfAndCdf(data: Float32Array, pdf: Float32Array,

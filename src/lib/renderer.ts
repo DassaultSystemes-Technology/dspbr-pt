@@ -508,11 +508,11 @@ export class PathtracingRenderer {
 
 
   private async parseMaterial(mat: any, gltf?: GLTF) {
+    // console.log(mat);
     let matInfo = new MaterialData();
     let matTexInfo = new MaterialTextureInfo();
 
     matInfo.albedo = mat.color.toArray();
-    // console.log(mat);
     if (mat.map) {
       matTexInfo.albedoTexture = this.parseTexture(mat.map);
     }
@@ -634,7 +634,7 @@ export class PathtracingRenderer {
         }
         if ('KHR_materials_iridescence' in mat.userData.gltfExtensions) {
           let ext = mat.userData.gltfExtensions["KHR_materials_iridescence"];
-          matInfo.iridescence = get_param("iridescenceFactor", ext, matInfo.iridescence);
+          matInfo.iridescence = get_param("iridescenceFactor", ext, 1.0);
           matInfo.iridescenceIOR = get_param("iridescenceIOR", ext, matInfo.iridescenceIOR);
           matInfo.iridescenceThicknessMinimum = get_param("iridescenceThicknessMinimum", ext, matInfo.iridescenceThicknessMinimum);
           matInfo.iridescenceThicknessMaximum = get_param("iridescenceThicknessMaximum", ext, matInfo.iridescenceThicknessMaximum);
