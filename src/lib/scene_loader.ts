@@ -148,8 +148,8 @@ export async function loadSceneFromUrl(url: string, autoscale: boolean) {
   await doc.transform(
     weld()
   );
-  const glb = io.writeBinary(doc);
-  return loadScene(glb, autoscale);
+  const glb = await io.writeBinary(doc);
+  return loadScene(glb.buffer, autoscale);
 }
 
 function loadScene(glb: ArrayBuffer, autoscale: boolean) {
