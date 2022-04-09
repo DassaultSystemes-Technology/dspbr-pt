@@ -7,12 +7,16 @@
     {
       "type": "chrome",
       "request": "launch",
-      "name": "Launch Chrome against localhost",
-      "url": "http://localhost:3000",
+      "name": "dspbr-pt debug",
+      "url": "http://localhost:3000#Damaged%20Helmet",
       "webRoot": "${workspaceFolder}",
+      "outFiles": [
+        "${workspaceFolder}/dist/*.js",
+        "!**/node_modules/**"
+      ],
       "breakOnLoad": false,
       "sourceMapPathOverrides": {
-        "../*": "${webRoot}/*"
+        "/__parcel_source_root/*": "${webRoot}/*"
       }
     }
   ]

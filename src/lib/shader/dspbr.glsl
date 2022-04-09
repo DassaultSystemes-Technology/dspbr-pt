@@ -13,18 +13,6 @@
  * limitations under the License.
  */
 
-uniform int u_int_SheenG;
-
-const int E_DIFFUSE = 1 << 0;
-const int E_SINGULAR = 1 << 1;
-const int E_REFLECTION = 1 << 2;
-const int E_TRANSMISSION = 1 << 3;
-const int E_COATING = 1 << 4;
-const int E_STRAIGHT = 1 << 5;
-
-#include <diffuse>
-#include <microfacet>
-#include <sheen>
 
 // float thinTransmissionRoughness(float ior, float roughness) {
 //   return saturate((0.65 * ior - 0.35) * roughness);
@@ -125,11 +113,6 @@ void importanceSampleBsdf(inout MaterialClosure c, inout float rr, vec3 wi, out 
   bsdf_pdf[1] = luminance(brdf_importance);
   bsdf_pdf[2] = luminance(bsdf_importance);
   bsdf_pdf[3] = clearcoat_importance;
-  // bsdf_pdf[0] = 1.0;
-  // bsdf_pdf[1] = 1.0;
-  // bsdf_pdf[2] = 1.0;
-  // bsdf_pdf[3] = 0.0;
-
 
   float bsdf_cdf[4];
   bsdf_cdf[0] = bsdf_pdf[0];
@@ -153,19 +136,19 @@ void importanceSampleBsdf(inout MaterialClosure c, inout float rr, vec3 wi, out 
 
   pdf = 1.0;
   vec3 wo;
-  if (rr <= bsdf_cdf[0]) { // diffuse
+  if (rr <= bsdf_cdf[0]) {
     c.event_type = E_DIFFUSE;
     pdf *= bsdf_cdf[0];
   }
-  else if(rr <= bsdf_cdf[1]) { // brdf
+  else if(rr <= bsdf_cdf[1]) {
     c.event_type = E_REFLECTION;
     pdf *= bsdf_cdf[1] - bsdf_cdf[0];
   }
-  else if(rr <= bsdf_cdf[2]) { // bsdf
+  else if(rr <= bsdf_cdf[2]) {
     c.event_type = E_TRANSMISSION;
     pdf *= bsdf_cdf[2] - bsdf_cdf[1];
   }
-  else if(rr <= bsdf_cdf[3]) { // bsdf
+  else if(rr <= bsdf_cdf[3]) {
     c.event_type = E_COATING;
     pdf *= bsdf_cdf[3] - bsdf_cdf[2];
   }

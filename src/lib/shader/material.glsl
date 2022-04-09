@@ -12,8 +12,73 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <fresnel>
-#include <iridescence>
+
+
+uniform int u_int_SheenG;
+uniform sampler2D u_sampler_material_data;
+uniform sampler2D u_sampler_material_texinfo_data;
+
+const int E_DIFFUSE = 1 << 0;
+const int E_SINGULAR = 1 << 1;
+const int E_REFLECTION = 1 << 2;
+const int E_TRANSMISSION = 1 << 3;
+const int E_COATING = 1 << 4;
+const int E_STRAIGHT = 1 << 5;
+
+
+struct MaterialData {
+  // 0
+  vec3 albedo;
+  float metallic;
+
+  // 1
+  float roughness;
+  float anisotropy;
+  float anisotropyRotation;
+  float transparency;
+
+  // 2
+  float cutoutOpacity;
+  bool doubleSided;
+  float normalScale;
+  float ior;
+
+  // 3
+  float specular;
+  vec3 specularTint;
+
+  // 4
+  float sheenRoughness;
+  vec3 sheenColor;
+
+  // 5
+  float normalScaleClearcoat;
+  vec3 emission;
+
+  // 6
+  float clearcoat;
+  float clearcoatRoughness;
+  float translucency;
+  float alphaCutoff;
+
+  // 8
+  float attenuationDistance;
+  vec3 attenuationColor;
+
+  // 9
+  vec3 subsurfaceColor;
+  bool thinWalled;
+
+  // 10
+  vec3 anisotropyDirection;
+  float pad;
+
+  // 11
+  float iridescence;
+  float iridescenceIor;
+  float iridescenceThicknessMinimum;
+  float iridescenceThicknessMaximum;
+};
 
 struct MaterialTextureInfo {
   TexInfo albedoTexture;
@@ -36,52 +101,52 @@ struct MaterialTextureInfo {
 
 void unpackMaterialData(in uint idx, out MaterialData matData) {
   vec4 val;
-  val = texelFetch(u_sampler2D_MaterialData, getStructParameterTexCoord(idx, 0u, MATERIAL_SIZE), 0);
+  val = texelFetch(u_sampler_material_data, getStructParameterTexCoord(idx, 0u, MATERIAL_SIZE), 0);
   matData.albedo = val.xyz;
   matData.metallic = val.w;
 
-  val = texelFetch(u_sampler2D_MaterialData, getStructParameterTexCoord(idx, 1u, MATERIAL_SIZE), 0);
+  val = texelFetch(u_sampler_material_data, getStructParameterTexCoord(idx, 1u, MATERIAL_SIZE), 0);
   matData.roughness = val.x;
   matData.anisotropy = val.y;
   matData.anisotropyRotation = val.z * 2.0 * PI;
   matData.transparency = val.w;
 
-  val = texelFetch(u_sampler2D_MaterialData, getStructParameterTexCoord(idx, 2u, MATERIAL_SIZE), 0);
+  val = texelFetch(u_sampler_material_data, getStructParameterTexCoord(idx, 2u, MATERIAL_SIZE), 0);
   matData.cutoutOpacity = val.x;
   matData.doubleSided = bool(val.y);
   matData.normalScale = val.z;
   matData.ior = val.w;
 
-  val = texelFetch(u_sampler2D_MaterialData, getStructParameterTexCoord(idx, 3u, MATERIAL_SIZE), 0);
+  val = texelFetch(u_sampler_material_data, getStructParameterTexCoord(idx, 3u, MATERIAL_SIZE), 0);
   matData.specular = val.x;
   matData.specularTint = val.yzw;
 
-  val = texelFetch(u_sampler2D_MaterialData, getStructParameterTexCoord(idx, 4u, MATERIAL_SIZE), 0);
+  val = texelFetch(u_sampler_material_data, getStructParameterTexCoord(idx, 4u, MATERIAL_SIZE), 0);
   matData.sheenRoughness = val.x;
   matData.sheenColor = val.yzw;
 
-  val = texelFetch(u_sampler2D_MaterialData, getStructParameterTexCoord(idx, 5u, MATERIAL_SIZE), 0);
+  val = texelFetch(u_sampler_material_data, getStructParameterTexCoord(idx, 5u, MATERIAL_SIZE), 0);
   matData.normalScaleClearcoat = val.x;
   matData.emission = val.yzw;
 
-  val = texelFetch(u_sampler2D_MaterialData, getStructParameterTexCoord(idx, 6u, MATERIAL_SIZE), 0);
+  val = texelFetch(u_sampler_material_data, getStructParameterTexCoord(idx, 6u, MATERIAL_SIZE), 0);
   matData.clearcoat = val.x;
   matData.clearcoatRoughness = val.y;
   matData.translucency = val.z;
   matData.alphaCutoff = val.w;
 
-  val = texelFetch(u_sampler2D_MaterialData, getStructParameterTexCoord(idx, 7u, MATERIAL_SIZE), 0);
+  val = texelFetch(u_sampler_material_data, getStructParameterTexCoord(idx, 7u, MATERIAL_SIZE), 0);
   matData.attenuationDistance = val.x;
   matData.attenuationColor = val.yzw;
 
-  val = texelFetch(u_sampler2D_MaterialData, getStructParameterTexCoord(idx, 8u, MATERIAL_SIZE), 0);
+  val = texelFetch(u_sampler_material_data, getStructParameterTexCoord(idx, 8u, MATERIAL_SIZE), 0);
   matData.subsurfaceColor = val.xyz;
   matData.thinWalled = bool(val.w);
 
-  val = texelFetch(u_sampler2D_MaterialData, getStructParameterTexCoord(idx, 9u, MATERIAL_SIZE), 0);
+  val = texelFetch(u_sampler_material_data, getStructParameterTexCoord(idx, 9u, MATERIAL_SIZE), 0);
   matData.anisotropyDirection = val.xyz;
 
-  val = texelFetch(u_sampler2D_MaterialData, getStructParameterTexCoord(idx, 10u, MATERIAL_SIZE), 0);
+  val = texelFetch(u_sampler_material_data, getStructParameterTexCoord(idx, 10u, MATERIAL_SIZE), 0);
   matData.iridescence = val.x;
   matData.iridescenceIor = val.y;
   matData.iridescenceThicknessMinimum = val.z;
@@ -89,8 +154,8 @@ void unpackMaterialData(in uint idx, out MaterialData matData) {
 }
 
 TexInfo getTextureInfo(ivec2 texInfoIdx, ivec2 transformInfoIdx) {
-  ivec4 texArrayInfo = ivec4(texelFetch(u_sampler2D_MaterialTexInfoData, texInfoIdx, 0));
-  vec4 transformInfo = texelFetch(u_sampler2D_MaterialTexInfoData, transformInfoIdx, 0);
+  ivec4 texArrayInfo = ivec4(texelFetch(u_sampler_material_texinfo_data, texInfoIdx, 0));
+  vec4 transformInfo = texelFetch(u_sampler_material_texinfo_data, transformInfoIdx, 0);
 
   TexInfo texInfo;
   texInfo.texArrayIdx = texArrayInfo.x;
@@ -179,7 +244,7 @@ vec2 roughness_conversion(float roughness, float anisotropy) {
   return max(a * a, vec2(MINIMUM_ROUGHNESS));
 }
 
-void configure_material(const in uint matIdx, inout RenderState rs, out MaterialClosure c, vec4 vertexColor) {
+void configure_material(const in uint matIdx, in RenderState rs, out MaterialClosure c, vec4 vertexColor) {
   vec2 uv = rs.uv0;
 
   MaterialData matData;

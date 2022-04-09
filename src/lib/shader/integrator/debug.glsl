@@ -1,9 +1,9 @@
 
-vec4 trace_debug(const Ray r) {
-  HitInfo hit;
+vec4 trace_debug(const bvh_ray r) {
+  bvh_hit hit;
 
   vec4 color = vec4(0);
-  if (rt_kernel_intersect_nearest(r, hit)) {
+  if (bvh_intersect_nearest(r, hit)) {
     vec3 contrib = vec3(0);
     RenderState rs;
     fillRenderState(r, hit, rs);

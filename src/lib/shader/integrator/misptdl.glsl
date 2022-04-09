@@ -1,6 +1,6 @@
-vec4 trace_misptdl(Ray r)
+vec4 trace_misptdl(bvh_ray r)
 {
-  HitInfo hit;
+  bvh_hit hit;
   vec3 path_weight = vec3(1.0);
 
   bool last_bounce_specular = true; // pinhole camera is considered singular
@@ -9,12 +9,12 @@ vec4 trace_misptdl(Ray r)
 
   int bounce = 0;
   vec3 radiance = vec3(0.0);
-  while(bounce <= u_int_maxBounces || last_bounce_specular)
+  while(bounce <= u_max_bounces || last_bounce_specular)
   {
     if(check_russian_roulette_path_termination(bounce, path_weight)) break;
 
     RenderState rs;
-    if (rt_kernel_intersect_nearest(r, hit)) { // primary camera ray
+    if (bvh_intersect_nearest(r, hit)) { // primary camera ray
       fillRenderState(r, hit, rs);
       last_bsdf_selection_pdf = rs.closure.bsdf_selection_pdf;
        // Absorption
@@ -48,7 +48,7 @@ vec4 trace_misptdl(Ray r)
       if(!sample_bsdf_bounce(rs, bounce_weight, last_bounce_pdf)) return vec4(radiance, 1.0); //absorped
       path_weight *= bounce_weight;
 
-      r = rt_kernel_create_ray(rs.wo, rs.hitPos + fix_normal(rs.geometryNormal, rs.wo) * u_float_rayEps, TFAR_MAX);
+      r = bvh_create_ray(rs.wo, rs.hitPos + fix_normal(rs.geometryNormal, rs.wo) * u_float_rayEps, TFAR_MAX);
       bounce++;
     }
     else {

@@ -4,3 +4,4 @@ export const Loader = {
   ...LoaderTmp
 }
 export {PathtracingRenderer} from './renderer';
+export {WavefrontRenderer} from './renderer_wavefront';

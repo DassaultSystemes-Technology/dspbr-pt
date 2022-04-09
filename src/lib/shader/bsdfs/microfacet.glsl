@@ -1,4 +1,3 @@
-
 // Eric Heitz. Understanding the Masking-Shadowing Function in Microfacet-Based
 // BRDFs. Journal of Computer Graphics TechniquesVol. 3, No. 2, 2014
 // http://jcgt.org/published/0003/02/03/paper.pdf
@@ -17,7 +16,7 @@ float projected_roughness(vec2 alpha, vec3 w, Geometry g) {
 float ggx_smith_lambda(vec2 alpha, vec3 w, Geometry g) {
   float sin_theta_2 = 1.0 - sqr(dot(w, g.n));
 
-  if (sin_theta_2 < EPSILON) {
+  if (sin_theta_2 < EPS) {
     return 0.0;
   }
 
@@ -66,7 +65,7 @@ float ggx_eval(vec2 alpha, vec3 wh, Geometry g) {
   float sin_theta_2 = 1.0 - cos_theta_2;
   float tan_theta_2 = sqr(sqrt(sin_theta_2) / cos_theta);
 
-  if (sin_theta_2 < EPSILON) {
+  if (sin_theta_2 < EPS) {
     // avoid 0 * inf
     return 1.0 / (PI * alpha.x * alpha.y * cos_theta_4);
   }

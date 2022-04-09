@@ -12,6 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+precision highp float;
 
 uvec2 rng_state;
 
@@ -25,7 +26,7 @@ float rng_NextFloat() {
     return float(george_marsaglia_rng()) / float(0xFFFFFFFFu);
 }
 
-void init_RNG(int seed) {
+void init_rng(int seed) {
     vec2 offset = vec2(seed*17,0.0);
 
     //Initialize RNG

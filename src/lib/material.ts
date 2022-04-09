@@ -318,3 +318,4 @@ export class MaterialTextureInfo {
   iridescenceTexture = new TexInfo();
   iridescenceThicknessTexture = new TexInfo();
 }
+

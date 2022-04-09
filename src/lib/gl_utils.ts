@@ -38,34 +38,40 @@ function createShader(gl: WebGL2RenderingContext, type: number, source: string) 
   if (shader) {
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
-    if (gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-      return shader;
-    } else {
-      const errorLog = gl.getShaderInfoLog(shader);
-      const errorPos = errorLog?.indexOf("ERROR: ") ?? 0;
-      let errorSnippet = errorLog?.substring(errorPos, errorPos+20);
-      const errorLineNumber = errorSnippet?.match(/(:\d+)/)![0].substring(1) ?? "0";
-      const sourceLines = source.split(/\r?\n/);
-      console.log(sourceLines[parseInt(errorLineNumber)-1]);
-      throw Error("shader compile error: " + errorLog);
-      gl.deleteShader(shader);
-    }
+    return shader;
+
   }
   else {
     throw Error("Could not create shader");
   }
 }
 
-export function createProgramFromSource(gl: WebGL2RenderingContext,
-  vertexShaderSource: string, fragmentShaderSource: string,
-  shaderChunks?: { [name: string]: string }) {
+function getShaderErrorLog(gl: WebGL2RenderingContext, shader: WebGLShader, source: string) {
+  var log = gl.getShaderInfoLog(shader);
+  if(log) {
+    const errorPos = log?.indexOf("ERROR: ") ?? 0;
+    let errorSnippet = log?.substring(errorPos, errorPos+20);
+    const errorLineNumber = parseInt(errorSnippet?.match(/(:\d+)/)![0].substring(1) ?? "0");
+    const sourceLines = source.split(/\r?\n/);
+    return log + "\n" + sourceLines.slice(errorLineNumber-5, errorLineNumber+5).join('\n');
+  }
 
-  if (shaderChunks !== undefined) {
-    for (let chunk in shaderChunks) {
-      let identifier = "#include <" + chunk + ">";
-      vertexShaderSource = vertexShaderSource.replace(identifier, shaderChunks[chunk]);
-      fragmentShaderSource = fragmentShaderSource.replace(identifier, shaderChunks[chunk]);
+  return "";
+}
+
+export function createProgramFromSource(gl: WebGL2RenderingContext,
+  vertexShaderSource: string, fragmentShaderSource: string, shaderChunks?: Map<string, string> ) {
+
+
+  if (shaderChunks) {
+    console.time("Shader chunk resolve...");
+    for (let [id, chunk] of shaderChunks) {
+      let identifier = "#include <" + id + ">";
+      vertexShaderSource = vertexShaderSource.replace(identifier, chunk);
+      fragmentShaderSource = fragmentShaderSource.replace(identifier, chunk);
+      // console.log(fragmentShaderSource);
     }
+    console.timeEnd("Shader chunk resolve...");
   }
 
   let vs = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
@@ -81,7 +87,13 @@ export function createProgramFromSource(gl: WebGL2RenderingContext,
     if (gl.getProgramParameter(program, gl.LINK_STATUS)) {
       return program;
     } else {
+      const vsLog = getShaderErrorLog(gl, vs, vertexShaderSource);
+      const fsLog = getShaderErrorLog(gl, fs, fragmentShaderSource);
+      gl.deleteShader(vs);
+      gl.deleteShader(fs);
       gl.deleteProgram(program);
+      console.log(vsLog);
+      console.log(fsLog);
       throw new Error("Program link error: " + gl.getProgramInfoLog(program));
     }
   } else {
@@ -89,13 +101,15 @@ export function createProgramFromSource(gl: WebGL2RenderingContext,
   }
 }
 
-export function createDataTexture(gl: WebGL2RenderingContext, data: Float32Array) {
+export function createDataTexture(gl: WebGL2RenderingContext, data?: Float32Array) :  WebGLTexture {
+  if(!data) throw Error("No data provided for data texture creation!");
+
   let maxTextureSize = getMaxTextureSize(gl);
 
   let numRGBAblocks = (data.length / 4) | 0;
   let sX = Math.min(numRGBAblocks, maxTextureSize);
   let sY = Math.max(1, ((numRGBAblocks + maxTextureSize - 1) / maxTextureSize) | 0);
-  console.log(`Create data texture: ${sX} x ${sY}`);
+  // console.log(`Create data texture: ${sX} x ${sY}`);
 
   let tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -113,7 +127,7 @@ export function createDataTexture(gl: WebGL2RenderingContext, data: Float32Array
 
   gl.bindTexture(gl.TEXTURE_2D, null);
 
-  return tex;
+  return tex as WebGLTexture;
 }
 
 export function createTexture(gl: WebGL2RenderingContext, target: any, internalformat: any, width: number, height: number, format: any, type: any, srcData: ArrayBufferView, srcOffset: number, minFilter: any = WebGL2RenderingContext.LINEAR, magFilter: any = WebGL2RenderingContext.LINEAR, wrapS: any = WebGL2RenderingContext.REPEAT, wrapT: any = WebGL2RenderingContext.REPEAT) {

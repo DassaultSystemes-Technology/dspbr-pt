@@ -9,4 +9,5 @@ debug.log
 .vscode/settings.json
 tmp/
 assets/
+demo/
 .parcel-cache

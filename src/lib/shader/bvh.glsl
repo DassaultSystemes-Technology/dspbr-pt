@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-struct Ray {
+struct bvh_ray {
   vec3 dir;
   vec3 org;
   float tfar;
@@ -21,20 +21,20 @@ struct Ray {
   ivec3 sign;
 };
 
-struct HitInfo {
+struct bvh_hit {
   int triIndex;
   float tfar;
   vec2 uv;
 };
 
-Ray rt_kernel_create_ray(in vec3 direction, in vec3 origin, in float tfar) {
+bvh_ray bvh_create_ray(in vec3 direction, in vec3 origin, in float tfar) {
   vec3 inv_direction = vec3(1.0) / direction;
 
-  return Ray(direction, origin, tfar, inv_direction,
+  return bvh_ray(direction, origin, tfar, inv_direction,
              ivec3((inv_direction.x < 0.0) ? 1 : 0, (inv_direction.y < 0.0) ? 1 : 0, (inv_direction.z < 0.0) ? 1 : 0));
 }
 
-bool intersectAABB(const in Ray ray, const in vec3 aabb[2], out float tmin, out float tmax) {
+bool intersectAABB(const in bvh_ray ray, const in vec3 aabb[2], out float tmin, out float tmax) {
   float tymin, tymax, tzmin, tzmax;
   tmin = (aabb[ray.sign[0]].x - ray.org.x) * ray.inv_dir.x;
   tmax = (aabb[1 - ray.sign[0]].x - ray.org.x) * ray.inv_dir.x;
@@ -48,14 +48,14 @@ bool intersectAABB(const in Ray ray, const in vec3 aabb[2], out float tmin, out 
 }
 
 // std. moeller trumbore triangle intersection test
-bool intersectTriangle(const in Ray r, in vec3 p0, in vec3 p1, in vec3 p2, const in float tfar, out float t,
+bool intersectTriangle(const in bvh_ray r, in vec3 p0, in vec3 p1, in vec3 p2, const in float tfar, out float t,
                        out vec2 uv) {
   vec3 e0 = p1 - p0;
   vec3 e1 = p2 - p0;
   vec3 pvec = cross(r.dir, e1);
   float det = dot(e0, pvec);
-  if (abs(det) < EPSILON) { // intersect backfaces
-    // if(a < EPSILON) // skip backfaces
+  if (abs(det) < EPS) { // intersect backfaces
+    // if(a < EPS) // skip backfaces
     return false;
   }
   float f = 1.0 / det;
@@ -71,48 +71,48 @@ bool intersectTriangle(const in Ray r, in vec3 p0, in vec3 p1, in vec3 p2, const
     return false;
   t = f * dot(e1, qvec);
 
-  if (t < EPSILON)
+  if (t < EPS)
     return false;
 
   uv = vec2(u, v);
   return (t > 0.0) && (t < tfar);
 }
 
-uint getMaterialIndex(const in uint triIndex) {
+uint get_material_idx(const in uint triIndex) {
   ivec2 idx = getStructParameterTexCoord(triIndex, 0u, TRIANGLE_STRIDE);
-  return uint(texelFetch(u_sampler2D_TriangleData, idx, 0).w);
+  return uint(texelFetch(u_sampler_triangle_data, idx, 0).w);
 }
 
-void getSceneTriangle(const in uint index, out vec3 p0, out vec3 p1, out vec3 p2) {
+void get_triangle(const in uint index, out vec3 p0, out vec3 p1, out vec3 p2) {
   ivec2 idx0 = getStructParameterTexCoord(index, POSITION_OFFSET, TRIANGLE_STRIDE);
   ivec2 idx1 = getStructParameterTexCoord(index, POSITION_OFFSET + VERTEX_STRIDE, TRIANGLE_STRIDE);
   ivec2 idx2 = getStructParameterTexCoord(index, POSITION_OFFSET + 2u * VERTEX_STRIDE, TRIANGLE_STRIDE);
 
-  p0 = texelFetch(u_sampler2D_TriangleData, idx0, 0).xyz;
-  p1 = texelFetch(u_sampler2D_TriangleData, idx1, 0).xyz;
-  p2 = texelFetch(u_sampler2D_TriangleData, idx2, 0).xyz;
+  p0 = texelFetch(u_sampler_triangle_data, idx0, 0).xyz;
+  p1 = texelFetch(u_sampler_triangle_data, idx1, 0).xyz;
+  p2 = texelFetch(u_sampler_triangle_data, idx2, 0).xyz;
 }
 
-vec3 calculateInterpolatedNormal(const in uint index, const in vec2 uv) {
+vec3 compute_interpolated_normal(const in uint index, const in vec2 uv) {
   ivec2 idx0 = getStructParameterTexCoord(index, NORMAL_OFFSET, TRIANGLE_STRIDE);
   ivec2 idx1 = getStructParameterTexCoord(index, NORMAL_OFFSET + VERTEX_STRIDE, TRIANGLE_STRIDE);
   ivec2 idx2 = getStructParameterTexCoord(index, NORMAL_OFFSET + 2u * VERTEX_STRIDE, TRIANGLE_STRIDE);
 
-  vec3 n0 = texelFetch(u_sampler2D_TriangleData, idx0, 0).xyz;
-  vec3 n1 = texelFetch(u_sampler2D_TriangleData, idx1, 0).xyz;
-  vec3 n2 = texelFetch(u_sampler2D_TriangleData, idx2, 0).xyz;
+  vec3 n0 = texelFetch(u_sampler_triangle_data, idx0, 0).xyz;
+  vec3 n1 = texelFetch(u_sampler_triangle_data, idx1, 0).xyz;
+  vec3 n2 = texelFetch(u_sampler_triangle_data, idx2, 0).xyz;
 
   return normalize((1.0 - uv.x - uv.y) * n0 + uv.x * n1 + uv.y * n2);
 }
 
-vec2 calculateInterpolatedUV(const in uint index, const in vec2 hit_uv, int set) {
+vec2 compute_interpolated_uv(const in uint index, const in vec2 hit_uv, int set) {
   ivec2 idx0 = getStructParameterTexCoord(index, UV_OFFSET, TRIANGLE_STRIDE);
   ivec2 idx1 = getStructParameterTexCoord(index, UV_OFFSET + VERTEX_STRIDE, TRIANGLE_STRIDE);
   ivec2 idx2 = getStructParameterTexCoord(index, UV_OFFSET + 2u * VERTEX_STRIDE, TRIANGLE_STRIDE);
 
-  vec4 uv0 = texelFetch(u_sampler2D_TriangleData, idx0, 0);
-  vec4 uv1 = texelFetch(u_sampler2D_TriangleData, idx1, 0);
-  vec4 uv2 = texelFetch(u_sampler2D_TriangleData, idx2, 0);
+  vec4 uv0 = texelFetch(u_sampler_triangle_data, idx0, 0);
+  vec4 uv1 = texelFetch(u_sampler_triangle_data, idx1, 0);
+  vec4 uv2 = texelFetch(u_sampler_triangle_data, idx2, 0);
 
   if (set == 0) {
     return (1.0 - hit_uv.x - hit_uv.y) * uv0.xy + hit_uv.x * uv1.xy + hit_uv.y * uv2.xy;
@@ -121,14 +121,14 @@ vec2 calculateInterpolatedUV(const in uint index, const in vec2 hit_uv, int set)
   }
 }
 
-vec4 calculateInterpolatedTangent(const in uint index, const in vec2 uv, vec3 n) {
+vec4 compute_interpolated_tangent(const in uint index, const in vec2 uv, vec3 n) {
   ivec2 idx0 = getStructParameterTexCoord(index, TANGENT_OFFSET, TRIANGLE_STRIDE);
   ivec2 idx1 = getStructParameterTexCoord(index, TANGENT_OFFSET + VERTEX_STRIDE, TRIANGLE_STRIDE);
   ivec2 idx2 = getStructParameterTexCoord(index, TANGENT_OFFSET + 2u * VERTEX_STRIDE, TRIANGLE_STRIDE);
 
-  vec4 t0 = texelFetch(u_sampler2D_TriangleData, idx0, 0);
-  vec4 t1 = texelFetch(u_sampler2D_TriangleData, idx1, 0);
-  vec4 t2 = texelFetch(u_sampler2D_TriangleData, idx2, 0);
+  vec4 t0 = texelFetch(u_sampler_triangle_data, idx0, 0);
+  vec4 t1 = texelFetch(u_sampler_triangle_data, idx1, 0);
+  vec4 t2 = texelFetch(u_sampler_triangle_data, idx2, 0);
 
   float handedness = (t0.w == t1.w && t0.w == t2.w) ? t0.w : 0.0;
   vec3 tangent = normalize((1.0 - uv.x - uv.y) * t0.xyz + uv.x * t1.xyz + uv.y * t2.xyz);
@@ -148,22 +148,22 @@ vec4 calculateInterpolatedVertexColors(const in uint index, const in vec2 hit_uv
   ivec2 idx0 = getStructParameterTexCoord(index, COLOR_OFFSET, TRIANGLE_STRIDE);
   ivec2 idx1 = getStructParameterTexCoord(index, COLOR_OFFSET + VERTEX_STRIDE, TRIANGLE_STRIDE);
   ivec2 idx2 = getStructParameterTexCoord(index, COLOR_OFFSET + 2u * VERTEX_STRIDE, TRIANGLE_STRIDE);
-  vec4 c0 = texelFetch(u_sampler2D_TriangleData, idx0, 0);
-  vec4 c1 = texelFetch(u_sampler2D_TriangleData, idx1, 0);
-  vec4 c2 = texelFetch(u_sampler2D_TriangleData, idx2, 0);
+  vec4 c0 = texelFetch(u_sampler_triangle_data, idx0, 0);
+  vec4 c1 = texelFetch(u_sampler_triangle_data, idx1, 0);
+  vec4 c2 = texelFetch(u_sampler_triangle_data, idx2, 0);
 
   return (1.0 - hit_uv.x - hit_uv.y) * c0 + hit_uv.x * c1 + hit_uv.y * c2;
 }
 
-bool bvh_IntersectRayBox(const in Ray r, const in float tfar, int pn, out int si, out int ei) {
+bool bvh_IntersectRayBox(const in bvh_ray r, const in float tfar, int pn, out int si, out int ei) {
   int idx_x0 = int(pn * 2 + 0) % int(MAX_TEXTURE_SIZE);
   int idx_y0 = int(pn * 2 + 0) / int(MAX_TEXTURE_SIZE);
 
   int idx_x1 = int(pn * 2 + 1) % int(MAX_TEXTURE_SIZE);
   int idx_y1 = int(pn * 2 + 1) / int(MAX_TEXTURE_SIZE);
 
-  vec4 nodeA = texelFetch(u_sampler2D_BVHData, ivec2(idx_x0, idx_y0), 0);
-  vec4 nodeB = texelFetch(u_sampler2D_BVHData, ivec2(idx_x1, idx_y1), 0);
+  vec4 nodeA = texelFetch(u_sampler_bvh, ivec2(idx_x0, idx_y0), 0);
+  vec4 nodeB = texelFetch(u_sampler_bvh, ivec2(idx_x1, idx_y1), 0);
   vec3 aabb[2];
   aabb[0] = nodeA.xyz;
   aabb[1] = nodeB.xyz;
@@ -181,7 +181,7 @@ bool bvh_IntersectRayBox(const in Ray r, const in float tfar, int pn, out int si
     - sort out the many tfars
     - sort the needed data in ray payload and return values
 */
-bool intersectSceneTriangles_BVH(const in Ray r, out HitInfo hit) {
+bool intersectSceneTriangles_BVH(const in bvh_ray r, out bvh_hit hit) {
   hit.tfar = r.tfar;
   hit.triIndex = -1;
 
@@ -205,7 +205,7 @@ bool intersectSceneTriangles_BVH(const in Ray r, out HitInfo hit) {
           float t = 0.0;
           vec2 uv;
           vec3 p0, p1, p2;
-          getSceneTriangle(uint(i), p0, p1, p2);
+          get_triangle(uint(i), p0, p1, p2);
           if (intersectTriangle(r, p0, p1, p2, hit.tfar, t, uv)) {
             hit.tfar = t;
             hit.triIndex = i;
@@ -226,13 +226,13 @@ bool intersectSceneTriangles_BVH(const in Ray r, out HitInfo hit) {
   return foundHit;
 }
 
-bool intersectSceneTriangles_Bruteforce(const in Ray r, out HitInfo hit) {
+bool intersectSceneTriangles_Bruteforce(const in bvh_ray r, out bvh_hit hit) {
   hit.tfar = r.tfar;
   hit.triIndex = -1;
 
   for (int i = 0; i < int(NUM_TRIANGLES); i++) {
     vec3 p0, p1, p2;
-    getSceneTriangle(uint(i), p0, p1, p2);
+    get_triangle(uint(i), p0, p1, p2);
 
     float t = 0.0;
     vec2 uv;
@@ -247,19 +247,19 @@ bool intersectSceneTriangles_Bruteforce(const in Ray r, out HitInfo hit) {
   return hit.triIndex >= 0;
 }
 
-bool rt_kernel_intersect_nearest(const in Ray r, out HitInfo hit) {
+bool bvh_intersect_nearest(const in bvh_ray r, out bvh_hit hit) {
   // return intersectSceneTriangles_Bruteforce(r, hit);
   return intersectSceneTriangles_BVH(r, hit);
 }
 
 bool isVisible(const in vec3 p0, const in vec3 p1) {
-  Ray r = rt_kernel_create_ray(normalize(p1 - p0), p0, length(p1 - p0));
-  HitInfo hit;
-  return !rt_kernel_intersect_nearest(r, hit); //!!TOOPT: add an early hit function here
+  bvh_ray r = bvh_create_ray(normalize(p1 - p0), p0, length(p1 - p0));
+  bvh_hit hit;
+  return !bvh_intersect_nearest(r, hit); //!!TOOPT: add an early hit function here
 }
 
 bool isOccluded(const in vec3 p0, const in vec3 dir) {
-  Ray r = rt_kernel_create_ray(normalize(dir), p0, TFAR_MAX);
-  HitInfo hit;
-  return rt_kernel_intersect_nearest(r, hit); //!!TOOPT: add an early hit function here
+  bvh_ray r = bvh_create_ray(normalize(dir), p0, TFAR_MAX);
+  bvh_hit hit;
+  return bvh_intersect_nearest(r, hit); //!!TOOPT: add an early hit function here
 }

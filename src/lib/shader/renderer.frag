@@ -19,8 +19,6 @@ precision highp float;
 precision highp sampler2D;
 precision highp sampler2DArray;
 
-#include <pathtracing_defines>
-
 in vec2 v_uv;
 
 uniform int u_int_FrameCount;
@@ -29,25 +27,26 @@ uniform float u_float_FocalLength;
 uniform vec3 u_vec3_CameraPosition;
 uniform vec2 u_vec2_InverseResolution;
 uniform mat4 u_mat4_ViewMatrix;
-uniform int u_int_maxBounces;
+uniform int u_max_bounces;
 uniform bool u_bool_forceIBLEval;
 uniform float u_float_iblRotation;
 uniform float u_float_rayEps;
 
 uniform sampler2D u_sampler2D_PreviousTexture;
 
-uniform sampler2D u_sampler2D_TriangleData;
-uniform sampler2D u_sampler2D_BVHData;
-uniform sampler2D u_sampler2D_MaterialData;
-uniform sampler2D u_sampler2D_MaterialTexInfoData;
+// Pathracing data buffers
+uniform sampler2D u_sampler_triangle_data;
+uniform sampler2D u_sampler_bvh;
+// uniform sampler2D u_sampler_material_data;
+// uniform sampler2D u_sampler_material_texinfo_data;
+
+// Env map buffers
 uniform sampler2D u_sampler_EnvMap;
 uniform sampler2D u_sampler_EnvMap_pdf;
 uniform sampler2D u_sampler_EnvMap_cdf;
 uniform sampler2D u_sampler_EnvMap_yPdf;
 uniform sampler2D u_sampler_EnvMap_yCdf;
 uniform ivec2 u_ivec2_IblResolution;
-
-#include <pathtracing_lights>
 
 uniform int u_int_DebugMode;
 uniform int u_int_RenderMode;
@@ -57,59 +56,20 @@ uniform vec4 u_BackgroundColor;
 
 layout(location = 0) out vec4 out_FragColor;
 
-struct MaterialData {
-  // 0
-  vec3 albedo;
-  float metallic;
 
-  // 1
-  float roughness;
-  float anisotropy;
-  float anisotropyRotation;
-  float transparency;
+// struct Light {
+//     vec3 position;
+//     float type;
+//     vec3 emission;
+//     float pad;
+// };
+// void unpackLightData(uint lightIdx, out Light light) {
+//     vec4 val;
+//     val = texelFetch(u_sampler2D_LightData, getStructParameterTexCoord(lightIdx, 0u, LIGHT_SIZE),
+//     0); light.position = val.xyz; light.type = val.w; val = texelFetch(u_sampler2D_LightData,
+//     getStructParameterTexCoord(lightIdx, 1u, LIGHT_SIZE), 0); light.emission = val.xyz;
+// }
 
-  // 2
-  float cutoutOpacity;
-  bool doubleSided;
-  float normalScale;
-  float ior;
-
-  // 3
-  float specular;
-  vec3 specularTint;
-
-  // 4
-  float sheenRoughness;
-  vec3 sheenColor;
-
-  // 5
-  float normalScaleClearcoat;
-  vec3 emission;
-
-  // 6
-  float clearcoat;
-  float clearcoatRoughness;
-  float translucency;
-  float alphaCutoff;
-
-  // 8
-  float attenuationDistance;
-  vec3 attenuationColor;
-
-  // 9
-  vec3 subsurfaceColor;
-  bool thinWalled;
-
-  // 10
-  vec3 anisotropyDirection;
-  float pad;
-
-  // 11
-  float iridescence;
-  float iridescenceIor;
-  float iridescenceThicknessMinimum;
-  float iridescenceThicknessMaximum;
-};
 
 struct MaterialClosure {
   vec3 albedo;
@@ -145,20 +105,6 @@ struct MaterialClosure {
   float iridescence_thickness;
 };
 
-// struct Light {
-//     vec3 position;
-//     float type;
-//     vec3 emission;
-//     float pad;
-// };
-// void unpackLightData(uint lightIdx, out Light light) {
-//     vec4 val;
-//     val = texelFetch(u_sampler2D_LightData, getStructParameterTexCoord(lightIdx, 0u, LIGHT_SIZE),
-//     0); light.position = val.xyz; light.type = val.w; val = texelFetch(u_sampler2D_LightData,
-//     getStructParameterTexCoord(lightIdx, 1u, LIGHT_SIZE), 0); light.emission = val.xyz;
-// }
-
-
 struct RenderState {
   vec3 hitPos;
   vec3 normal;
@@ -171,24 +117,23 @@ struct RenderState {
   MaterialClosure closure;
 };
 
-struct TexInfo {
-  int texArrayIdx;
-  int texIdx;
-  int texCoordSet;
-  int pad;
-  vec2 texOffset;
-  vec2 texScale;
-};
 
-#include <pathtracing_rng>
-#include <pathtracing_utils>
-#include <pathtracing_tex_array_lookup>
-#include <pathtracing_material>
-#include <pathtracing_rt_kernel>
-
-
-#include <pathtracing_dspbr>
+#include <rng>
+#include <constants>
+#include <material_constants>
+#include <mesh_constants>
+#include <tex_array_lookup>
+#include <utils>
+#include <bvh>
+#include <material>
+#include <fresnel>
+#include <diffuse>
+#include <iridescence>
+#include <microfacet>
+#include <sheen>
+#include <dspbr>
 #include <lighting>
+
 
 const int RM_PT = 0;
 const int RM_MISPTDL = 1;
@@ -197,25 +142,25 @@ const int RM_PTDL = 2;
 ///////////////////////////////////////////////////////////////////////////////
 // Pathtracing Integrator Common
 ///////////////////////////////////////////////////////////////////////////////
-void fillRenderState(const in Ray r, const in HitInfo hit, out RenderState rs) {
+void fillRenderState(const in bvh_ray r, const in bvh_hit hit, out RenderState rs) {
   rs.hitPos = r.org + r.dir * hit.tfar;
 
   uint triIdx = uint(hit.triIndex);
 
-  // rs.uv1 = calculateInterpolatedUV(hit.triIndex, hit.uv, 1);
+  // rs.uv1 = compute_interpolated_uv(hit.triIndex, hit.uv, 1);
   rs.wi = -r.dir;
 
   vec3 p0, p1, p2;
-  getSceneTriangle(triIdx, p0, p1, p2);
+  get_triangle(triIdx, p0, p1, p2);
   rs.geometryNormal = compute_triangle_normal(p0, p1, p2);
-  rs.normal = calculateInterpolatedNormal(triIdx, hit.uv);
+  rs.normal = compute_interpolated_normal(triIdx, hit.uv);
 
-  rs.uv0 = calculateInterpolatedUV(triIdx, hit.uv, 0);
-  rs.tangent = calculateInterpolatedTangent(triIdx, hit.uv, rs.normal);
+  rs.uv0 = compute_interpolated_uv(triIdx, hit.uv, 0);
+  rs.tangent = compute_interpolated_tangent(triIdx, hit.uv, rs.normal);
 
   vec4 vertexColor = calculateInterpolatedVertexColors(triIdx, hit.uv);
 
-  uint matIdx = getMaterialIndex(triIdx);
+  uint matIdx = get_material_idx(triIdx);
   configure_material(matIdx, rs, rs.closure, vertexColor);
 
   float bsdf_selection_pdf;
@@ -270,7 +215,7 @@ bool check_russian_roulette_path_termination(int bounce, inout vec3 path_weight)
 #include <pt_integrator>
 #include <misptdl_integrator>
 
-Ray calcuateViewRay(float r0, float r1) {
+bvh_ray calcuateViewRay(float r0, float r1) {
   // box filter
   vec2 pixelOffset = (vec2(r0, r1) * 2.0) * u_vec2_InverseResolution;
 
@@ -282,13 +227,13 @@ Ray calcuateViewRay(float r0, float r1) {
   fragPosView = mat3(u_mat4_ViewMatrix) * fragPosView;
   vec3 origin = u_vec3_CameraPosition;
 
-  return rt_kernel_create_ray(fragPosView, origin, TFAR_MAX);
+  return bvh_create_ray(fragPosView, origin, TFAR_MAX);
 }
 
 void main() {
-  init_RNG(u_int_FrameCount * u_int_maxBounces);
+  init_rng(u_int_FrameCount * u_max_bounces);
 
-  Ray r = calcuateViewRay(rng_NextFloat(), rng_NextFloat());
+  bvh_ray r = calcuateViewRay(rng_NextFloat(), rng_NextFloat());
 
   vec4 contribution;
   if (u_int_RenderMode == RM_PT)

@@ -1,17 +1,17 @@
-vec4 trace_pt(Ray r)
+vec4 trace_pt(bvh_ray r)
 {
-  HitInfo hit;
+  bvh_hit hit;
   vec3 path_weight = vec3(1.0);
   vec3 contribution = vec3(0);
 
   bool last_bounce_specular = true; // pinhole camera is considered singular
 
   int bounce = 0;
-  while(bounce <= u_int_maxBounces || last_bounce_specular)
+  while(bounce <= u_max_bounces || last_bounce_specular)
   {
     if(check_russian_roulette_path_termination(bounce, path_weight)) break;
 
-    if (rt_kernel_intersect_nearest(r, hit)) { // primary camera ray
+    if (bvh_intersect_nearest(r, hit)) { // primary camera ray
       RenderState rs;
       fillRenderState(r, hit, rs);
 
@@ -29,7 +29,7 @@ vec4 trace_pt(Ray r)
       if(!sample_bsdf_bounce(rs, bounce_weight, bounce_pdf)) break; //absorped
       path_weight *= bounce_weight;
 
-      r = rt_kernel_create_ray(rs.wo, rs.hitPos + fix_normal(rs.geometryNormal, rs.wo) * u_float_rayEps, TFAR_MAX);
+      r = bvh_create_ray(rs.wo, rs.hitPos + fix_normal(rs.geometryNormal, rs.wo) * u_float_rayEps, TFAR_MAX);
       bounce++;
     }
     else {

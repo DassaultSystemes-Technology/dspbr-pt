@@ -17,7 +17,8 @@ import Stats from 'three/examples/jsm/libs/stats.module.js';
 import { GUI } from 'dat.GUI';
 import { SimpleDropzone } from 'simple-dropzone';
 import { ThreeRenderer } from './three_renderer';
-import { PathtracingRenderer, Loader } from '../lib/index';
+import { PathtracingRenderer, WavefrontRenderer, Loader } from '../lib/index';
+import { ThreeSceneTranslator } from '../lib/three_scene_translator';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import * as Assets from './asset_index';
@@ -51,8 +52,12 @@ class App {
   autoScaleScene = false;
   autoRotate = false;
   interactionScale = 0.2;
+  interactionTimeoutId: any;
+  pathtracedInteraction = true;
+  resumePathtracing = false;
 
   sceneBoundingBox: THREE.Box3;
+
 
   constructor() {
     // this.scene = Assets.getScene(0).name;
@@ -83,6 +88,9 @@ class App {
 
     this.controls = new OrbitControls(this.camera, this.canvas);
     this.controls.screenSpacePanning = true;
+    this.controls.enableDamping = false;
+    this.controls.rotateSpeed = 2.0;
+    this.controls.panSpeed = 2.0;
 
     this.controls.addEventListener('change', () => {
       this.camera.updateMatrixWorld();
@@ -90,14 +98,33 @@ class App {
     });
 
     this.controls.addEventListener('start', () => {
-      this.renderer.interruptFrame();
-      this["pixelRatio"] = this.renderer.pixelRatio;
-      this.renderer.pixelRatio = this.interactionScale;
-      this.startPathtracing();
+
+      if (this.pathtracing) {
+        if (this.pathtracedInteraction) {
+          this.renderer.interruptFrame();
+          clearTimeout(this.interactionTimeoutId);
+          this.renderer.setLowResRenderMode(true);
+          this.startPathtracing();
+        } else {
+          this.stopPathtracing();
+          this.startRasterizer();
+          this.resumePathtracing = true;
+        }
+      }
+
     });
 
     this.controls.addEventListener('end', () => {
-      this.renderer.pixelRatio = this["pixelRatio"];
+      if (this.pathtracedInteraction) {
+        this.interactionTimeoutId = setTimeout(() => {
+          this.renderer.setLowResRenderMode(false);
+        }, 500);
+      } else {
+        if (this.resumePathtracing) {
+          this.startPathtracing();
+          this.stopRasterizer();
+        }
+      }
     });
 
     this.controls.mouseButtons = {
@@ -106,13 +133,14 @@ class App {
       RIGHT: THREE.MOUSE.DOLLY
     }
 
-    this.renderer = new PathtracingRenderer({ canvas: this.canvas_pt });
+    this.renderer = new WavefrontRenderer({ canvas: this.canvas_pt });
+    // this.renderer = new PathtracingRenderer({ canvas: this.canvas_pt });
     this.three_renderer = new ThreeRenderer({ canvas: this.canvas_three, powerPreference: "high-performance", alpha: true });
 
     this.renderer.pixelRatio = 0.5;
-    this.renderer.maxBounces = 8;
-    // this.renderer.iblRotation = 180.0;
-    // this.renderer.exposure = Assets.getIBL(0).intensity || 1.4;
+    this.renderer.maxBounces = 5;
+    this.renderer.pixelRatioLowRes = 0.15;
+    this.renderer.iblRotation = 180.0;
 
     window.addEventListener('resize', () => {
       this.resize();
@@ -121,7 +149,6 @@ class App {
     const input = document.createElement('input');
     const dropCtrlOverlay = new SimpleDropzone(this.startpage, input);
     dropCtrlOverlay.on('dropstart', () => {
-      this.showLoadscreen();
       this.hideStartpage();
     });
     dropCtrlOverlay.on('drop', ({ files }) => this.loadDropFiles(files));
@@ -129,7 +156,6 @@ class App {
 
     const dropCtrlCanvas = new SimpleDropzone(this.canvas, input);
     dropCtrlCanvas.on('drop', ({ files }) => {
-      this.showLoadscreen();
       this.loadDropFiles(files);
     });
     // dropCtrl.on('droperror', () => this.hideSpinner());
@@ -142,23 +168,19 @@ class App {
     this.initUI();
     this.initStats();
 
-    if ( window.location.hash ) {
+    if (window.location.hash) {
       const uris = window.location.hash.split("#");
 
-      if(uris.length == 2) {
+      if (uris.length == 2) {
         this.loadScenario(uris[1], this.current_ibl);
         this.hideStartpage();
       }
-      if(uris.length == 3) {
+      else if (uris.length == 3) {
         this.loadScenario(uris[1], uris[2]);
         this.hideStartpage();
         console.log(uris);
       }
     }
-
-    // this.loadScenario("https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/IridescenceSuzanne/glTF/IridescenceSuzanne.gltf", this.current_ibl);
-    // this.hideStartpage();
-
   }
 
   private currentIblUrl() {
@@ -166,42 +188,59 @@ class App {
   }
 
   private loadDropFiles(fileMap) {
-    const files: [string, File][] = Array.from(fileMap)
-    if (files.length == 1 && files[0][1].name.match(/\.hdr$/)) {
-      this.status.innerHTML = "Loading HDR...";
-      // const url = URL.createObjectURL(e.dataTransfer.getData('text/html'));
-      Loader.loadIBL(URL.createObjectURL(files[0][1])).then((ibl) => {
-        this.renderer.setIBL(ibl);
-        this.three_renderer.setIBL(ibl);
-        const iblNode = document.getElementById("ibl-info");
-        iblNode.innerHTML = '';
-        this.hideLoadscreen();
-      });
-    } else {
-      this.status.innerText = "Loading scene...";
-      const scenePromise = Loader.loadSceneFromBlobs(files, this.autoScaleScene);
-      const iblPromise = Loader.loadIBL(this.currentIblUrl());
-      this.setIBLInfo(this.current_ibl, Assets.ibls[this.current_ibl].credit)
-
-      Promise.all([scenePromise, iblPromise]).then(([gltf, ibl]) => {
-        this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
-        this.updateCameraFromBoundingBox();
-        this.renderer.setIBL(ibl);
-
-        this.renderer.setScene(gltf.scene, gltf).then(() => {
-          this.startPathtracing();
+    fileMap.forEach((value, key) => {
+      var foundHDR = false;
+      if (key.match(/\.hdr$/)) {
+        this.showLoadscreen("Loading HDR...");
+        Loader.loadIBL(URL.createObjectURL(value)).then((ibl) => {
+          this.renderer.setIBL(ibl);
+          this.three_renderer.setIBL(ibl);
+          this.setIBLInfo(value.name);
+          this.hideLoadscreen();
+          foundHDR = true;
         });
+      }
+      if (key.match(/\.glb$/) || key.match(/\.gltf$/)) {
+        if (this.pathtracing)
+          this.stopPathtracing();
 
-        this.three_renderer.setScene(new THREE.Scene().add(gltf.scene));
-        this.three_renderer.setIBL(ibl);
-        this.centerView();
+        this.showLoadscreen("Loading Scene...");
+        const files: [string, File][] = Array.from(fileMap);
+        Loader.loadSceneFromBlobs(files, this.autoScaleScene).then((gltf) => {
+          this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
+          this.updateCameraFromBoundingBox();
+          this.centerView();
 
-        this.hideLoadscreen();
-      });
-    }
+          ThreeSceneTranslator.translateThreeScene(gltf.scene, gltf).then((pathtracingSceneData) => {
+            this.renderer.setScene(pathtracingSceneData);
+            if (this.pathtracing)
+              this.startPathtracing();
+
+            this.three_renderer.setScene(new THREE.Scene().add(gltf.scene));
+            if (!this.pathtracing) {
+              this.startRasterizer();
+            }
+            this.hideLoadscreen();
+          });
+
+          if (!foundHDR) {
+            Loader.loadIBL(this.currentIblUrl()).then((ibl) => {
+              this.setIBLInfo(this.current_ibl, Assets.ibls[this.current_ibl].credit)
+              this.renderer.setIBL(ibl);
+              this.three_renderer.setIBL(ibl);
+            });
+          }
+        });
+      }
+    });
   }
 
-  private loadScenario(sceneUrl, iblUrl) {
+
+  private async loadScenario(sceneUrl, iblUrl) {
+    if (this.pathtracing)
+      this.stopPathtracing();
+    this.showLoadscreen("Loading Scene...");
+
     const sceneKey = sceneUrl.replaceAll('%20', ' ');
     if (sceneKey in Assets.scenes) {
       const scene = Assets.scenes[sceneKey];
@@ -215,29 +254,30 @@ class App {
       const ibl = Assets.ibls[iblKey];
       this.setIBLInfo(iblKey, ibl.credit);
       iblUrl = ibl.url;
-    }else {
+    } else {
       this.setIBLInfo(iblUrl);
     }
 
-    const scenePromise = Loader.loadSceneFromUrl(sceneUrl, this.autoScaleScene);
-    const iblPromise = Loader.loadIBL(iblUrl);
+    const gltf = await Loader.loadSceneFromUrl(sceneUrl, this.autoScaleScene);
+    const ibl = await Loader.loadIBL(iblUrl);
 
-    Promise.all([scenePromise, iblPromise]).then(([gltf, ibl]) => {
-      this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
-      this.updateCameraFromBoundingBox();
+    this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
+    this.updateCameraFromBoundingBox();
+    this.centerView();
+    this.renderer.setIBL(ibl);
 
-      this.renderer.setIBL(ibl);
-      this.renderer.setScene(gltf.scene, gltf).then(() => {
-        if (this.pathtracing)
-          this.startPathtracing();
-      });
+    const pathtracingSceneData = await ThreeSceneTranslator.translateThreeScene(gltf.scene, gltf);
+    this.renderer.setScene(pathtracingSceneData);
+    if (this.pathtracing)
+      this.startPathtracing();
 
-      this.three_renderer.setScene(new THREE.Scene().add(gltf.scene));
-      this.three_renderer.setIBL(ibl);
-      if (!this.pathtracing) {
-        this.startRasterizer();
-      }
-    });
+    this.three_renderer.setScene(new THREE.Scene().add(gltf.scene));
+    this.three_renderer.setIBL(ibl);
+    if (!this.pathtracing) {
+      this.startRasterizer();
+    }
+
+    this.hideLoadscreen();
   }
 
 
@@ -253,7 +293,8 @@ class App {
   }
 
   private startRasterizer() {
-    this.stopPathtracing();
+    if (this.pathtracing)
+      this.stopPathtracing();
     this.three_renderer.render(this.camera, () => {
       var destCtx = this.canvas.getContext("2d");
       destCtx.drawImage(this.canvas_three, 0, 0);
@@ -332,7 +373,7 @@ class App {
       return;
 
     this._gui = new GUI();
-    GUI.toggleHide();
+    // GUI.toggleHide();
     this._gui.domElement.classList.add("hidden");
     this._gui.width = 300;
 
@@ -367,6 +408,7 @@ class App {
       const sceneInfo = Assets.scenes[value];
       this.loadScenario(sceneInfo.url, this.current_ibl);
       this.setSceneInfo(value, sceneInfo.credit);
+      this.hideStartpage();
     });
 
     // this._gui.add(this, 'autoScaleScene').name('Autoscale Scene');
@@ -375,6 +417,8 @@ class App {
       this.controls.autoRotate = value;
       this.renderer.resetAccumulation();
     });
+
+    scene.open();
 
     const ibl_names = Object.keys(Assets.ibls);
     let lighting = this._gui.addFolder('Lighting');
@@ -413,7 +457,7 @@ class App {
     });
 
     interator.add(this.renderer, 'debugMode', this.renderer.debugModes).name('Debug Mode');
-    interator.add(this.renderer, 'renderMode', this.renderer.renderModes).name('Integrator');
+    // interator.add(this.renderer, 'renderMode', this.renderer.renderModes).name('Integrator');
     interator.add(this.renderer, 'maxBounces').name('Bounce Depth').min(0).max(32).step(1);
     // interator.add(this.renderer, 'sheenG', this.renderer.sheenGModes).name('Sheen G');
     interator.add(this.renderer, 'rayEps').name('Ray Offset');
@@ -430,7 +474,8 @@ class App {
     display.add(this.renderer, 'enableGamma').name('Gamma');
 
     display.add(this.renderer, 'pixelRatio').name('Pixel Ratio').min(0.1).max(1.0);
-    display.add(this, 'interactionScale').name('Interaction Ratio').min(0.1).max(1.0).step(0.1);
+    display.add(this, 'pathtracedInteraction').name('Pathtraced Interaction');
+    display.add(this.renderer, 'pixelRatioLowRes').name('Interaction Ratio').min(0.1).max(1.0).step(0.1);
     display.open();
 
     let background = this._gui.addFolder('Background');
@@ -451,10 +496,11 @@ class App {
 
   hideStartpage() {
     this.startpage.style.visibility = "hidden";
-    GUI.toggleHide();
+    // GUI.toggleHide();
   }
 
-  showLoadscreen() {
+  showLoadscreen(msg: string) {
+    this.status.innerText = "Loading Scene...";
     this.loadscreen.style.visibility = "visible";
     this.spinner.style.visibility = "visible";
   }
@@ -466,12 +512,12 @@ class App {
 
   setIBLInfo(name: string, credit?: any) {
     document.getElementById("ibl-info").innerHTML = `IBL: ${name}`;
-    if(credit) document.getElementById("ibl-info").innerHTML += ` - ${credit}`;
+    if (credit) document.getElementById("ibl-info").innerHTML += ` - ${credit}`;
   }
 
   setSceneInfo(name: string, credit?: any) {
     document.getElementById("scene-info").innerHTML = `Scene: ${name}`;
-    if(credit) document.getElementById("scene-info").innerHTML += ` - ${credit}`;
+    if (credit) document.getElementById("scene-info").innerHTML += ` - ${credit}`;
   }
 }
 

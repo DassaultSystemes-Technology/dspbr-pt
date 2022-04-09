@@ -38,7 +38,7 @@
     "prepublishOnly": "shx mv README.md src/viewer/README.md && shx cp src/lib/README.md README.md",
     "postpublish": "shx mv src/viewer/README.md README.md",
     "render": "electron src/cli/offscreen.js --enable-logging",
-    "postinstall": "npx patch-package && shx mkdir src/viewer/assets"
+    "postinstall": "npx patch-package"
   },
   "targets": {
     "viewer": {
