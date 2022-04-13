@@ -21,16 +21,25 @@ precision highp sampler2DArray;
 
 in vec2 v_uv;
 
-uniform int u_int_FrameCount;
-uniform float u_float_FilmHeight;
-uniform float u_float_FocalLength;
-uniform vec3 u_vec3_CameraPosition;
-uniform vec2 u_vec2_InverseResolution;
-uniform mat4 u_mat4_ViewMatrix;
-uniform int u_max_bounces;
-uniform bool u_bool_forceIBLEval;
-uniform float u_ibl_rotation;
-uniform float u_float_ray_eps;
+ layout(std140) uniform PathTracingUniformBlock {
+    mat4  u_mat4_ViewMatrix;
+    vec4 u_BackgroundColor;
+    vec4  u_vec3_CameraPosition;
+    vec2  u_vec2_InverseResolution;
+    ivec2 u_ibl_resolution;
+    float u_int_FrameCount;
+    float u_int_DebugMode;
+    float u_int_SheenG;
+    float u_bool_UseIBL;
+    float u_ibl_rotation;
+    float u_bool_ShowBackground;
+    float u_max_bounces;
+    float u_float_FocalLength;
+    float u_bool_forceIBLEval;
+    float u_float_ray_eps;
+    float u_int_RenderMode;
+    float  u_pad;
+};
 
 uniform sampler2D u_sampler2D_PreviousTexture;
 
@@ -44,13 +53,7 @@ uniform sampler2D u_sampler_env_map_pdf;
 uniform sampler2D u_sampler_env_map_cdf;
 uniform sampler2D u_sampler_env_map_yPdf;
 uniform sampler2D u_sampler_env_map_yCdf;
-uniform ivec2 u_ibl_resolution;
 
-uniform int u_int_DebugMode;
-uniform int u_int_RenderMode;
-uniform bool u_bool_UseIBL;
-uniform bool u_bool_ShowBackground;
-uniform vec4 u_BackgroundColor;
 
 layout(location = 0) out vec4 out_FragColor;
 
@@ -161,30 +164,30 @@ bvh_ray calcuateViewRay(float r0, float r1) {
 
   float aspect = u_vec2_InverseResolution.y / u_vec2_InverseResolution.x;
 
-  vec2 uv = (v_uv * vec2(aspect, 1.0) + pixelOffset) * u_float_FilmHeight;
+  vec2 uv = (v_uv * vec2(aspect, 1.0) + pixelOffset) * u_vec3_CameraPosition.w;
   vec3 fragPosView = normalize(vec3(uv.x, uv.y, -u_float_FocalLength));
 
   fragPosView = mat3(u_mat4_ViewMatrix) * fragPosView;
-  vec3 origin = u_vec3_CameraPosition;
+  vec3 origin = u_vec3_CameraPosition.xyz;
 
   return bvh_create_ray(fragPosView, origin, TFAR_MAX);
 }
 
 void main() {
-  rng_init(u_int_FrameCount * u_max_bounces);
+  rng_init(int(u_int_FrameCount) * int(u_max_bounces));
 
   bvh_ray r = calcuateViewRay(rng_float(), rng_float());
 
   vec4 contribution;
-  if (u_int_RenderMode == RM_PT)
+  if (int(u_int_RenderMode) == RM_PT)
     contribution = trace_pt(r);
-  if (u_int_RenderMode == RM_MISPTDL)
+  if (int(u_int_RenderMode) == RM_MISPTDL)
     contribution = trace_misptdl(r);
-  if (u_int_DebugMode > 0)
+  if (int(u_int_DebugMode) > 0)
     contribution = trace_debug(r);
 
   vec4 previousFrameColor = texelFetch(u_sampler2D_PreviousTexture, ivec2(gl_FragCoord.xy), 0);
-  contribution = (previousFrameColor * float(u_int_FrameCount - 1) + contribution) / float(u_int_FrameCount);
+  contribution = (previousFrameColor * (u_int_FrameCount - 1.0) + contribution) / u_int_FrameCount;
 
   out_FragColor = contribution;
 }

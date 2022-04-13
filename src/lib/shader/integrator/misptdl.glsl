@@ -9,7 +9,7 @@ vec4 trace_misptdl(bvh_ray r)
 
   int bounce = 0;
   vec3 radiance = vec3(0.0);
-  while(bounce <= u_max_bounces || last_bounce_specular)
+  while(bounce <= int(u_max_bounces) || last_bounce_specular)
   {
     if(check_russian_roulette_path_termination(bounce, path_weight)) break;
 
@@ -33,7 +33,7 @@ vec4 trace_misptdl(bvh_ray r)
         vec3 ibl_sample_dir;
         vec3 ibl_radiance = vec3(0);
 
-        if(u_bool_UseIBL)
+        if(bool(u_bool_UseIBL))
         {
           vec3 ibl_sample_dir = sample_ibl_dir_importance(rng_float(), rng_float(), ibl_sample_pdf);
 
@@ -65,9 +65,9 @@ vec4 trace_misptdl(bvh_ray r)
       bounce++;
     }
     else {
-      if(u_bool_UseIBL) {
+      if(bool(u_bool_UseIBL)) {
         if(bounce == 0) {
-            if (u_bool_ShowBackground) {
+            if (bool(u_bool_ShowBackground)) {
               return vec4(eval_ibl(r.dir), 1.0);
             } else {
               return vec4(pow(u_BackgroundColor.xyz, vec3(2.2)), u_BackgroundColor.w);

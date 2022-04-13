@@ -7,7 +7,7 @@ vec4 trace_pt(bvh_ray r)
   bool last_bounce_specular = true; // pinhole camera is considered singular
 
   int bounce = 0;
-  while(bounce <= u_max_bounces || last_bounce_specular)
+  while(bounce <= int(u_max_bounces) || last_bounce_specular)
   {
     if(check_russian_roulette_path_termination(bounce, path_weight)) break;
 
@@ -33,7 +33,7 @@ vec4 trace_pt(bvh_ray r)
       bounce++;
     }
     else {
-      if(u_bool_UseIBL) {
+      if(bool(u_bool_UseIBL)) {
         contribution += eval_ibl(r.dir) * path_weight;
       }
       break;

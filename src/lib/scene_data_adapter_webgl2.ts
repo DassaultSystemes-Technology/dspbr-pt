@@ -80,8 +80,8 @@ export class PathtracingSceneDataAdapterWebGL2 {
     var _textureInfoUniformBuffer = gl.createBuffer();
     gl.bindBuffer(gl.UNIFORM_BUFFER, _textureInfoUniformBuffer);
     const texInfoListFlat = this._sceneData.getFlatTextureInfoBuffer();
-    gl.bufferData(gl.UNIFORM_BUFFER, texInfoListFlat, gl.DYNAMIC_DRAW);
-    gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, _textureInfoUniformBuffer);
+    gl.bufferData(gl.UNIFORM_BUFFER, texInfoListFlat, gl.STATIC_DRAW);
+    gl.bindBufferBase(gl.UNIFORM_BUFFER, 1, _textureInfoUniformBuffer);
 
     this._materialBufferShaderChunk = "";
     let numMaterialsToUpload = this._sceneData.num_materials;
@@ -99,8 +99,8 @@ export class PathtracingSceneDataAdapterWebGL2 {
       const end = start + numMaterialsThisBlock * numValuesPerMaterial;
       const materialsArraySlice = materialListFlat.slice(start, end);
       console.log(materialsArraySlice);
-      gl.bufferData(gl.UNIFORM_BUFFER, materialsArraySlice, gl.DYNAMIC_DRAW);
-      gl.bindBufferBase(gl.UNIFORM_BUFFER, i+1, materialUniformBuffer);
+      gl.bufferData(gl.UNIFORM_BUFFER, materialsArraySlice, gl.STATIC_DRAW);
+      gl.bindBufferBase(gl.UNIFORM_BUFFER, i+2, materialUniformBuffer);
       this._materialUniformBuffers.push(materialUniformBuffer!);
 
       numMaterialsToUpload -= materialsPerBlock;

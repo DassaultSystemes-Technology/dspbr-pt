@@ -8,7 +8,7 @@ vec4 trace_debug(const bvh_ray r) {
     RenderState rs;
     fillRenderState(r, hit, rs);
 
-    if (u_int_DebugMode == 1) {
+    if (int(u_int_DebugMode) == 1) {
       contrib = vec3(rs.closure.albedo);
       // vec3 sampleDir = normalize(vec3(rng_float(), rng_float(),rng_float()));
       // float pdf;
@@ -23,46 +23,46 @@ vec4 trace_debug(const bvh_ray r) {
       // // contrib = vec3(abs(pdf-pdf2));
       // // contrib = abs(dir-sampleDir);
     }
-    if (u_int_DebugMode == 2)
+    if (int(u_int_DebugMode) == 2)
       contrib = vec3(rs.closure.metallic);
-    if (u_int_DebugMode == 3)
+    if (int(u_int_DebugMode) == 3)
       contrib = vec3(rs.closure.alpha, 0.0);
-    if (u_int_DebugMode == 4)
+    if (int(u_int_DebugMode) == 4)
       contrib = rs.closure.n;
-    if (u_int_DebugMode == 5) {
+    if (int(u_int_DebugMode) == 5) {
       contrib = rs.closure.t.xyz;
     }
-    if (u_int_DebugMode == 6) {
+    if (int(u_int_DebugMode) == 6) {
       Geometry g = calculateBasis(rs.closure.n, rs.closure.t);
       contrib = g.b;
     }
-    if (u_int_DebugMode == 7) {
+    if (int(u_int_DebugMode) == 7) {
       contrib = vec3(rs.closure.transparency);
     }
-    if (u_int_DebugMode == 8) {
+    if (int(u_int_DebugMode) == 8) {
       contrib = vec3(rs.uv0, 0.0);
     }
-    if (u_int_DebugMode == 9) {
+    if (int(u_int_DebugMode) == 9) {
       contrib = vec3(rs.closure.clearcoat);
     }
-    if (u_int_DebugMode == 12) {
+    if (int(u_int_DebugMode) == 12) {
       contrib = vec3(rs.closure.specular);
     }
-    if (u_int_DebugMode == 13) {
+    if (int(u_int_DebugMode) == 13) {
       contrib = rs.closure.specular_tint;
     }
-    if (u_int_DebugMode == 14) {
+    if (int(u_int_DebugMode) == 14) {
       contrib = fresnel_schlick(rs.closure.specular_f0, rs.closure.specular_f90, dot(rs.closure.n, rs.wi));
     }
     color = vec4(contrib, 1.0);
   } else { // direct background hit
-    if (u_bool_ShowBackground) {
-      if(u_int_DebugMode == 10) {
+    if (bool(u_bool_ShowBackground)) {
+      if(int(u_int_DebugMode) == 10) {
         vec3 sampleDir = rotate_ibl_dir(r.dir, false);
         float pdf;
         color = vec4(texture(u_sampler_env_map_pdf, dir_to_uv(sampleDir, pdf)).xyz, 1.0) * 10.0;
       }
-      else if(u_int_DebugMode == 11) {
+      else if(int(u_int_DebugMode) == 11) {
         vec3 sampleDir = rotate_ibl_dir(r.dir, false);
         float pdf;
         color = vec4(texture(u_sampler_env_map_cdf, dir_to_uv(sampleDir, pdf)).xyz, 1.0);

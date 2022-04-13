@@ -59,9 +59,8 @@ function getShaderErrorLog(gl: WebGL2RenderingContext, shader: WebGLShader, sour
   return "";
 }
 
-export function createProgramFromSource(gl: WebGL2RenderingContext,
+export async function createProgramFromSource(gl: WebGL2RenderingContext,
   vertexShaderSource: string, fragmentShaderSource: string, shaderChunks?: Map<string, string> ) {
-
 
   if (shaderChunks) {
     console.time("Shader chunk resolve...");
@@ -74,6 +73,8 @@ export function createProgramFromSource(gl: WebGL2RenderingContext,
     console.timeEnd("Shader chunk resolve...");
   }
 
+  var ext = gl.getExtension('KHR_parallel_shader_compile');
+
   let vs = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
   let fs = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
   if (vs && fs) {
@@ -84,17 +85,34 @@ export function createProgramFromSource(gl: WebGL2RenderingContext,
     gl.attachShader(program, vs);
     gl.attachShader(program, fs);
     gl.linkProgram(program);
-    if (gl.getProgramParameter(program, gl.LINK_STATUS)) {
+
+    function checkToUseProgram() {
+      if (gl.getProgramParameter(program!, gl.LINK_STATUS)) {
+        return true;
+      } else {
+        const vsLog = getShaderErrorLog(gl, vs, vertexShaderSource);
+        const fsLog = getShaderErrorLog(gl, fs, fragmentShaderSource);
+        gl.deleteShader(vs);
+        gl.deleteShader(fs);
+        console.log(vsLog);
+        console.log(fsLog);
+        gl.deleteProgram(program);
+        throw new Error("Program link error: " + gl.getProgramInfoLog(program!));
+      }
+    }
+
+    if (ext) {
+      function checkCompletion() {
+        if (gl.getProgramParameter(program!, ext!.COMPLETION_STATUS_KHR) == true) {
+          checkToUseProgram();
+        } else {
+          requestAnimationFrame(checkCompletion);
+        }
+      }
+      requestAnimationFrame(checkCompletion);
       return program;
     } else {
-      const vsLog = getShaderErrorLog(gl, vs, vertexShaderSource);
-      const fsLog = getShaderErrorLog(gl, fs, fragmentShaderSource);
-      gl.deleteShader(vs);
-      gl.deleteShader(fs);
-      gl.deleteProgram(program);
-      console.log(vsLog);
-      console.log(fsLog);
-      throw new Error("Program link error: " + gl.getProgramInfoLog(program));
+      checkToUseProgram();
     }
   } else {
     throw new Error("Shader compile error");

@@ -14,8 +14,6 @@
  */
 
 
-uniform int u_int_SheenG;
-
 const int E_DIFFUSE = 1 << 0;
 const int E_SINGULAR = 1 << 1;
 const int E_REFLECTION = 1 << 2;
