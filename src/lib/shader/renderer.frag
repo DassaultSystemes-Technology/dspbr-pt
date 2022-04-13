@@ -29,24 +29,22 @@ uniform vec2 u_vec2_InverseResolution;
 uniform mat4 u_mat4_ViewMatrix;
 uniform int u_max_bounces;
 uniform bool u_bool_forceIBLEval;
-uniform float u_float_iblRotation;
-uniform float u_float_rayEps;
+uniform float u_ibl_rotation;
+uniform float u_float_ray_eps;
 
 uniform sampler2D u_sampler2D_PreviousTexture;
 
 // Pathracing data buffers
 uniform sampler2D u_sampler_triangle_data;
 uniform sampler2D u_sampler_bvh;
-// uniform sampler2D u_sampler_material_data;
-// uniform sampler2D u_sampler_material_texinfo_data;
 
 // Env map buffers
-uniform sampler2D u_sampler_EnvMap;
-uniform sampler2D u_sampler_EnvMap_pdf;
-uniform sampler2D u_sampler_EnvMap_cdf;
-uniform sampler2D u_sampler_EnvMap_yPdf;
-uniform sampler2D u_sampler_EnvMap_yCdf;
-uniform ivec2 u_ivec2_IblResolution;
+uniform sampler2D u_sampler_env_map;
+uniform sampler2D u_sampler_env_map_pdf;
+uniform sampler2D u_sampler_env_map_cdf;
+uniform sampler2D u_sampler_env_map_yPdf;
+uniform sampler2D u_sampler_env_map_yCdf;
+uniform ivec2 u_ibl_resolution;
 
 uniform int u_int_DebugMode;
 uniform int u_int_RenderMode;
@@ -56,76 +54,20 @@ uniform vec4 u_BackgroundColor;
 
 layout(location = 0) out vec4 out_FragColor;
 
-
-// struct Light {
-//     vec3 position;
-//     float type;
-//     vec3 emission;
-//     float pad;
-// };
-// void unpackLightData(uint lightIdx, out Light light) {
-//     vec4 val;
-//     val = texelFetch(u_sampler2D_LightData, getStructParameterTexCoord(lightIdx, 0u, LIGHT_SIZE),
-//     0); light.position = val.xyz; light.type = val.w; val = texelFetch(u_sampler2D_LightData,
-//     getStructParameterTexCoord(lightIdx, 1u, LIGHT_SIZE), 0); light.emission = val.xyz;
-// }
-
-
-struct MaterialClosure {
-  vec3 albedo;
-  float transparency;
-  float translucency;
-  float cutout_opacity;
-  float metallic;
-  float specular;
-  float f0;
-  vec3 specular_f0;
-  vec3 specular_f90;
-  vec3 specular_tint;
-  vec3 emission;
-  vec3 normal;
-  float sheen_roughness;
-  vec3 sheen_color;
-  vec2 alpha;
-  float clearcoat;
-  float clearcoat_alpha;
-  bool thin_walled;
-  bool double_sided;
-  float attenuationDistance;
-  vec3 attenuationColor;
-  float ior;
-  bool backside;
-  vec3 n;
-  vec3 ng;
-  vec4 t;
-  int event_type;
-  float bsdf_selection_pdf;
-  float iridescence;
-  float iridescence_ior;
-  float iridescence_thickness;
-};
-
-struct RenderState {
-  vec3 hitPos;
-  vec3 normal;
-  vec3 geometryNormal;
-  vec4 tangent;
-  vec3 wo;
-  vec3 wi;
-  vec2 uv0;
-  vec2 uv1;
-  MaterialClosure closure;
-};
-
-
+#include <structs>
+#include <texture_accessor>
 #include <rng>
 #include <constants>
-#include <material_constants>
-#include <mesh_constants>
-#include <tex_array_lookup>
 #include <utils>
-#include <bvh>
+
+
+#include <buffer_accessor>
+#include <material_block>
 #include <material>
+
+#include <mesh_constants>
+#include <bvh>
+
 #include <fresnel>
 #include <diffuse>
 #include <iridescence>
@@ -134,10 +76,8 @@ struct RenderState {
 #include <dspbr>
 #include <lighting>
 
-
 const int RM_PT = 0;
 const int RM_MISPTDL = 1;
-const int RM_PTDL = 2;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Pathtracing Integrator Common
@@ -152,11 +92,11 @@ void fillRenderState(const in bvh_ray r, const in bvh_hit hit, out RenderState r
 
   vec3 p0, p1, p2;
   get_triangle(triIdx, p0, p1, p2);
-  rs.geometryNormal = compute_triangle_normal(p0, p1, p2);
-  rs.normal = compute_interpolated_normal(triIdx, hit.uv);
+  rs.ng = compute_triangle_normal(p0, p1, p2);
+  rs.n = compute_interpolated_normal(triIdx, hit.uv);
 
   rs.uv0 = compute_interpolated_uv(triIdx, hit.uv, 0);
-  rs.tangent = compute_interpolated_tangent(triIdx, hit.uv, rs.normal);
+  rs.tangent = compute_interpolated_tangent(triIdx, hit.uv, rs.n);
 
   vec4 vertexColor = calculateInterpolatedVertexColors(triIdx, hit.uv);
 
@@ -164,8 +104,8 @@ void fillRenderState(const in bvh_ray r, const in bvh_hit hit, out RenderState r
   configure_material(matIdx, rs, rs.closure, vertexColor);
 
   float bsdf_selection_pdf;
-  float rr_brdf = rng_NextFloat();
-  importanceSampleBsdf(rs.closure, rr_brdf, rs.wi, bsdf_selection_pdf);
+  float rr_brdf = rng_float();
+  select_bsdf(rs.closure, rr_brdf, rs.wi, bsdf_selection_pdf);
   rs.closure.bsdf_selection_pdf = bsdf_selection_pdf;
 }
 
@@ -173,7 +113,7 @@ void fillRenderState(const in bvh_ray r, const in bvh_hit hit, out RenderState r
 bool sample_bsdf_bounce(inout RenderState rs, out vec3 sampleWeight, out float pdf) {
   bool ignoreBackfaces = false;//(!rs.closure.double_sided && rs.closure.backside);
 
-  if (rng_NextFloat() > rs.closure.cutout_opacity || ignoreBackfaces) {
+  if (rng_float() > rs.closure.cutout_opacity || ignoreBackfaces) {
     rs.closure.event_type |= E_SINGULAR;
     rs.wo = -rs.wi;
     pdf = 1.0;
@@ -182,7 +122,7 @@ bool sample_bsdf_bounce(inout RenderState rs, out vec3 sampleWeight, out float p
   }
   else {
     rs.wo = sample_dspbr(rs.closure, rs.wi,
-                          vec3(rng_NextFloat(), rng_NextFloat(), rng_NextFloat()),
+                          vec3(rng_float(), rng_float(), rng_float()),
                           sampleWeight, pdf);
 
     if (pdf < EPS_PDF) {
@@ -199,7 +139,7 @@ bool sample_bsdf_bounce(inout RenderState rs, out vec3 sampleWeight, out float p
 bool check_russian_roulette_path_termination(int bounce, inout vec3 path_weight)
 {
   if (bounce > RR_START_DEPTH) {
-    float rr = rng_NextFloat();
+    float rr = rng_float();
     if(rr <= RR_TERMINATION_PROB) {
       return false;
     }
@@ -208,16 +148,16 @@ bool check_russian_roulette_path_termination(int bounce, inout vec3 path_weight)
 }
 
 
-///////////////////////////////////////////////////////////////////////////////
-// Ray Generation
-///////////////////////////////////////////////////////////////////////////////
 #include <debug_integrator>
 #include <pt_integrator>
 #include <misptdl_integrator>
 
+///////////////////////////////////////////////////////////////////////////////
+// Ray Generation
+///////////////////////////////////////////////////////////////////////////////
 bvh_ray calcuateViewRay(float r0, float r1) {
   // box filter
-  vec2 pixelOffset = (vec2(r0, r1) * 2.0) * u_vec2_InverseResolution;
+  vec2 pixelOffset = vec2(r0, r1) * u_vec2_InverseResolution;
 
   float aspect = u_vec2_InverseResolution.y / u_vec2_InverseResolution.x;
 
@@ -231,9 +171,9 @@ bvh_ray calcuateViewRay(float r0, float r1) {
 }
 
 void main() {
-  init_rng(u_int_FrameCount * u_max_bounces);
+  rng_init(u_int_FrameCount * u_max_bounces);
 
-  bvh_ray r = calcuateViewRay(rng_NextFloat(), rng_NextFloat());
+  bvh_ray r = calcuateViewRay(rng_float(), rng_float());
 
   vec4 contribution;
   if (u_int_RenderMode == RM_PT)

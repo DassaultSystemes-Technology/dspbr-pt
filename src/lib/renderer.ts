@@ -23,6 +23,7 @@ import shader_constants from '/src/lib/shader/constants.glsl';
 import copy_shader from '/src/lib/shader/copy.glsl';
 import display_shader from '/src/lib/shader/display.frag';
 
+import structs_shader from '/src/lib/shader/structs.glsl';
 import rng_shader from '/src/lib/shader/rng.glsl';
 import utils_shader from '/src/lib/shader/utils.glsl';
 import material_shader from '/src/lib/shader/material.glsl';
@@ -69,7 +70,7 @@ export class PathtracingRenderer {
   private gl: any;
   private canvas: any | undefined;
 
-  private _scene?: PathtracingSceneDataAdapterWebGL2;
+  private scene?: PathtracingSceneDataAdapterWebGL2;
 
   private ibl: WebGLTexture | null = null;
   private iblImportanceSamplingData: IBLImportanceSamplingData = new IBLImportanceSamplingData();
@@ -276,7 +277,7 @@ export class PathtracingRenderer {
 
   stopRendering() {
     this._isRendering = false;
-  };
+};
 
   interruptFrame() {
     cancelAnimationFrame(this._currentAnimationFrameId);
@@ -300,27 +301,27 @@ export class PathtracingRenderer {
     gl.useProgram(this.ptProgram);
     gl.activeTexture(gl.TEXTURE0 + numTextureSlots)
     gl.bindTexture(gl.TEXTURE_2D, this.ibl);
-    gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_sampler_EnvMap"),
+    gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_sampler_env_map"),
       numTextureSlots++);
 
     gl.activeTexture(gl.TEXTURE0 + numTextureSlots)
     gl.bindTexture(gl.TEXTURE_2D, this.iblImportanceSamplingData.pdf);
-    gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_sampler_EnvMap_pdf"),
+    gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_sampler_env_map_pdf"),
       numTextureSlots++);
 
     gl.activeTexture(gl.TEXTURE0 + numTextureSlots)
     gl.bindTexture(gl.TEXTURE_2D, this.iblImportanceSamplingData.cdf);
-    gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_sampler_EnvMap_cdf"),
+    gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_sampler_env_map_cdf"),
       numTextureSlots++);
 
     gl.activeTexture(gl.TEXTURE0 + numTextureSlots)
     gl.bindTexture(gl.TEXTURE_2D, this.iblImportanceSamplingData.yPdf);
-    gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_sampler_EnvMap_yPdf"),
+    gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_sampler_env_map_yPdf"),
       numTextureSlots++);
 
     gl.activeTexture(gl.TEXTURE0 + numTextureSlots)
     gl.bindTexture(gl.TEXTURE_2D, this.iblImportanceSamplingData.yCdf);
-    gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_sampler_EnvMap_yCdf"),
+    gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_sampler_env_map_yCdf"),
       numTextureSlots++);
 
     let filmHeight = Math.tan(camera.fov * 0.5 * Math.PI / 180.0) * camera.near;
@@ -338,7 +339,7 @@ export class PathtracingRenderer {
       this.sheenGModes.indexOf(this._sheenG));
     gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_bool_UseIBL"),
       this._useIBL);
-    gl.uniform1f(gl.getUniformLocation(this.ptProgram, "u_float_iblRotation"),
+    gl.uniform1f(gl.getUniformLocation(this.ptProgram, "u_ibl_rotation"),
       this._iblRotation);
     gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_bool_ShowBackground"),
       this._showBackground);
@@ -346,7 +347,7 @@ export class PathtracingRenderer {
       this._backgroundColor);
     gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_max_bounces"),
       this._maxBounces);
-    gl.uniform2i(gl.getUniformLocation(this.ptProgram, "u_ivec2_IblResolution"),
+    gl.uniform2i(gl.getUniformLocation(this.ptProgram, "u_ibl_resolution"),
       this.iblImportanceSamplingData.width, this.iblImportanceSamplingData.height);
     gl.uniform2f(gl.getUniformLocation(this.ptProgram, "u_vec2_InverseResolution"),
       1.0 / renderRes[0], 1.0 / renderRes[1]);
@@ -354,7 +355,7 @@ export class PathtracingRenderer {
       camera.near);
     gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_bool_forceIBLEval"),
       this._forceIBLEval);
-    gl.uniform1f(gl.getUniformLocation(this.ptProgram, "u_float_rayEps"),
+    gl.uniform1f(gl.getUniformLocation(this.ptProgram, "u_float_ray_eps"),
       this._rayEps);
     gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_int_RenderMode"),
       this.renderModes.indexOf(this._renderMode));
@@ -527,8 +528,8 @@ export class PathtracingRenderer {
   setScene(sceneData: PathtracingSceneData) {
     this.stopRendering();
 
-    this._scene = new PathtracingSceneDataAdapterWebGL2(this.gl, sceneData);
-    this._scene.generateGPUDataBuffers();
+    this.scene = new PathtracingSceneDataAdapterWebGL2(this.gl, sceneData);
+    this.scene.generateGPUBuffers();
 
     this.initializeShaders();
     this.resetAccumulation();
@@ -544,43 +545,61 @@ export class PathtracingRenderer {
     loc = gl.getUniformLocation(program, "u_sampler_bvh");
     gl.uniform1i(loc, texSlot);
     gl.activeTexture(gl.TEXTURE0 + texSlot++);
-    gl.bindTexture(gl.TEXTURE_2D, this._scene?.bvhDataTexture);
+    gl.bindTexture(gl.TEXTURE_2D, this.scene?.bvhDataTexture);
 
     loc = gl.getUniformLocation(program, "u_sampler_triangle_data");
     gl.uniform1i(loc, texSlot);
     gl.activeTexture(gl.TEXTURE0 + texSlot++);
-    gl.bindTexture(gl.TEXTURE_2D, this._scene?.triangleDataTexture);
+    gl.bindTexture(gl.TEXTURE_2D, this.scene?.triangleDataTexture);
 
-    loc = gl.getUniformLocation(program, "u_sampler_material_data");
-    gl.uniform1i(loc, texSlot);
-    gl.activeTexture(gl.TEXTURE0 + texSlot++);
-    gl.bindTexture(gl.TEXTURE_2D, this._scene?.materialDataTexture);
-
-    loc = gl.getUniformLocation(program, "u_sampler_material_texinfo_data");
-    gl.uniform1i(loc, texSlot);
-    gl.activeTexture(gl.TEXTURE0 + texSlot++);
-    gl.bindTexture(gl.TEXTURE_2D, this._scene?.materialTextureInfoDataTexture);
-
-    for (let t in this._scene?.texArrays) {
+    for (let t in this.scene?.texArrayTextures) {
       let loc = gl.getUniformLocation(program, t);
       gl.uniform1i(loc, texSlot);
       gl.activeTexture(gl.TEXTURE0 + texSlot++);
-      gl.bindTexture(gl.TEXTURE_2D_ARRAY, this._scene?.texArrays[t]);
+      gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.scene?.texArrayTextures[t]);
     }
+
+    const materialUniformBuffers = this.scene?.materialUniformBuffers!;
+    for(let i=0; i<materialUniformBuffers.length; i++) {
+      let matBlockIdx = gl.getUniformBlockIndex(program, `MaterialBlock${i}`);
+      gl.uniformBlockBinding(program, matBlockIdx, i+1);
+    }
+    // const materialBlockSize = gl.getActiveUniformBlockParameter(
+    //   program,
+    //   matBlockIdx,
+    //   gl.UNIFORM_BLOCK_DATA_SIZE
+    // );
+    //const expectedMaterialBlockSize = 240*this.scene!.sceneData.num_materials;
+
+    let texInfoBlockIdx = gl.getUniformBlockIndex(program, "TextureInfoBlock");
+    gl.uniformBlockBinding(program, texInfoBlockIdx, 0);
+    // const textureInfoBlockSize = gl.getActiveUniformBlockParameter(
+    //   program,
+    //   texInfoBlockIdx,
+    //   gl.UNIFORM_BLOCK_DATA_SIZE
+    // );
+    // const expectedTextureInfoBlockSize = 32*this.scene!.sceneData.num_textures;
+
+    // if(materialBlockSize != expectedMaterialBlockSize)
+    //   throw new Error(`Material uniform buffer WebGL expected size of ${materialBlockSize}doesn't match real size ${expectedMaterialBlockSize}. Check alignment and padding!`);
+    // if(textureInfoBlockSize != expectedTextureInfoBlockSize)
+    //   throw new Error(`Texture Block uniform buffer WebGL expected size of ${textureInfoBlockSize} doesn't match real size${expectedTextureInfoBlockSize}. Check alignment and padding!`);
+
 
     gl.useProgram(null);
     return texSlot;
   }
 
   private initializeShaders() {
-    if (!this._scene) throw new Error("Scene not initialized");
+    if (!this.scene) throw new Error("Scene not initialized");
     console.time("Pathtracing shader generation");
 
-    const materialConstants = `
-    const uint MATERIAL_SIZE = 11u;
-    const uint MATERIAL_TEX_INFO_SIZE = 15u;
-    const uint TEX_INFO_SIZE = 2u;
+    const bufferAccessSnippet = `
     const uint MAX_TEXTURE_SIZE = ${glu.getMaxTextureSize(this.gl)}u;
+    ivec2 getStructParameterTexCoord(uint structIdx, uint paramIdx, uint structStride) {
+    return ivec2((structIdx * structStride + paramIdx) % MAX_TEXTURE_SIZE,
+                (structIdx * structStride + paramIdx) / MAX_TEXTURE_SIZE);
+    }
     `;
 
     const meshConstants = `
@@ -591,31 +610,40 @@ export class PathtracingRenderer {
     const uint UV_OFFSET = 2u;
     const uint TANGENT_OFFSET = 3u;
     const uint COLOR_OFFSET = 4u;
-    const uint NUM_TRIANGLES = ${this._scene.sceneData.num_triangles}u;
-  `;
+    const uint NUM_TRIANGLES = ${this.scene.sceneData.num_triangles}u;
+    `;
 
-    const shaderChunks = new Map<string, string>();
-    shaderChunks.set('constants', shader_constants);
-    shaderChunks.set('tex_array_lookup', this._scene.texArrayShaderSnippet);
-    shaderChunks.set('lights', this._scene.lightShaderSnippet);
-    shaderChunks.set('rng', rng_shader);
-    shaderChunks.set('utils', utils_shader);
-    shaderChunks.set('material', material_shader);
-    shaderChunks.set('dspbr', dspbr_shader);
-    shaderChunks.set('bvh', bvh_shader);
-    shaderChunks.set('lighting', lighting_shader);
-    shaderChunks.set('diffuse', diffuse_shader);
-    shaderChunks.set('microfacet', microfacet_shader);
-    shaderChunks.set('sheen', sheen_shader);
-    shaderChunks.set('fresnel', fresnel_shader);
-    shaderChunks.set('iridescence', iridescence_shader);
+    const materialBlock = `
+    layout(std140) uniform TextureInfoBlock
+    {
+      TexInfo u_tex_infos[${this.scene.sceneData.num_textures}];
+    };
+    `
 
-    shaderChunks.set('debug_integrator', debug_integrator_shader);
-    shaderChunks.set('pt_integrator', pt_integrator_shader);
-    shaderChunks.set('misptdl_integrator', misptdl_integrator_shader);
-    shaderChunks.set('material_constants', materialConstants);
-    shaderChunks.set('mesh_constants', meshConstants);
-
+    console.log( this.scene.materialBufferShaderChunk);
+    const shaderChunks = new Map<string, string>([
+      ['structs', structs_shader],
+      ['rng', rng_shader],
+      ['constants', shader_constants],
+      ['lights', this.scene.lightShaderChunk],
+      ['utils', utils_shader],
+      ['material', material_shader],
+      ['buffer_accessor', bufferAccessSnippet],
+      ['texture_accessor', this.scene.texAccessorShaderChunk],
+      ['material_block', materialBlock + this.scene.materialBufferShaderChunk],
+      ['dspbr', dspbr_shader],
+      ['bvh', bvh_shader],
+      ['lighting', lighting_shader],
+      ['diffuse', diffuse_shader],
+      ['microfacet', microfacet_shader],
+      ['sheen', sheen_shader],
+      ['fresnel', fresnel_shader],
+      ['iridescence', iridescence_shader],
+      ['debug_integrator', debug_integrator_shader],
+      ['pt_integrator', pt_integrator_shader],
+      ['misptdl_integrator', misptdl_integrator_shader],
+      ['mesh_constants', meshConstants],
+    ]);
     this.ptProgram = glu.createProgramFromSource(this.gl, vertexShader, render_shader, shaderChunks);
     console.timeEnd("Pathtracing shader generation");
   }

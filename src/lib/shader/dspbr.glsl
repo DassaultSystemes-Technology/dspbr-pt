@@ -100,7 +100,7 @@ float dspbr_pdf(const in MaterialClosure c, vec3 wi, vec3 wo) {
   return pdf;
 }
 
-void importanceSampleBsdf(inout MaterialClosure c, inout float rr, vec3 wi, out float pdf) {
+void select_bsdf(inout MaterialClosure c, inout float rr, vec3 wi, out float pdf) {
   Geometry g = calculateBasis(c.n, c.t);
 
   vec3 diffuse_importance = dspbr_diffuse_rho(c);

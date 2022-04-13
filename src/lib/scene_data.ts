@@ -1,5 +1,5 @@
 
-import { MaterialData, TexInfo, MaterialTextureInfo } from './material';
+import { MaterialData, TexInfo } from './material';
 import { Texture } from 'three'
 
 class Light {
@@ -14,17 +14,18 @@ export class PathtracingSceneData {
   public get lights() { return this._lights; }
 
   private _materials: MaterialData[] = [];
-  private _materialTexInfos: MaterialTextureInfo[] = [];
-  public get num_materials() { return this._materials.length };
+  public get num_materials() { return this._materials.length; }
+  public get materials() { return this._materials; }
 
-  private _texArrayList: any[] = [];
-  public get texArrayList() { return this._texArrayList; }
+  private _texInfos: TexInfo[] = [];
+  public getTexInfo(idx: number) { return this._texInfos[idx]; }
+  public get num_textures() { return this._texInfos.length; }
 
-  private _texArrayDict: { [idx: string]: any; } = {};
-  public get texArrayDict() { return this._texArrayDict; }
+  private _texArrays = new Map<string, Texture[]>();
+  public get texArrays() { return this._texArrays; }
 
   private _triangleBuffer?: Float32Array;
-  public set triangleBuffer(buffer: Float32Array) { this._triangleBuffer = buffer;}
+  public set triangleBuffer(buffer: Float32Array) { this._triangleBuffer = buffer; }
   public get num_triangles() { return this._triangleBuffer ? this._triangleBuffer.length / 3 : 0 };
 
   private _bvhBuffer?: Float32Array;
@@ -32,7 +33,7 @@ export class PathtracingSceneData {
     this._bvhBuffer = buffer;
   }
 
-  public addTexture(tex: Texture) {
+  public addTexture(tex: Texture): number {
     let texInfo = new TexInfo();
 
     let findTextureInList = (tex: Texture, texList: Texture[]) => {
@@ -44,33 +45,32 @@ export class PathtracingSceneData {
     };
 
     let res = [tex.image.width, tex.image.height].join(',');
-    if (res in this._texArrayDict) {
-      let texArrayIdx = this._texArrayDict[res];
-      let texIdxInArray = findTextureInList(tex, this._texArrayList[texArrayIdx]);
-      if (texIdxInArray < 0) {
-        this._texArrayList[texArrayIdx].push(tex);
-        texIdxInArray = this._texArrayList[texArrayIdx].length - 1;
+    if (this._texArrays.has(res)) {
+      let texArray = this._texArrays.get(res)!;
+      let texIdx = findTextureInList(tex, texArray!);
+      if (texIdx < 0) {
+        texArray.push(tex);
+        texIdx = texArray.length - 1;
       }
-      texInfo.texArrayIdx = texArrayIdx;
-      texInfo.texIdx = texIdxInArray;
+      texInfo.texArrayIdx = this._texArrays.size-1;
+      texInfo.texIdx = texIdx;
     } else {
-      this._texArrayDict[res] = this._texArrayList.length;
-      let tex_array = [tex];
-      this._texArrayList.push(tex_array);
-      texInfo.texArrayIdx = this._texArrayList.length - 1;
+      this._texArrays.set(res, [tex]);
+      texInfo.texArrayIdx = this._texArrays.size-1;
       texInfo.texIdx = 0;
     }
 
     texInfo.texOffset = [tex.offset.x, tex.offset.y];
     texInfo.texScale = [tex.repeat.x, tex.repeat.y];
 
-    texInfo.texCoordSet = 0; // TODO Handle second uv set
-    return texInfo;
+    texInfo.uvSet = 0; // TODO Handle second uv set
+
+    this._texInfos.push(texInfo);
+    return this._texInfos.length - 1;
   }
 
-  public addMaterial(mat: MaterialData, matTexInfo: MaterialTextureInfo) {
+  public addMaterial(mat: MaterialData) {
     this._materials.push(mat);
-    this._materialTexInfos.push(matTexInfo);
   }
 
   public addLight(light: Light) {
@@ -92,12 +92,9 @@ export class PathtracingSceneData {
     return new Float32Array(flattenArray(flatMaterialParamList));
   }
 
-  public getFlatMaterialTextureInfoBuffer(): Float32Array {
-    let flatTextureParamList = this._materialTexInfos.map(matTexInfo => {
-      let texInfos = Object.values(matTexInfo);
-      return texInfos.map((texInfo: TexInfo) => {
-        return flattenArray(texInfo.data);
-      });
+  public getFlatTextureInfoBuffer(): Float32Array {
+    let flatTextureParamList = this._texInfos.map((texInfo: TexInfo) => {
+      return flattenArray(texInfo.data);
     });
     return new Float32Array(flattenArray(flatTextureParamList));
   }
@@ -116,4 +113,4 @@ function flattenArray(arr: any, result: number[] = []) {
 };
 
 
-export { MaterialTextureInfo, TexInfo, MaterialData, Light }
+export { TexInfo, MaterialData, Light }

@@ -2,18 +2,17 @@ import * as THREE from 'three';
 import { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { mergeBufferGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { SimpleTriangleBVH } from './bvh';
-import { PathtracingSceneData, MaterialTextureInfo, TexInfo, MaterialData, Light } from './scene_data';
+import { PathtracingSceneData, TexInfo, MaterialData, Light } from './scene_data';
 
 export namespace ThreeSceneTranslator {
 
   async function parseMaterial(mat: THREE.MeshPhysicalMaterial, sceneData: PathtracingSceneData, gltf?: GLTF) {
     // console.log(mat);
     let matInfo = new MaterialData();
-    let matTexInfo = new MaterialTextureInfo();
 
     matInfo.albedo = mat.color.toArray();
     if (mat.map) {
-      matTexInfo.albedoTexture = sceneData.addTexture(mat.map);
+      matInfo.albedoTextureId = sceneData.addTexture(mat.map);
     }
 
     matInfo.metallic = mat.metalness || 0;
@@ -26,54 +25,54 @@ export namespace ThreeSceneTranslator {
       matInfo.alphaCutoff = 1.0;
 
     if (mat.metalnessMap) {
-      matTexInfo.metallicRoughnessTexture = sceneData.addTexture(mat.metalnessMap);
+      matInfo.metallicRoughnessTextureId = sceneData.addTexture(mat.metalnessMap);
     }
 
     if (mat.normalMap) {
-      matTexInfo.normalTexture = sceneData.addTexture(mat.normalMap);
+      matInfo.normalTextureId = sceneData.addTexture(mat.normalMap);
       matInfo.normalScale = mat.normalScale.x;
     }
 
     if (mat.emissive) {
       matInfo.emission = mat.emissive.toArray();
       if (mat.emissiveMap) {
-        matTexInfo.emissionTexture = sceneData.addTexture(mat.emissiveMap);
+        matInfo.emissionTextureId = sceneData.addTexture(mat.emissiveMap);
       }
     }
 
     matInfo.clearcoat = mat.clearcoat || 0;
     if (mat.clearcoatMap) {
-      matTexInfo.clearcoatTexture = sceneData.addTexture(mat.clearcoatMap);
+      matInfo.clearcoatTextureId = sceneData.addTexture(mat.clearcoatMap);
     }
 
     matInfo.clearcoatRoughness = mat.clearcoatRoughness || 0;
     if (mat.clearcoatRoughnessMap) {
-      matTexInfo.clearcoatRoughnessTexture = sceneData.addTexture(mat.clearcoatRoughnessMap);
+      matInfo.clearcoatRoughnessTextureId = sceneData.addTexture(mat.clearcoatRoughnessMap);
     }
 
     matInfo.transparency = mat.transmission || 0;
     if (mat.transmissionMap) {
-      matTexInfo.transmissionTexture = sceneData.addTexture(mat.transmissionMap);
+      matInfo.transmissionTextureId = sceneData.addTexture(mat.transmissionMap);
     }
 
     matInfo.specular = (mat.specularIntensity === undefined) ? 1.0 : mat.specularIntensity;
     if (mat.specularColor)
       matInfo.specularTint = mat.specularColor.toArray();
     if (mat.specularIntensityMap) {
-      matTexInfo.specularTexture = sceneData.addTexture(mat.specularIntensityMap);
+      matInfo.specularTextureId = sceneData.addTexture(mat.specularIntensityMap);
     }
     if (mat.specularColorMap) {
-      matTexInfo.specularColorTexture = sceneData.addTexture(mat.specularColorMap);
+      matInfo.specularColorTextureId = sceneData.addTexture(mat.specularColorMap);
     }
 
     if (mat.sheenColor)
       matInfo.sheenColor = mat.sheenColor.toArray();
     if (mat.sheenColorMap) {
-      matTexInfo.sheenColorTexture = sceneData.addTexture(mat.sheenColorMap);
+      matInfo.sheenColorTextureId = sceneData.addTexture(mat.sheenColorMap);
     }
     matInfo.sheenRoughness = (mat.sheenRoughness === undefined) ? 0.0 : mat.sheenRoughness;
     if (mat.sheenRoughnessMap) {
-      matTexInfo.sheenRoughnessTexture = sceneData.addTexture(mat.sheenRoughnessMap);
+      matInfo.sheenRoughnessTextureId = sceneData.addTexture(mat.sheenRoughnessMap);
     }
 
     // KHR_materials_volume
@@ -119,15 +118,15 @@ export namespace ThreeSceneTranslator {
           if ("anisotropyTexture" in ext) {
             await gltf.parser.getDependency('texture', ext.anisotropyTexture.index)
               .then((tex: THREE.Texture) => {
-                matTexInfo.anisotropyTexture = sceneData.addTexture(tex);
-                setTextureTransformFromExt(matTexInfo.anisotropyTexture, ext.anisotropyTexture);
+                matInfo.anisotropyTextureId = sceneData.addTexture(tex);
+                setTextureTransformFromExt(sceneData.getTexInfo(matInfo.anisotropyTextureId), ext.anisotropyTexture);
             });
           }
           if ("anisotropyDirectionTexture" in ext) {
             await gltf.parser.getDependency('texture', ext.anisotropyDirectionTexture.index)
               .then((tex: THREE.Texture) => {
-                matTexInfo.anisotropyDirectionTexture = sceneData.addTexture(tex);
-                setTextureTransformFromExt(matTexInfo.anisotropyDirectionTexture, ext.anisotropyDirectionTexture);
+                matInfo.anisotropyDirectionTextureId = sceneData.addTexture(tex);
+                setTextureTransformFromExt(sceneData.getTexInfo(matInfo.anisotropyDirectionTextureId), ext.anisotropyDirectionTexture);
             });
           }
         }
@@ -140,15 +139,15 @@ export namespace ThreeSceneTranslator {
           if ("iridescenceTexture" in ext) {
             await gltf.parser.getDependency('texture', ext.iridescenceTexture.index)
               .then((tex: THREE.Texture) => {
-                matTexInfo.iridescenceTexture = sceneData.addTexture(tex);
-                setTextureTransformFromExt(matTexInfo.iridescenceTexture, ext.iridescenceTexture);
+                matInfo.iridescenceTextureId = sceneData.addTexture(tex);
+                setTextureTransformFromExt(sceneData.getTexInfo(matInfo.iridescenceTextureId), ext.iridescenceTexture);
             });
           }
           if ("iridescenceThicknessTexture" in ext) {
             await gltf.parser.getDependency('texture', ext.iridescenceThicknessTexture.index)
               .then((tex: THREE.Texture) => {
-                matTexInfo.iridescenceThicknessTexture = sceneData.addTexture(tex);
-                setTextureTransformFromExt(matTexInfo.iridescenceThicknessTexture, ext.iridescenceThicknessTexture);
+                matInfo.iridescenceThicknessTextureId = sceneData.addTexture(tex);
+                setTextureTransformFromExt(sceneData.getTexInfo(matInfo.iridescenceThicknessTextureId), ext.iridescenceThicknessTexture);
             });
           }
         }
@@ -158,7 +157,7 @@ export namespace ThreeSceneTranslator {
         //   if ("translucencyTexture" in ext) {
         //     await this._gltf.parser.getDependency('texture', ext.translucencyTexture.index)
         //       .then((tex) => {
-        //         matTexInfo.translucencyTexture = sceneData.addTexture(tex);
+        //         matTexInfo.translucencyTextureId = sceneData.addTexture(tex);
         //         setTextureTransformFromExt(matTexInfo.translucencyTexture, ext.translucencyTexture);
         //       });
         //   }
@@ -197,7 +196,7 @@ export namespace ThreeSceneTranslator {
       }
     }
 
-    sceneData.addMaterial(matInfo, matTexInfo);
+    sceneData.addMaterial(matInfo);
   }
 
   export async function translateThreeScene(scene: THREE.Group, gltf?: GLTF) {

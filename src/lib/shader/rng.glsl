@@ -22,11 +22,19 @@ uint george_marsaglia_rng() {
     return (rng_state.x << 16u) + rng_state.y;
 }
 
-float rng_NextFloat() {
+void rng_set_state(uvec2 state) {
+  rng_state = state;
+}
+
+uvec2 rng_get_state() {
+  return rng_state;
+}
+
+float rng_float() {
     return float(george_marsaglia_rng()) / float(0xFFFFFFFFu);
 }
 
-void init_rng(int seed) {
+void rng_init(int seed) {
     vec2 offset = vec2(seed*17,0.0);
 
     //Initialize RNG

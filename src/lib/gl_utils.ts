@@ -66,7 +66,7 @@ export function createProgramFromSource(gl: WebGL2RenderingContext,
   if (shaderChunks) {
     console.time("Shader chunk resolve...");
     for (let [id, chunk] of shaderChunks) {
-      let identifier = "#include <" + id + ">";
+      let identifier = `#include <${id}>`;
       vertexShaderSource = vertexShaderSource.replace(identifier, chunk);
       fragmentShaderSource = fragmentShaderSource.replace(identifier, chunk);
       // console.log(fragmentShaderSource);

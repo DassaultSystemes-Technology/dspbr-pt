@@ -101,11 +101,12 @@ class App {
 
       if (this.pathtracing) {
         if (this.pathtracedInteraction) {
-          this.renderer.interruptFrame();
+          //this.renderer.interruptFrame();
           clearTimeout(this.interactionTimeoutId);
           this.renderer.setLowResRenderMode(true);
-          this.startPathtracing();
+          //this.startPathtracing();
         } else {
+          clearTimeout(this.interactionTimeoutId);
           this.stopPathtracing();
           this.startRasterizer();
           this.resumePathtracing = true;
@@ -121,8 +122,10 @@ class App {
         }, 500);
       } else {
         if (this.resumePathtracing) {
+          this.interactionTimeoutId = setTimeout(() => {
           this.startPathtracing();
           this.stopRasterizer();
+          }, 500);
         }
       }
     });
@@ -133,8 +136,8 @@ class App {
       RIGHT: THREE.MOUSE.DOLLY
     }
 
-    this.renderer = new WavefrontRenderer({ canvas: this.canvas_pt });
-    // this.renderer = new PathtracingRenderer({ canvas: this.canvas_pt });
+    // this.renderer = new WavefrontRenderer({ canvas: this.canvas_pt });
+    this.renderer = new PathtracingRenderer({ canvas: this.canvas_pt });
     this.three_renderer = new ThreeRenderer({ canvas: this.canvas_three, powerPreference: "high-performance", alpha: true });
 
     this.renderer.pixelRatio = 0.5;

@@ -20,26 +20,27 @@ import { PathtracingSceneDataAdapterWebGL2 } from './scene_data_adapter_webgl2'
 import * as glu from './gl_utils';
 
 import constants_shader_source from '/src/lib/shader/constants.glsl';
-import copy_shader from '/src/lib/shader/copy.glsl';
-import display_shader from '/src/lib/shader/display.frag';
 import rng_shader_source from '/src/lib/shader/rng.glsl';
 import utils_shader_source from '/src/lib/shader/utils.glsl';
-import material_shader_souce from '/src/lib/shader/material.glsl';
-import dspbr_shader_source from '/src/lib/shader/dspbr.glsl';
 import bvh_shader_source from '/src/lib/shader/bvh.glsl';
-import lighting_shader from '/src/lib/shader/lighting.glsl';
+
+//* Material & Light
+import material_shader_souce from '/src/lib/shader/material.glsl';
 import diffuse_shader_source from '/src/lib/shader/bsdfs/diffuse.glsl';
 import microfacet_shader_source from '/src/lib/shader/bsdfs/microfacet.glsl';
 import sheen_shader_source from '/src/lib/shader/bsdfs/sheen.glsl';
 import fresnel_shader_source from '/src/lib/shader/bsdfs/fresnel.glsl';
 import iridescence_shader_source from '/src/lib/shader/bsdfs/iridescence.glsl';
+import dspbr_shader_source from '/src/lib/shader/dspbr.glsl';
+import lighting_shader_source from '/src/lib/shader/lighting.glsl';
 
+//* Render Passes
 import ray_gen_shader_source from '/src/lib/shader/wavefront/ray_gen.glsl';
 import trace_shader_source from '/src/lib/shader/wavefront/trace.glsl';
 import bounce_shader_source from '/src/lib/shader/wavefront/bounce.glsl';
+import display_shader_source from '/src/lib/shader/display.frag';
+import copy_shader_source from '/src/lib/shader/wavefront/copy.glsl';
 
-// import render_shader from '/src/lib/shader/renderer.frag';
-// import wavefront_integrator_shader from '/src/lib/shader/wavefront/.glsl';
 
 let fs_quad_shader_source = ` #version 300 es
 layout(location = 0) in vec4 position;
@@ -82,12 +83,10 @@ export class WavefrontRenderer {
 
   private fbos: Map<string, WebGLFramebuffer> = new Map<string, WebGLFramebuffer>();
   private renderBuffers: Map<string, WebGLTexture> = new Map<string, WebGLTexture>();
+  private copyBuffers: Map<string, [WebGLTexture, WebGLTexture]> = new Map<string, [WebGLTexture, WebGLTexture]>();
   private shaders: Map<string, WebGLProgram> = new Map<string, WebGLTexture>();
 
   private quadVao: WebGLVertexArrayObject | null = null;
-  private ptProgram: WebGLProgram | null = null;
-  private copyProgram: WebGLProgram | null = null;
-  private displayProgram: WebGLProgram | null = null;
   private quadVertexBuffer: WebGLBuffer | null = null;
 
   private renderRes = new Map<RenderResolutionMode, [number, number]>();
@@ -134,16 +133,6 @@ export class WavefrontRenderer {
   }
   public set tonemapping(val) {
     this._tonemapping = val;
-    this.resetAccumulation();
-  }
-
-  public sheenGModes = ["Charlie", "Ashikhmin"];
-  private _sheenG: string = "Charlie";
-  public get sheenG() {
-    return this._sheenG;
-  }
-  public set sheenG(val) {
-    this._sheenG = val;
     this.resetAccumulation();
   }
 
@@ -261,7 +250,6 @@ export class WavefrontRenderer {
 
     this.resize(Math.floor(this.canvas.width), Math.floor(this.canvas.height));
     this.initVao();
-    this.initFramebuffers();
   }
 
   resetAccumulation() {
@@ -271,7 +259,6 @@ export class WavefrontRenderer {
   resize(width: number, height: number) {
     this._isRendering = false;
     this.displayRes = [width, height];
-    console.log(this.displayRes);
 
     this.renderRes.set(RenderResolutionMode.High, [Math.ceil(this.displayRes[0] * this._pixelRatio),
     Math.ceil(this.displayRes[1] * this._pixelRatio)]);
@@ -292,14 +279,24 @@ export class WavefrontRenderer {
     cancelAnimationFrame(this._currentAnimationFrameId);
   }
 
+  private bindTextures(program: WebGLProgram, mappingInfo: Map<string, WebGLTexture>, startSlot: number = 0): number {
+    const gl = this.gl;
+    let slot = startSlot;
+    for (let [uniform_name, texture] of mappingInfo) {
+      gl.activeTexture(gl.TEXTURE0 + slot);
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.uniform1i(gl.getUniformLocation(program, uniform_name), slot++);
+    }
+    return slot;
+  }
+
   private rayGenRenderPass(camera: any, renderRes: [number, number]) {
     const gl = this.gl;
+    const program = this.shaders.get("ray_gen");
+    gl.useProgram(program);
 
     let filmHeight = Math.tan(camera.fov * 0.5 * Math.PI / 180.0) * camera.near;
 
-
-    const program = this.shaders.get("ray_gen");
-    gl.useProgram(program);
     gl.uniform1f(gl.getUniformLocation(program, "u_film_height"), filmHeight);
     gl.uniform1i(gl.getUniformLocation(program, "u_frame_count"), this.frameCount);
     gl.uniform1i(gl.getUniformLocation(program, "u_max_bounces"), this.maxBounces);
@@ -314,66 +311,49 @@ export class WavefrontRenderer {
 
   private traceRenderPass() {
     const gl = this.gl;
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, this.renderBuffers.get("ray_dir"));
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, this.renderBuffers.get("ray_org"));
-    gl.activeTexture(gl.TEXTURE2);
-    gl.bindTexture(gl.TEXTURE_2D, this.scene?.bvhDataTexture);
-    gl.activeTexture(gl.TEXTURE3);
-    gl.bindTexture(gl.TEXTURE_2D, this.scene?.triangleDataTexture);
-
-    // gl.viewport(0, 0, this.displayRes[0], this.displayRes[1]);
-
     const program = this.shaders.get("trace");
     gl.useProgram(program);
-    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_ray_dir"), 0);
-    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_ray_org"), 1);
-    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_bvh"), 2);
-    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_triangle_data"), 3);
+
+    const samplerMapping = new Map<string, WebGLTexture>([
+      ["u_sampler_bvh", this.scene?.bvhDataTexture!],
+      ["u_sampler_ray_dir", this.renderBuffers.get("ray_dir")!],
+      ["u_sampler_ray_org", this.renderBuffers.get("ray_org")!],
+      ["u_sampler_triangle_data", this.scene?.triangleDataTexture!],
+      ["u_sampler_light_sample_dir", this.renderBuffers.get("light_sample_dir")!],
+    ])
+    this.bindTextures(program!, samplerMapping);
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    gl.useProgram(null);
   }
 
   private bounceRenderPass() {
     const gl = this.gl;
     const program = this.shaders.get("bounce");
-
-    let slot = 0;
     gl.useProgram(program);
 
-    gl.activeTexture(gl.TEXTURE0 + slot);
-    gl.bindTexture(gl.TEXTURE_2D, this.renderBuffers.get("hitpos_matid"));
-    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_hitpos_matid"), slot++);
+    const samplerMapping = new Map<string, WebGLTexture>([
+      ["u_sampler_hitpos_matid", this.renderBuffers.get("hitpos_matid")!],
+      ["u_sampler_shading_normal", this.renderBuffers.get("shading_normal")!],
+      ["u_sampler_geometry_normal", this.renderBuffers.get("geometry_normal")!],
+      ["u_sampler_tangent", this.renderBuffers.get("tangent")!],
+      ["u_sampler_uv", this.renderBuffers.get("uv")!],
+      ["u_sampler_wi", this.renderBuffers.get("wi")!],
 
-    gl.activeTexture(gl.TEXTURE0 + slot);
-    gl.bindTexture(gl.TEXTURE_2D, this.renderBuffers.get("shading_normal"));
-    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_shading_normal"), slot++);
+      ["u_sampler_radiance", this.copyBuffers.get("radiance")![0]],
+      ["u_sampler_path_weight_pdf", this.copyBuffers.get("weight_pdf")![0]],
+      ["u_sampler_rng_state", this.copyBuffers.get("rng_state")![0]],
 
-    gl.activeTexture(gl.TEXTURE0 + slot);
-    gl.bindTexture(gl.TEXTURE_2D, this.renderBuffers.get("geometry_normal"));
-    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_geometry_normal"), slot++);
+      ["u_sampler_material_data", this.renderBuffers.get("u_sampler_material_data")!],
+      ["u_sampler_material_texinfo_data", this.renderBuffers.get("u_sampler_material_texinfo_data")!],
 
-    gl.activeTexture(gl.TEXTURE0 + slot);
-    gl.bindTexture(gl.TEXTURE_2D, this.renderBuffers.get("tangent"));
-    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_tangent"), slot++);
+      ["u_sampler_env_map", this.ibl!],
+      ["u_sampler_env_map_pdf", this.iblImportanceSamplingData.pdf!],
+      ["u_sampler_env_map_cdf", this.iblImportanceSamplingData.cdf!],
+      ["u_sampler_env_map_yPdf", this.iblImportanceSamplingData.yPdf!],
+      ["u_sampler_env_map_yCdf", this.iblImportanceSamplingData.yCdf!]
+    ])
 
-    gl.activeTexture(gl.TEXTURE0 + slot);
-    gl.bindTexture(gl.TEXTURE_2D, this.renderBuffers.get("uv"));
-    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_uv"), slot++);
-
-    gl.activeTexture(gl.TEXTURE0 + slot);
-    gl.bindTexture(gl.TEXTURE_2D, this.renderBuffers.get("ray_dir"));
-    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_indir"), slot++);
-
-    gl.activeTexture(gl.TEXTURE0 + slot);
-    gl.bindTexture(gl.TEXTURE_2D, this.scene?.materialDataTexture);
-    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_material_data"), slot++);
-
-    gl.activeTexture(gl.TEXTURE0 + slot);
-    gl.bindTexture(gl.TEXTURE_2D, this.scene?.materialTextureInfoDataTexture);
-    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_material_texinfo_data"), slot++);
+    let slot = this.bindTextures(program!, samplerMapping);
 
     for (let t in this.scene?.texArrays) {
       gl.activeTexture(gl.TEXTURE0 + slot);
@@ -381,10 +361,46 @@ export class WavefrontRenderer {
       gl.uniform1i(gl.getUniformLocation(program, t), slot++);
     }
 
+    gl.uniform2i(gl.getUniformLocation(program, "u_ibl_resolution"), this.iblImportanceSamplingData.width, this.iblImportanceSamplingData.height);
+    gl.uniform1f(gl.getUniformLocation(program, "u_ibl_rotation"), this.iblRotation);
+    gl.uniform1f(gl.getUniformLocation(program, "u_float_ray_eps"), this.rayEps);
+
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    //gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.useProgram(null);
+    gl.bindTexture(gl.TEXTURE_2D, null);
   }
+
+  private copyBuffersRenderPass() {
+    const gl = this.gl;
+    const program = this.shaders.get("copy");
+    gl.useProgram(program);
+
+    const samplerMapping = new Map<string, WebGLTexture>([
+      ["u_sampler_rng_state", this.copyBuffers.get("rng_state")![1]],
+      ["u_sampler_weight_pdf", this.copyBuffers.get("weight_pdf")![1]],
+      ["u_sampler_radiance", this.copyBuffers.get("radiance")![1]],
+    ])
+
+    this.bindTextures(program!, samplerMapping);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
+  private displayRenderPass() {
+    const gl = this.gl;
+    const program = this.shaders.get("display");
+    gl.useProgram(program);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.copyBuffers.get("radiance")![1]);
+    // gl.bindTexture(gl.TEXTURE_2D, this.renderBuffers.get("ray_dir"));
+    gl.uniform1i(gl.getUniformLocation(program, "tex"), 0);
+
+    gl.uniform1f(gl.getUniformLocation(program, "exposure"), this._exposure);
+    gl.uniform1i(gl.getUniformLocation(program, "gamma"), this._enableGamma);
+    gl.uniform1i(gl.getUniformLocation(program, "tonemappingMode"), this.tonemappingModes.indexOf(this._tonemapping));
+
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
 
   renderFrame(camera: any, num_samples: number, frameFinishedCB: (frameCount: number) => void, renderingFinishedCB: () => void) {
     if (!this._isRendering) return;
@@ -395,21 +411,33 @@ export class WavefrontRenderer {
     gl.bindVertexArray(this.quadVao);
     gl.viewport(0, 0, renderRes![0], renderRes![1]);
 
+    //* 1. Ray Generation
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbos.get("ray_gen"));
-    // for(let i=0; i<8; i++) {
     this.rayGenRenderPass(camera, renderRes!);
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbos.get("intersection_state"));
-    // gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    this.traceRenderPass();
+    for (let i = 0; i < this.maxBounces; i++) {
+      //* 2. Trace & Intersect
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbos.get("trace"));
+      this.traceRenderPass();
+
+      //* 3. Shade & Bounce + Generate Light Sample
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbos.get("bounce"));
+      this.bounceRenderPass();
+
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbos.get("copy"));
+      this.copyBuffersRenderPass();
+    }
+
+    //* 4. Accumulate
+    // this.accumulationRenderPass();
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    // gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbos.get("bounce"));
-    if (!this._isRendering) return;
-    this.bounceRenderPass();
-    // }
-    gl.bindVertexArray(null);
+    gl.viewport(0, 0, this.displayRes[0], this.displayRes[1]);
 
+    // //* 5. Display
+    this.displayRenderPass();
+
+    gl.bindVertexArray(null);
     this.frameCount++;
 
     if (num_samples !== -1 && this.frameCount >= num_samples) {
@@ -432,95 +460,131 @@ export class WavefrontRenderer {
     }); // start render loop
   }
 
+  private createRenderBuffers() {
+
+    const createBuffer = (name: string) => {
+      const renderRes = this.renderRes.get(RenderResolutionMode.High);
+      this.renderBuffers.set(name, glu.createRenderBufferTexture(this.gl, null, renderRes![0], renderRes![1])!);
+    }
+
+    const bufferNames = [
+      "hitpos_matid",
+      "shading_normal",
+      "geometry_normal",
+      "tangent",
+      "uv",
+      "wi",
+      "ray_org",
+      "ray_dir",
+      "light_sample_dir"
+    ].map((value: string) => { createBuffer(value); })
+  }
+
+  private createSwapBuffers() {
+    const gl = this.gl;
+    const renderRes = this.renderRes.get(RenderResolutionMode.High);
+
+    const createRB32UIRenderBufferTexture = () => {
+      var tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG32UI, Math.floor(renderRes![0]), Math.floor(renderRes![1]), 0, gl.RG_INTEGER, gl.UNSIGNED_INT, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.bindTexture(gl.TEXTURE_2D, null);
+      return tex;
+    };
+
+    this.copyBuffers.set("rng_state", [createRB32UIRenderBufferTexture(), createRB32UIRenderBufferTexture()]);
+    this.copyBuffers.set("weight_pdf", [
+      glu.createRenderBufferTexture(gl, null, renderRes![0], renderRes![1])!,
+      glu.createRenderBufferTexture(gl, null, renderRes![0], renderRes![1])!
+    ]);
+    this.copyBuffers.set("radiance", [
+      glu.createRenderBufferTexture(gl, null, renderRes![0], renderRes![1])!,
+      glu.createRenderBufferTexture(gl, null, renderRes![0], renderRes![1])!
+    ]);
+  }
+
+  private cleanup() {
+    const gl = this.gl;
+    for (let fbo in this.fbos.values()) {
+      gl.deleteFramebuffer(fbo);
+    }
+    for (let tex in this.renderBuffers.values()) {
+      gl.deleteTexture(tex);
+    }
+    for (let [tex0, tex1] of this.copyBuffers.values()) {
+      gl.deleteTexture(tex0);
+      gl.deleteTexture(tex1);
+    }
+    this.fbos.clear();
+    this.renderBuffers.clear();
+    this.copyBuffers.clear();
+  }
+
   private initFramebuffers() {
     console.time("Initializing Framebuffers");
     const gl = this.gl;
 
-    const fbos = this.fbos;
-    const renderBuffers = this.renderBuffers;
-    const renderRes = this.renderRes.get(RenderResolutionMode.High);
+    this.cleanup();
+    this.createRenderBuffers();
+    this.createSwapBuffers();
 
-    // cleanup
-    for (let fbo in fbos.values()) {
-      gl.deleteFramebuffer(fbo);
+    const createFbo = (name: string, textures: WebGLTexture[]) => {
+      let drawBuffers: any = [];
+      const fbo = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+
+      for (let i = 0; i < textures.length; i++) {
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i, gl.TEXTURE_2D, textures[i], 0);
+        drawBuffers.push(gl.COLOR_ATTACHMENT0 + i);
+      }
+      gl.drawBuffers(drawBuffers);
+      this.fbos.set(name, fbo);
     }
-    for (let tex in renderBuffers.values()) {
-      gl.deleteTexture(tex);
-    }
-    fbos.clear();
-    renderBuffers.clear();
 
-    const rayGenFbo = gl.createFramebuffer();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, rayGenFbo);
-    renderBuffers.set("ray_org", glu.createRenderBufferTexture(gl, null, renderRes![0], renderRes![1])!);
-    renderBuffers.set("ray_dir", glu.createRenderBufferTexture(gl, null, renderRes![0], renderRes![1])!);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, renderBuffers.get("ray_org"), 0);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, renderBuffers.get("ray_dir"), 0);
-    gl.drawBuffers([
-      gl.COLOR_ATTACHMENT0,
-      gl.COLOR_ATTACHMENT1
+    createFbo("ray_gen", [
+      this.renderBuffers.get("ray_org")!,
+      this.renderBuffers.get("ray_dir")!,
+      this.copyBuffers.get("rng_state")![0],
+      this.copyBuffers.get("radiance")![0],
+      this.copyBuffers.get("weight_pdf")![0]
     ]);
-    fbos.set("ray_gen", rayGenFbo);
 
-    const intersectionStateFbo = gl.createFramebuffer();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, intersectionStateFbo);
-    renderBuffers.set("hitpos_matid", glu.createRenderBufferTexture(gl, null, renderRes![0], renderRes![1])!);
-    renderBuffers.set("shading_normal", glu.createRenderBufferTexture(gl, null, renderRes![0], renderRes![1])!);
-    renderBuffers.set("geometry_normal", glu.createRenderBufferTexture(gl, null, renderRes![0], renderRes![1])!);
-    renderBuffers.set("tangent", glu.createRenderBufferTexture(gl, null, renderRes![0], renderRes![1])!);
-    renderBuffers.set("uv", glu.createRenderBufferTexture(gl, null, renderRes![0], renderRes![1])!);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, renderBuffers.get("hitpos_matid"), 0);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, renderBuffers.get("shading_normal"), 0);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT2, gl.TEXTURE_2D, renderBuffers.get("geometry_normal"), 0);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT3, gl.TEXTURE_2D, renderBuffers.get("tangent"), 0);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT4, gl.TEXTURE_2D, renderBuffers.get("uv"), 0);
-    gl.drawBuffers([
-      gl.COLOR_ATTACHMENT0,
-      gl.COLOR_ATTACHMENT1,
-      gl.COLOR_ATTACHMENT2,
-      gl.COLOR_ATTACHMENT3,
-      gl.COLOR_ATTACHMENT4,
+    createFbo("trace", [
+      this.renderBuffers.get("hitpos_matid")!,
+      this.renderBuffers.get("shading_normal")!,
+      this.renderBuffers.get("geometry_normal")!,
+      this.renderBuffers.get("tangent")!,
+      this.renderBuffers.get("uv")!,
+      this.renderBuffers.get("wi")!,
     ]);
-    fbos.set("intersection_state", intersectionStateFbo);
 
-    console.log(gl.checkFramebufferStatus(gl.FRAMEBUFFER));
+    createFbo("bounce", [
+      this.copyBuffers.get("weight_pdf")![1],
+      this.renderBuffers.get("ray_org")!,
+      this.renderBuffers.get("ray_dir")!,
+      this.renderBuffers.get("light_sample_dir")!,
+      this.copyBuffers.get("rng_state")![1],
+      this.copyBuffers.get("radiance")![1]
+    ]);
+
+    createFbo("copy", [
+      this.copyBuffers.get("rng_state")![0],
+      this.copyBuffers.get("weight_pdf")![0],
+      this.copyBuffers.get("radiance")![0],
+    ]);
+
+    // console.log(gl.checkFramebufferStatus(gl.FRAMEBUFFER));
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-
-    // this.copyBuffer_lr = glu.createRenderBufferTexture(gl, null, this.renderResLow[0], this.renderResLow[1]);
-    // this.copyFbo_lr = gl.createFramebuffer();
-    // gl.bindFramebuffer(gl.FRAMEBUFFER, this.copyFbo_lr);
-    // gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.copyBuffer_lr, 0);
-    // gl.drawBuffers([
-    //   gl.COLOR_ATTACHMENT0
-    // ]);
-    // // console.log(gl.checkFramebufferStatus(gl.FRAMEBUFFER));
-
-    // this.renderBuffer = glu.createRenderBufferTexture(gl, null, this.renderRes[0], this.renderRes[1]);
-    // this.fbo = gl.createFramebuffer();
-    // gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
-    // gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.renderBuffer, 0);
-    // gl.drawBuffers([
-    //   gl.COLOR_ATTACHMENT0
-    // ]);
-    // // console.log(gl.checkFramebufferStatus(gl.FRAMEBUFFER));
-
-    // this.copyBuffer = glu.createRenderBufferTexture(gl, null, this.renderRes[0], this.renderRes[1]);
-    // this.copyFbo = gl.createFramebuffer();
-    // gl.bindFramebuffer(gl.FRAMEBUFFER, this.copyFbo);
-    // gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.copyBuffer, 0);
-    // gl.drawBuffers([
-    //   gl.COLOR_ATTACHMENT0
-    // ]);
-    // // console.log(gl.checkFramebufferStatus(gl.FRAMEBUFFER));
-
-    // gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     console.timeEnd("Initializing Framebuffers");
   }
 
   private async initVao() {
     let gl = this.gl;
     // glu.printGLInfo(gl);
-
 
     // fullscreen quad position buffer
     const positions = new Float32Array([-1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0]);
@@ -568,7 +632,7 @@ export class WavefrontRenderer {
     this.stopRendering();
 
     this.scene = new PathtracingSceneDataAdapterWebGL2(this.gl, sceneData);
-    this.scene.generateGPUDataBuffers();
+    this.scene.generateGPUBuffers();
 
     this.initializeShaders();
     this.resetAccumulation();
@@ -584,8 +648,8 @@ export class WavefrontRenderer {
     }
     this.shaders.clear();
 
-    this.shaders.set("copy", glu.createProgramFromSource(gl, fs_quad_shader_source, copy_shader));
-    this.shaders.set("display", glu.createProgramFromSource(gl, fs_quad_shader_source, display_shader));
+    this.shaders.set("copy", glu.createProgramFromSource(gl, fs_quad_shader_source, copy_shader_source));
+    this.shaders.set("display", glu.createProgramFromSource(gl, fs_quad_shader_source, display_shader_source));
 
     const rayGenShaderSourceDependencies = new Map<string, string>([
       ["rng", rng_shader_source]
@@ -602,12 +666,20 @@ export class WavefrontRenderer {
       const uint TANGENT_OFFSET = 3u;
       const uint COLOR_OFFSET = 4u;
       const uint NUM_TRIANGLES = ${this.scene.sceneData.num_triangles}u;
-      const uint MAX_TEXTURE_SIZE = ${glu.getMaxTextureSize(this.gl)}u;
+    `;
+
+    const bufferAccessSnippet = `
+        const uint MAX_TEXTURE_SIZE = ${glu.getMaxTextureSize(this.gl)}u;
+        ivec2 getStructParameterTexCoord(uint structIdx, uint paramIdx, uint structStride) {
+        return ivec2((structIdx * structStride + paramIdx) % MAX_TEXTURE_SIZE,
+                    (structIdx * structStride + paramIdx) / MAX_TEXTURE_SIZE);
+      }
     `;
 
     const traceShaderSourceDependencies = new Map<string, string>([
       ["constants", constants_shader_source],
       ["mesh_constants", meshConstants],
+      ["buffer_accessor", bufferAccessSnippet],
       ["utils", utils_shader_source],
       ["bvh", bvh_shader_source]
     ]);
@@ -618,13 +690,14 @@ export class WavefrontRenderer {
         const uint MATERIAL_SIZE = 11u;
         const uint MATERIAL_TEX_INFO_SIZE = 15u;
         const uint TEX_INFO_SIZE = 2u;
-        const uint MAX_TEXTURE_SIZE = ${glu.getMaxTextureSize(this.gl)}u;
     `;
 
     const bounceShaderSourceDependencies = new Map<string, string>([
       ["constants", constants_shader_source],
       ["material_constants", materialConstants],
-      ["tex_array_lookup", this.scene.texArrayShaderSnippet],
+      ["buffer_accessor", bufferAccessSnippet],
+      ["rng", rng_shader_source],
+      ["tex_array_lookup", this.scene.texAccessorShaderChunk],
       ["utils", utils_shader_source],
       ["diffuse", diffuse_shader_source],
       ["sheen", sheen_shader_source],
@@ -632,6 +705,7 @@ export class WavefrontRenderer {
       ["iridescence", iridescence_shader_source],
       ["microfacet", microfacet_shader_source],
       ["material", material_shader_souce],
+      ["lighting", lighting_shader_source],
       ["dspbr", dspbr_shader_source]
     ]);
     this.shaders.set("bounce", glu.createProgramFromSource(this.gl,

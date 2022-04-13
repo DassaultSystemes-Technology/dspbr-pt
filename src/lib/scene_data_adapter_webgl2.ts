@@ -1,12 +1,11 @@
 import { Scene } from 'three';
 import * as glu from './gl_utils';
-import { PathtracingSceneData, MaterialTextureInfo, TexInfo, MaterialData, Light } from './scene_data';
-
+import { PathtracingSceneData } from './scene_data';
 
 export class PathtracingSceneDataAdapterWebGL2 {
-  private _gl: WebGL2RenderingContext;
+  private gl: WebGL2RenderingContext;
   private _sceneData: PathtracingSceneData;
-    public get sceneData() { return this._sceneData;}
+  public get sceneData() { return this._sceneData; }
 
   private _bvhDataTexture?: WebGLTexture;
   public get bvhDataTexture() { return this._bvhDataTexture; }
@@ -14,52 +13,148 @@ export class PathtracingSceneDataAdapterWebGL2 {
   private _triangleDataTexture?: WebGLTexture;
   public get triangleDataTexture() { return this._triangleDataTexture; }
 
-  private _materialDataTexture?: WebGLTexture;
-  public get materialDataTexture() { return this._materialDataTexture; }
+  private _materialUniformBuffers: WebGLBuffer[] = [];
+  public get materialUniformBuffers() { return this._materialUniformBuffers; }
+  private _materialBufferShaderChunk: string = "";
+  public get materialBufferShaderChunk() { return this._materialBufferShaderChunk; }
 
-  private _materialTextureInfoDataTexture?: WebGLTexture;
-  public get materialTextureInfoDataTexture() { return this._materialTextureInfoDataTexture; }
+  private _textureInfoUniformBuffer?: WebGLBuffer;
+  public get textureInfoUniformBuffer() { return this._textureInfoUniformBuffer; }
 
-  private _texArrays: { [k: string]: WebGLTexture | null } = {};
-  public get texArrays() { return this._texArrays; }
+  private _texArrayTextures: { [k: string]: WebGLTexture | null } = {};
+  public get texArrayTextures() { return this._texArrayTextures; }
 
-  private _texArrayShaderSnippet: string = "";
-  public get texArrayShaderSnippet() { return this._texArrayShaderSnippet; }
+  private _texAccessorShaderChunk: string = "";
+  public get texAccessorShaderChunk() { return this._texAccessorShaderChunk; }
 
-  private _lightShaderSnippet: string = "";
-  public get lightShaderSnippet() { return this._lightShaderSnippet; }
+  private _lightShaderChunk: string = "";
+  public get lightShaderChunk() { return this._lightShaderChunk; }
 
   constructor(gl: WebGL2RenderingContext, sceneData: PathtracingSceneData) {
-    this._gl = gl;
+    this.gl = gl;
     this._sceneData = sceneData;
   }
 
-  public generateGPUDataBuffers() {
+  public clear() {
+    const gl = this.gl;
+    if (this._bvhDataTexture) gl.deleteTexture(this._bvhDataTexture);
+    if (this._triangleDataTexture) gl.deleteTexture(this._triangleDataTexture);
+    if (this._textureInfoUniformBuffer) gl.deleteBuffer(this._textureInfoUniformBuffer);
+
+    this._materialUniformBuffers.map((ubo: WebGLBuffer) => { gl.deleteBuffer(ubo); })
+
+    for (let t in this._texArrayTextures) {
+      if (this._texArrayTextures[t] !== undefined) {
+        gl.deleteTexture(this._texArrayTextures[t]);
+      }
+    }
+  }
+
+  public generateGPUBuffers() {
     console.time("Generate gpu data buffers");
-    const gl = this._gl;
+    const gl = this.gl;
     this.clear();
     this._bvhDataTexture = glu.createDataTexture(gl, this._sceneData.getFlatBvhBuffer());
     this._triangleDataTexture = glu.createDataTexture(gl, this._sceneData.getFlatTriangleDataBuffer());
-    this._materialDataTexture = glu.createDataTexture(gl, this._sceneData.getFlatMaterialBuffer());
-    this._materialTextureInfoDataTexture = glu.createDataTexture(gl, this._sceneData.getFlatMaterialTextureInfoBuffer());
 
-    this.generateTextureArrayBuffers();
+    this.generateTextureArrays();
     this.generateLightBuffers();
+    this.generateUniformMaterialBuffers();
 
     console.timeEnd("Generate gpu data buffers");
   }
 
-  private generateTextureArrayBuffers() {
-    const gl = this._gl;
-    const texArrayList = this._sceneData.texArrayList;
-    for (let i = 0; i < texArrayList.length; i++) {
-      const texList = texArrayList[i];
-      const texSize = texList[0].image.width * texList[0].image.height * 4;
-      let data = new Uint8Array(texSize * texList.length);
+  private generateUniformMaterialBuffers() {
+    const gl = this.gl;
 
-      data.set(getImageData(texList[0].image).data);
-      for (let t = 1; t < texList.length; t++) {
-        data.set(getImageData(texList[t].image).data, texSize * t);
+    const numMaterials = this._sceneData.num_materials;
+    const materialDataSize = this._sceneData.materials[0].data.byteLength;
+    const maxBlockSize = gl.getParameter(gl.MAX_UNIFORM_BLOCK_SIZE);
+
+    const materialsPerBlock = Math.floor(maxBlockSize / materialDataSize);
+    const numRequiredMaterialBlocks = Math.ceil(numMaterials / materialsPerBlock);
+
+    const materialListFlat = this._sceneData.getFlatMaterialBuffer();
+    const numValuesPerMaterial = this._sceneData.materials[0].data.length;
+
+    var _textureInfoUniformBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.UNIFORM_BUFFER, _textureInfoUniformBuffer);
+    const texInfoListFlat = this._sceneData.getFlatTextureInfoBuffer();
+    gl.bufferData(gl.UNIFORM_BUFFER, texInfoListFlat, gl.DYNAMIC_DRAW);
+    gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, _textureInfoUniformBuffer);
+
+    this._materialBufferShaderChunk = "";
+    let numMaterialsToUpload = this._sceneData.num_materials;
+    for(let i=0; i<numRequiredMaterialBlocks; i++) {
+      const numMaterialsThisBlock = Math.min(materialsPerBlock, numMaterialsToUpload);
+      var materialUniformBuffer = gl.createBuffer();
+      this._materialBufferShaderChunk += `
+      layout(std140) uniform MaterialBlock${i}
+      {
+        MaterialData u_materials_${i}[${numMaterialsThisBlock}];
+      };
+      `
+      gl.bindBuffer(gl.UNIFORM_BUFFER, materialUniformBuffer);
+      const start = numValuesPerMaterial * materialsPerBlock * i;
+      const end = start + numMaterialsThisBlock * numValuesPerMaterial;
+      const materialsArraySlice = materialListFlat.slice(start, end);
+      console.log(materialsArraySlice);
+      gl.bufferData(gl.UNIFORM_BUFFER, materialsArraySlice, gl.DYNAMIC_DRAW);
+      gl.bindBufferBase(gl.UNIFORM_BUFFER, i+1, materialUniformBuffer);
+      this._materialUniformBuffers.push(materialUniformBuffer!);
+
+      numMaterialsToUpload -= materialsPerBlock;
+    }
+
+    this._materialBufferShaderChunk += `
+    MaterialData get_material(uint idx) {
+      MaterialData data;
+    `;
+    for(let i=1; i<=numRequiredMaterialBlocks; i++) {
+      this._materialBufferShaderChunk +=
+      `
+        if(idx < ${materialsPerBlock * i}u) {
+          return u_materials_${i-1 }[idx - ${materialsPerBlock * (i-1)}u];
+        }
+      `;
+    }
+    this._materialBufferShaderChunk += `
+    return data;
+    }`;
+
+    gl.bindBuffer(gl.UNIFORM_BUFFER, null);
+  }
+
+  private generateTextureArrays() {
+    const gl = this.gl;
+    const texArrays = this._sceneData.texArrays;
+
+    // create texture arrays
+    const getImageData = (image: ImageBitmap) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = image.width;
+      canvas.height = image.height;
+
+      const context = canvas.getContext('2d');
+
+      if (context) {
+        context.drawImage(image, 0, 0);
+        return context.getImageData(0, 0, image.width, image.height);
+      } else {
+        throw Error("Couldn't parse image data from texture");
+      }
+    }
+
+    let i = 0;
+    for (const textureList of texArrays.values()) {
+      const width = textureList[0].image.width;
+      const height = textureList[0].image.height;
+      const texSize = width * height * 4;
+      let data = new Uint8Array(texSize * textureList.length);
+
+      data.set(getImageData(textureList[0].image).data);
+      for (let t = 1; t < textureList.length; t++) {
+        data.set(getImageData(textureList[t].image).data, texSize * t);
       }
 
       let texArray = gl.createTexture();
@@ -73,9 +168,9 @@ export class PathtracingSceneDataAdapterWebGL2 {
         gl.TEXTURE_2D_ARRAY,
         0,
         gl.RGBA,
-        texList[0].image.width,
-        texList[0].image.height,
-        texList.length,
+        width,
+        height,
+        textureList.length,
         0,
         gl.RGBA,
         gl.UNSIGNED_BYTE,
@@ -83,35 +178,32 @@ export class PathtracingSceneDataAdapterWebGL2 {
       );
       gl.bindTexture(gl.TEXTURE_2D_ARRAY, null);
 
-      console.log(`Create texture array: ${texList[0].image.width} x ${texList[0].image.height} x ${texList.length}`)
+      console.log(`Create texture array: ${width} x ${height} x ${textureList.length}`)
 
-      this._texArrays[`u_sampler2DArray_MaterialTextures_${i}`] = texArray;
-      this._texArrayShaderSnippet += `uniform sampler2DArray u_sampler2DArray_MaterialTextures_${i};\n`
+      this._texArrayTextures[`u_sampler2DArray_MaterialTextures_${i}`] = texArray;
+      this._texAccessorShaderChunk += `
+      uniform sampler2DArray u_sampler2DArray_MaterialTextures_${i};
+      `
+
+      i++;
     }
 
-    this._texArrayShaderSnippet += `
-    struct TexInfo {
-      int texArrayIdx;
-      int texIdx;
-      int texCoordSet;
-      int pad;
-      vec2 texOffset;
-      vec2 texScale;
-    };\n`
+    this._texAccessorShaderChunk += `
+    vec4 evaluateMaterialTextureValue(const in TexInfo texInfo, const in vec2 texCoord) {
+      if(texInfo.tex_array_idx < 0.0) return vec4(1.0);
+    `;
 
-
-    this._texArrayShaderSnippet += "\n";
-    this._texArrayShaderSnippet += "vec4 evaluateMaterialTextureValue(const in TexInfo texInfo, const in vec2 texCoord) { \n";
-    this._texArrayShaderSnippet += `  if(texInfo.texArrayIdx < 0) return vec4(1.0);\n`
-    for (let i = 0; i < this._sceneData.texArrayList.length; i++) {
-      this._texArrayShaderSnippet += `    if(texInfo.texArrayIdx == ${i}) {\n`
-      this._texArrayShaderSnippet += `        vec2 tuv = texCoord * texInfo.texScale + texInfo.texOffset;`
-      this._texArrayShaderSnippet += `        return texture(u_sampler2DArray_MaterialTextures_${i}, vec3(tuv, texInfo.texIdx));\n`
-      this._texArrayShaderSnippet += "   }\n";
+    for (let i = 0; i < texArrays.size; i++) {
+      this._texAccessorShaderChunk += `
+      if(int(texInfo.tex_array_idx) == ${i}) {
+        vec2 tuv = texCoord * texInfo.scale + texInfo.offset;
+        return texture(u_sampler2DArray_MaterialTextures_${i}, vec3(tuv, texInfo.tex_idx));
+      }`;
     }
 
-    this._texArrayShaderSnippet += `       return vec4(1.0);\n`
-    this._texArrayShaderSnippet += "}\n";
+    this._texAccessorShaderChunk += `
+      return vec4(1.0);
+    }`
   }
 
   private generateLightBuffers() {
@@ -128,41 +220,12 @@ export class PathtracingSceneDataAdapterWebGL2 {
 
       let pos = lights[0].position;
       let em = lights[0].emission;
-      this._lightShaderSnippet = `
+      this._lightShaderChunk = `
       #define HAS_POINT_LIGHT 1
       const vec3 cPointLightPosition = vec3(${pos[0]}, ${pos[1]}, ${pos[2]});
       const vec3 cPointLightEmission = vec3(${em[0]}, ${em[1]}, ${em[2]});
       `;
     }
   }
-
-  public clear() {
-    const gl = this._gl;
-    if (this._bvhDataTexture) gl.deleteTexture(this._bvhDataTexture);
-    if (this._triangleDataTexture) gl.deleteTexture(this._triangleDataTexture);
-    if (this._materialDataTexture) gl.deleteTexture(this._materialDataTexture);
-    if (this._materialTextureInfoDataTexture) gl.deleteTexture(this._materialTextureInfoDataTexture);
-
-    for (let t in this._texArrays) {
-      if (this._texArrays[t] !== undefined) {
-        gl.deleteTexture(this._texArrays[t]);
-      }
-    }
-  }
 }
 
-// create texture arrays
-function getImageData(image: ImageBitmap) {
-  const canvas = document.createElement('canvas');
-  canvas.width = image.width;
-  canvas.height = image.height;
-
-  const context = canvas.getContext('2d');
-
-  if (context) {
-    context.drawImage(image, 0, 0);
-    return context.getImageData(0, 0, image.width, image.height);
-  } else {
-    throw Error("Couldn't parse image data from texture");
-  }
-}

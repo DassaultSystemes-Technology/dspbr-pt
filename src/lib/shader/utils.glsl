@@ -148,7 +148,7 @@ vec3 fromThetaPhi(float theta, float phi) {
   return vec3(sin(theta) * cos(phi), cos(theta), sin(theta) * sin(phi));
 }
 
-vec2 mapDirToUV(vec3 dir, out float pdf) {
+vec2 dir_to_uv(vec3 dir, out float pdf) {
   float theta = computeTheta(dir);
   float u = computePhi(dir) / TWO_PI;
   float v = theta / PI;
@@ -156,7 +156,7 @@ vec2 mapDirToUV(vec3 dir, out float pdf) {
   return vec2(u, v);
 }
 
-vec3 mapUVToDir(vec2 uv, out float pdf) {
+vec3 uv_to_dir(vec2 uv, out float pdf) {
   float theta = uv.y * PI;
   float phi = uv.x * TWO_PI;
   pdf = 1.0 / (2.0 * PI * PI * max(EPS_COS, sin(theta)));
@@ -214,11 +214,6 @@ vec4 rotation_to_tangent(float angle, vec3 normal, vec4 tangent) {
   } else {
     return tangent;
   }
-}
-
-ivec2 getStructParameterTexCoord(uint structIdx, uint paramIdx, uint structStride) {
-  return ivec2((structIdx * structStride + paramIdx) % MAX_TEXTURE_SIZE,
-               (structIdx * structStride + paramIdx) / MAX_TEXTURE_SIZE);
 }
 
 vec3 to_linear_rgb(vec3 srgb) {

@@ -27,15 +27,28 @@ vec4 trace_misptdl(bvh_ray r)
       last_bounce_specular = bool(rs.closure.event_type & E_SINGULAR);
 
       if(!last_bounce_specular) { // We can't evaluate direct light conribution for singular events
-        radiance += sampleAndEvaluatePointLight(rs); // point light contribution is always evaluated
+        // radiance += sampleAndEvaluatePointLight(rs); // point light contribution is always evaluated
 
         float ibl_sample_pdf;
         vec3 ibl_sample_dir;
-        vec3 ibl_radiance;
+        vec3 ibl_radiance = vec3(0);
 
-        if(u_bool_UseIBL && sampleAndEvaluateEnvironmentLight(rs, rng_NextFloat(),
-              rng_NextFloat(), ibl_sample_dir, ibl_radiance, ibl_sample_pdf))
+        if(u_bool_UseIBL)
         {
+          vec3 ibl_sample_dir = sample_ibl_dir_importance(rng_float(), rng_float(), ibl_sample_pdf);
+
+          float cosNL = dot(ibl_sample_dir, rs.closure.n);
+          if(bool(rs.closure.event_type & (E_REFLECTION | E_DIFFUSE)) && cosNL > EPS_COS) {
+            if(!isOccluded(rs.hitPos + rs.closure.n * u_float_ray_eps, ibl_sample_dir)) {
+              ibl_radiance =  eval_dspbr(rs.closure, rs.wi, ibl_sample_dir) * eval_ibl(ibl_sample_dir) * cosNL;
+            }
+          }
+          else if(bool(rs.closure.event_type & E_TRANSMISSION) && cosNL < EPS_COS) {
+            if(!isOccluded(rs.hitPos - rs.closure.n * u_float_ray_eps, ibl_sample_dir)) {
+              ibl_radiance = eval_dspbr(rs.closure, rs.wi, ibl_sample_dir) * eval_ibl(ibl_sample_dir) * -cosNL;
+            }
+          }
+          //sampleAndEvaluateEnvironmentLight(rs, rng_float(), rng_float(), ibl_sample_dir, ibl_radiance, ibl_sample_pdf)
           float brdf_sample_pdf = dspbr_pdf(rs.closure, rs.wi, ibl_sample_dir) * rs.closure.bsdf_selection_pdf;
           if(ibl_sample_pdf > EPS_PDF && brdf_sample_pdf > EPS_PDF) {
             float mis_weight = mis_balance_heuristic(ibl_sample_pdf, brdf_sample_pdf);
@@ -48,21 +61,21 @@ vec4 trace_misptdl(bvh_ray r)
       if(!sample_bsdf_bounce(rs, bounce_weight, last_bounce_pdf)) return vec4(radiance, 1.0); //absorped
       path_weight *= bounce_weight;
 
-      r = bvh_create_ray(rs.wo, rs.hitPos + fix_normal(rs.geometryNormal, rs.wo) * u_float_rayEps, TFAR_MAX);
+      r = bvh_create_ray(rs.wo, rs.hitPos + fix_normal(rs.ng, rs.wo) * u_float_ray_eps, TFAR_MAX);
       bounce++;
     }
     else {
       if(u_bool_UseIBL) {
         if(bounce == 0) {
             if (u_bool_ShowBackground) {
-              return vec4(evaluateIBL(r.dir), 1.0);
+              return vec4(eval_ibl(r.dir), 1.0);
             } else {
               return vec4(pow(u_BackgroundColor.xyz, vec3(2.2)), u_BackgroundColor.w);
             }
         } else {
           float ibl_sample_pdf = sampleEnvironmentLightPdf(r.dir);
           float mis_weight = last_bounce_specular ? 1.0 : mis_balance_heuristic(last_bounce_pdf *last_bsdf_selection_pdf, ibl_sample_pdf);
-          radiance += evaluateIBL(r.dir) * path_weight * mis_weight;
+          radiance += eval_ibl(r.dir) * path_weight * mis_weight;
         }
       }
       break;

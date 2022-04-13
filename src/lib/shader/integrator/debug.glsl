@@ -10,16 +10,16 @@ vec4 trace_debug(const bvh_ray r) {
 
     if (u_int_DebugMode == 1) {
       contrib = vec3(rs.closure.albedo);
-      // vec3 sampleDir = normalize(vec3(rng_NextFloat(), rng_NextFloat(),rng_NextFloat()));
+      // vec3 sampleDir = normalize(vec3(rng_float(), rng_float(),rng_float()));
       // float pdf;
       // vec3 c;
-      // sampleAndEvaluateEnvironmentLight(rs, rng_NextFloat(), rng_NextFloat(), sampleDir, c, pdf);
+      // sampleAndEvaluateEnvironmentLight(rs, rng_float(), rng_float(), sampleDir, c, pdf);
       // float pdf2 = sampleEnvironmentLightPdf(sampleDir);
       // contrib = vec3(abs(pdf-pdf2));//rs.closure.albedo;
 
       // // float pdf, pdf2;
-      // // vec2 uv = mapDirToUV(sampleDir, pdf);
-      // // vec3 dir = mapUVToDir(uv, pdf2);
+      // // vec2 uv = dir_to_uv(sampleDir, pdf);
+      // // vec3 dir = uv_to_dir(uv, pdf2);
       // // contrib = vec3(abs(pdf-pdf2));
       // // contrib = abs(dir-sampleDir);
     }
@@ -58,19 +58,19 @@ vec4 trace_debug(const bvh_ray r) {
   } else { // direct background hit
     if (u_bool_ShowBackground) {
       if(u_int_DebugMode == 10) {
-        vec3 sampleDir = transformIBLDir(r.dir, false);
+        vec3 sampleDir = rotate_ibl_dir(r.dir, false);
         float pdf;
-        color = vec4(texture(u_sampler_EnvMap_pdf, mapDirToUV(sampleDir, pdf)).xyz, 1.0) * 10.0;
+        color = vec4(texture(u_sampler_env_map_pdf, dir_to_uv(sampleDir, pdf)).xyz, 1.0) * 10.0;
       }
       else if(u_int_DebugMode == 11) {
-        vec3 sampleDir = transformIBLDir(r.dir, false);
+        vec3 sampleDir = rotate_ibl_dir(r.dir, false);
         float pdf;
-        color = vec4(texture(u_sampler_EnvMap_cdf, mapDirToUV(sampleDir, pdf)).xyz, 1.0);
+        color = vec4(texture(u_sampler_env_map_cdf, dir_to_uv(sampleDir, pdf)).xyz, 1.0);
       }
       else {
-        vec3 sampleDir = transformIBLDir(r.dir, false);
+        vec3 sampleDir = rotate_ibl_dir(r.dir, false);
         float pdf;
-        color = vec4(texture(u_sampler_EnvMap, mapDirToUV(sampleDir, pdf)).xyz, 1.0);
+        color = vec4(texture(u_sampler_env_map, dir_to_uv(sampleDir, pdf)).xyz, 1.0);
       }
     }
   }
