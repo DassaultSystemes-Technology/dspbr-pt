@@ -89,10 +89,10 @@ function precompute1DPdfAndCdf(data: Float32Array, pdf: Float32Array,
 }
 
 async function precomputeIBLImportanceSamplingData(texture: any) {
+  console.time("Precomputing IBL importance sampling data...");
   const image = texture.image;
   const w = image.width;
   const h = image.height;
-  console.log("Precomputing IBL importance sampling data...");
 
   const f = new Float32Array(w * h);
   const sumX = new Float32Array(h);
@@ -126,6 +126,8 @@ async function precomputeIBLImportanceSamplingData(texture: any) {
   texture["yPDF"] = yPDF;
   texture["yCDF"] = yCDF;
   texture["totalSum"] = totalSum;
+
+  console.timeEnd("Precomputing IBL importance sampling data...");
 }
 
 export function loadIBL(ibl: string) {

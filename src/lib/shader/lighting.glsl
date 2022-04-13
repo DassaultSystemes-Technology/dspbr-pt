@@ -23,7 +23,7 @@
 
 //   float cosNL = dot(light_dir, n);
 
-//   bool isVisible = isVisible(rs.hitPos + n * u_float_ray_eps, cPointLightPosition);
+//   bool isVisible = isVisible(rs.hitPos + n * u_ray_eps, cPointLightPosition);
 
 //   // bool transmit = false;
 //   // if (cosNL < 0.0 && rs.closure.transparency > 0.0)
@@ -59,11 +59,11 @@ int sampleRow1D(sampler2D pdf, sampler2D cdf, int row, int size, inout float r, 
   return x;
 }
 
-ivec2 sample_ibl_pixel_importance(float r0, float r1, out float o_sample_pdf) {
+ivec2 ibl_sample_pixel(float r0, float r1, out float o_sample_pdf) {
   float pdfY = 1.0;
   float pdfX = 1.0;
-  int w = u_ibl_resolution.x;
-  int h = u_ibl_resolution.y;
+  int w = int(u_ibl_resolution.x);
+  int h = int(u_ibl_resolution.y);
   int y = sampleRow1D(u_sampler_env_map_yPdf, u_sampler_env_map_yCdf, 0, h, r1, pdfY);
   int x = sampleRow1D(u_sampler_env_map_pdf, u_sampler_env_map_cdf, y, w, r0, pdfX);
 
@@ -71,41 +71,44 @@ ivec2 sample_ibl_pixel_importance(float r0, float r1, out float o_sample_pdf) {
   return ivec2(x, y);
 }
 
-vec3 rotate_ibl_dir(vec3 dir, bool inverse) {
+vec3 rotate_dir_phi(vec3 dir, bool inverse) {
   float angle = inverse ? -u_ibl_rotation : u_ibl_rotation;
-  return mat3(cos(angle), 0.0, sin(angle), 0.0, 1.0, 0.0, -sin(angle), 0.0, cos(angle)) * dir;
+  mat3 m = mat3(
+    cos(angle), 0.0, sin(angle),
+    0.0, 1.0, 0.0,
+    -sin(angle), 0.0, cos(angle));
+  return m * dir;
 }
 
-
-vec3 sample_ibl_dir_importance(float r0, float r1, out float o_sample_pdf) {
+vec3 ibl_sample_direction(float r0, float r1, out float o_sample_pdf) {
   float sample_pdf;
-  ivec2 xy = sample_ibl_pixel_importance(r0, r1, sample_pdf);
-  vec2 uv = vec2(xy) / vec2(u_ibl_resolution.x, u_ibl_resolution.y);
+  ivec2 xy = ibl_sample_pixel(r0, r1, sample_pdf);
+  vec2 uv = vec2(xy) / u_ibl_resolution;
 
   float angular_pdf;
-  vec3 sample_dir = rotate_ibl_dir(uv_to_dir(uv, angular_pdf), true);
+  vec3 sample_dir = rotate_dir_phi(uv_to_dir(uv, angular_pdf), true);
   o_sample_pdf = sample_pdf * angular_pdf;
 
   return sample_dir;
 }
 
-vec3 eval_ibl(vec3 dir) {
+vec3 ibl_eval(vec3 dir) {
   float pdf; // TODO needs multiply?
-  vec3 sample_dir = rotate_ibl_dir(dir, false);
+  vec3 sample_dir = rotate_dir_phi(dir, false);
   vec2 uv = dir_to_uv(sample_dir, pdf);
   return texture(u_sampler_env_map, uv).xyz;
 }
 
-float sampleEnvironmentLightPdf(vec3 direction) {
-  float angularPdf;
-  vec3 sampleDir = rotate_ibl_dir(direction, false);
-  vec2 uv = dir_to_uv(sampleDir, angularPdf);
-  float w = float(u_ibl_resolution.x);
-  float h = float(u_ibl_resolution.y);
+float ibl_pdf(vec3 dir) {
+  float pdf_w;
+  vec3 sample_dir = rotate_dir_phi(dir, false);
+  vec2 uv = dir_to_uv(sample_dir, pdf_w);
+  float w = u_ibl_resolution.x;
+  float h = u_ibl_resolution.y;
 
   float x = min((uv.x) * w, w - 1.0);
   float y = min((uv.y) * h, h - 1.0);
   return w * h * texelFetch(u_sampler_env_map_yPdf, ivec2(y, 0), 0).x *
-         texelFetch(u_sampler_env_map_pdf, ivec2(x, y), 0).x * angularPdf;
+         texelFetch(u_sampler_env_map_pdf, ivec2(x, y), 0).x * pdf_w;
 }
 

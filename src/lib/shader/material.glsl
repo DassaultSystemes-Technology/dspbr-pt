@@ -32,6 +32,10 @@ vec4 get_texture_value(float tex_info_id, vec2 uv) {
   return tex_info_id < 0.0 ? vec4(1,1,1,1) : evaluateMaterialTextureValue(u_tex_infos[int(tex_info_id)], uv);
 }
 
+bool is_specular_event(MaterialClosure c) {
+  return bool(c.event_type & E_SINGULAR);
+}
+
 void configure_material(const in uint matIdx, in RenderState rs, out MaterialClosure c, vec4 vertexColor) {
   vec2 uv = rs.uv0;
 

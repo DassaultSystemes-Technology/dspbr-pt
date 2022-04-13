@@ -29,12 +29,12 @@ vec4 trace_pt(bvh_ray r)
       if(!sample_bsdf_bounce(rs, bounce_weight, bounce_pdf)) break; //absorped
       path_weight *= bounce_weight;
 
-      r = bvh_create_ray(rs.wo, rs.hitPos + fix_normal(rs.ng, rs.wo) * u_float_ray_eps, TFAR_MAX);
+      r = bvh_create_ray(rs.wo, rs.hitPos + fix_normal(rs.ng, rs.wo) * u_ray_eps, TFAR_MAX);
       bounce++;
     }
     else {
-      if(bool(u_bool_UseIBL)) {
-        contribution += eval_ibl(r.dir) * path_weight;
+      if(u_use_ibl > 0.0) {
+        contribution += ibl_eval(r.dir) * path_weight;
       }
       break;
     }

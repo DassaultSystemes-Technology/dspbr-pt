@@ -309,6 +309,7 @@ function SimpleTriangleBVH(triDataStride) {
 	}
 
 	me.build = function(triData) {
+    const start = new Date().getTime();
 		me.m_pTriangles = triData;
 		me.m_NumTriangles = (me.m_pTriangles.length / (3 * triDataStride)) | 0;
 		me.m_pTriIndices = new Int32Array(me.m_NumTriangles);
@@ -316,16 +317,20 @@ function SimpleTriangleBVH(triDataStride) {
 		me.m_RootNode = new BVHNode(0);
 		me.m_Info_NumNodes = 1;
 
-		console.log("Building BVH for " + me.m_NumTriangles + " triangles.");
-
 		for (let i = 0; i < me.m_NumTriangles; i++) me.m_pTriIndices[i] = i;
 
 		computeAABB(me.m_RootNode.m_AABB, 0, me.m_NumTriangles);
 
 		buildTree_Rec(me.m_RootNode, 0, me.m_NumTriangles, 0/*startdepth*/);
 
-		console.log("BVH Depth = " + me.m_Info_TreeDepth + "; NumNodes = " + me.m_Info_NumNodes);
-
+    const end = new Date().getTime();
+    var time = end - start;
+		console.log(
+    `Bvh Stats:
+     Triangles:     ${me.m_NumTriangles}
+     Depth:         ${me.m_Info_TreeDepth}
+     Nodes:         ${me.m_Info_NumNodes}
+     Build time:    ${end - start}ms`)
 		//me.printTreeRec(me.m_RootNode, 0);
 	};
 

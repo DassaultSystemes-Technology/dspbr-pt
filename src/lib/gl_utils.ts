@@ -63,14 +63,14 @@ export async function createProgramFromSource(gl: WebGL2RenderingContext,
   vertexShaderSource: string, fragmentShaderSource: string, shaderChunks?: Map<string, string> ) {
 
   if (shaderChunks) {
-    console.time("Shader chunk resolve...");
+    console.time("Resolving shader chunks");
     for (let [id, chunk] of shaderChunks) {
       let identifier = `#include <${id}>`;
       vertexShaderSource = vertexShaderSource.replace(identifier, chunk);
       fragmentShaderSource = fragmentShaderSource.replace(identifier, chunk);
       // console.log(fragmentShaderSource);
     }
-    console.timeEnd("Shader chunk resolve...");
+    console.timeEnd("Resolving shader chunks");
   }
 
   var ext = gl.getExtension('KHR_parallel_shader_compile');
@@ -113,6 +113,7 @@ export async function createProgramFromSource(gl: WebGL2RenderingContext,
       return program;
     } else {
       checkToUseProgram();
+      return program;
     }
   } else {
     throw new Error("Shader compile error");

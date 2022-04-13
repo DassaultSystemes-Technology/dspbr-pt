@@ -66,6 +66,10 @@ export interface PathtracingRendererParameters {
   context?: WebGL2RenderingContext;
 }
 
+export enum RenderResMode {
+  High,
+  Low
+}
 export class PathtracingRenderer {
   private gl: any;
   private canvas: any | undefined;
@@ -74,6 +78,9 @@ export class PathtracingRenderer {
 
   private ibl: WebGLTexture | null = null;
   private iblImportanceSamplingData: IBLImportanceSamplingData = new IBLImportanceSamplingData();
+
+  private fbos = new Map<string, WebGLFramebuffer[]>();
+  private renderBuffers = new Map<string, WebGLFramebuffer[]>();
 
   private fbo: WebGLFramebuffer | null = null;
   private copyFbo: WebGLFramebuffer | null = null;
@@ -91,14 +98,12 @@ export class PathtracingRenderer {
   private displayProgram: WebGLProgram | null = null;
   private quadVertexBuffer: WebGLBuffer | null = null;
 
-  private renderRes: [number, number] = [0, 0];
-  private renderResLow: [number, number] = [0, 0];
-  private displayRes: [number, number] = [0, 0];
+  private renderRes = [[0, 0], [0, 0]]; // [highres, lowres]
+  private displayRes = [0, 0];
 
   private _frameCount = 1;
   private _isRendering = false;
   private _currentAnimationFrameId = -1;
-
 
   private _exposure = 1.0;
   public get exposure() {
@@ -110,7 +115,7 @@ export class PathtracingRenderer {
   }
 
   public debugModes = ["None", "Albedo", "Metalness", "Roughness", "Normals", "Tangents", "Bitangents", "Transparency", "UV0", "Clearcoat", "IBL PDF", "IBL CDF", "Specular", "SpecularTint", "Fresnel_Schlick"];
-  private _debugMode: string = "None";
+  private _debugMode: string = "Albedo";
   public get debugMode() {
     return this._debugMode;
   }
@@ -223,12 +228,11 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
-  private _lowResRenderMode = false;
+  private _renderResMode = RenderResMode.High;
   private setLowResRenderMode(flag: boolean) {
-    this._lowResRenderMode = flag;
+    this._renderResMode = flag ? RenderResMode.Low : RenderResMode.High;
     this.resetAccumulation();
   }
-
 
   private _backgroundColor = [0.0, 0.0, 0.0, 1.0];
   public get backgroundColor() {
@@ -259,7 +263,8 @@ export class PathtracingRenderer {
     this.gl.bindBufferBase(this.gl.UNIFORM_BUFFER, 0, this.pathtracingUniformBuffer);
     this.gl.bindBuffer(this.gl.UNIFORM_BUFFER, null);
 
-    this.initRenderer();
+    this.resize(Math.floor(this.canvas.width), Math.floor(this.canvas.height));
+    this.initFullscreenQuad();
   }
 
   resetAccumulation() {
@@ -269,11 +274,14 @@ export class PathtracingRenderer {
   resize(width: number, height: number) {
     this._isRendering = false;
     this.displayRes = [width, height];
-    this.renderRes = [Math.ceil(this.displayRes[0] * this._pixelRatio),
-    Math.ceil(this.displayRes[1] * this._pixelRatio)];
-
-    this.renderResLow = [Math.ceil(this.displayRes[0] * this._pixelRatioLowRes),
-    Math.ceil(this.displayRes[1] * this._pixelRatioLowRes)];
+    this.renderRes[0] = [
+      Math.ceil(this.displayRes[0] * this._pixelRatio),
+      Math.ceil(this.displayRes[1] * this._pixelRatio)
+    ];
+    this.renderRes[1] = [
+      Math.ceil(this.displayRes[0] * this._pixelRatioLowRes),
+      Math.ceil(this.displayRes[1] * this._pixelRatioLowRes)
+    ];
 
     this.initFramebuffers();
     this.resetAccumulation();
@@ -290,57 +298,55 @@ export class PathtracingRenderer {
 
   private pathtracingUniformBuffer: WebGLBuffer;
   private pathTracingUniforms = {
-    "u_mat4_ViewMatrix": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-    "u_BackgroundColor": [0, 0, 0, 1],
-    "u_vec3_CameraPosition": [0, 0, 0, 0],
-    "u_vec2_InverseResolution": [0, 0],
-    "u_ibl_resolution": [0,0],
-    "u_int_FrameCount": 0,
-    "u_int_DebugMode": 0,
-    "u_int_SheenG": 0,
-    "u_bool_UseIBL": 0,
+    "u_u_view_mat": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+    "u_background_color": [0, 0, 0, 1],
+    "u_camera_pos": [0, 0, 0, 0],
+    "u_inv_render_res": [0, 0],
+    "u_ibl_resolution": [0, 0],
+    "u_frame_count": 0,
+    "u_debug_mode": 0,
+    "u_sheen_G": 0,
+    "u_use_ibl": 0,
     "u_ibl_rotation": 0,
-    "u_bool_ShowBackground": 0,
+    "u_background_from_ibl": 0,
     "u_max_bounces": 0,
-    "u_float_FocalLength": 0,
-    "u_bool_forceIBLEval": 0,
-    "u_float_ray_eps": 0,
-    "u_int_RenderMode": 0,
+    "u_focal_length": 0,
+    "u_force_ibl_on_last_bounce": 0,  // not used
+    "u_ray_eps": 0,
+    "u_render_mode": 0,
     "pad": 0
   };
 
   private updatePathracingUniforms(camera: any) {
-    const renderRes = this._lowResRenderMode ? this.renderResLow : this.renderRes;
+    const renderRes = this.renderRes[this._renderResMode];
     let filmHeight = Math.tan(camera.fov * 0.5 * Math.PI / 180.0) * camera.near;
 
-    this.pathTracingUniforms["u_mat4_ViewMatrix"] = camera.matrixWorld.elements;
-    this.pathTracingUniforms["u_vec3_CameraPosition"] = [camera.position.x, camera.position.y, camera.position.z, filmHeight];
-    this.pathTracingUniforms["u_int_FrameCount"] =  this._frameCount;
-    this.pathTracingUniforms["u_int_DebugMode"] =  this.debugModes.indexOf(this._debugMode);
-    this.pathTracingUniforms["u_int_SheenG"] = this.sheenGModes.indexOf(this._sheenG);
-    this.pathTracingUniforms["u_bool_UseIBL"] =  this.useIBL ? 1 : 0;
-    this.pathTracingUniforms["u_ibl_rotation"] =  this.iblRotation;
-    this.pathTracingUniforms["u_bool_ShowBackground"] =  this.showBackground ?  1 : 0;
-    this.pathTracingUniforms["u_BackgroundColor"] =  this.backgroundColor;
-    this.pathTracingUniforms["u_max_bounces"] =  this.maxBounces;
+    this.pathTracingUniforms["u_u_view_mat"] = camera.matrixWorld.elements;
+    this.pathTracingUniforms["u_camera_pos"] = [camera.position.x, camera.position.y, camera.position.z, filmHeight];
+    this.pathTracingUniforms["u_frame_count"] = this._frameCount;
+    this.pathTracingUniforms["u_debug_mode"] = this.debugModes.indexOf(this._debugMode);
+    this.pathTracingUniforms["u_sheen_G"] = this.sheenGModes.indexOf(this._sheenG);
+    this.pathTracingUniforms["u_use_ibl"] = this.useIBL ? 1 : 0;
+    this.pathTracingUniforms["u_ibl_rotation"] = this._iblRotation;
+    this.pathTracingUniforms["u_background_from_ibl"] = this.showBackground ? 1 : 0;
+    this.pathTracingUniforms["u_background_color"] = this.backgroundColor;
+    this.pathTracingUniforms["u_max_bounces"] = this.maxBounces;
     this.pathTracingUniforms["u_ibl_resolution"] = [this.iblImportanceSamplingData.width, this.iblImportanceSamplingData.height];
-    this.pathTracingUniforms["u_vec2_InverseResolution"] =  [1.0 / renderRes[0], 1.0 / renderRes[1]];
-    this.pathTracingUniforms["u_float_FocalLength"] = camera.near;
-    this.pathTracingUniforms["u_bool_forceIBLEval"] =  this.forceIBLEval ? 1 : 0;
-    this.pathTracingUniforms["u_float_ray_eps"] =  this.rayEps;
-    this.pathTracingUniforms["u_int_RenderMode"] =  this.renderModes.indexOf(this._renderMode);
+    this.pathTracingUniforms["u_inv_render_res"] = [1.0 / renderRes[0], 1.0 / renderRes[1]];
+    this.pathTracingUniforms["u_focal_length"] = camera.near;
+    this.pathTracingUniforms["u_ray_eps"] = this.rayEps;
+    this.pathTracingUniforms["u_render_mode"] = this.renderModes.indexOf(this._renderMode);
 
     const uniformValues = new Float32Array(Object.values(this.pathTracingUniforms).flat());
-    console.log(uniformValues.length);
     this.gl.bindBuffer(this.gl.UNIFORM_BUFFER, this.pathtracingUniformBuffer);
     this.gl.bufferData(this.gl.UNIFORM_BUFFER, uniformValues, this.gl.STATIC_DRAW);
     this.gl.bindBuffer(this.gl.UNIFORM_BUFFER, null);
   }
 
-  private bindTextures(): number {
+  private bindTextures(startSlot: number): number {
     let gl = this.gl;
 
-    let slot = 2; // first 2 slots used are blocked by bvh and mesh textures
+    let slot = startSlot;
     gl.useProgram(this.ptProgram);
 
     gl.activeTexture(gl.TEXTURE0 + slot)
@@ -373,21 +379,20 @@ export class PathtracingRenderer {
   }
 
   renderFrame(camera: any, num_samples: number, frameFinishedCB: (frameCount: number) => void, renderingFinishedCB: () => void) {
+    let gl = this.gl;
     if (!this._isRendering) {
       return;
     }
 
-    const fbo = this._lowResRenderMode ? this.fbo_lr : this.fbo;
-    const copyFbo = this._lowResRenderMode ? this.copyFbo_lr : this.copyFbo;
-    const renderRes = this._lowResRenderMode ? this.renderResLow : this.renderRes;
-    const copyBuffer = this._lowResRenderMode ? this.copyBuffer_lr : this.copyBuffer;
-    const renderBuffer = this._lowResRenderMode ? this.renderBuffer_lr : this.renderBuffer;
+    const fbo = this.fbos.get("pt_fbo")![this._renderResMode];
+    const copyFbo = this.fbos.get("copy_fbo")![this._renderResMode];
+    const renderBuffer = this.renderBuffers.get("pt_buffer")![this._renderResMode];
+    const copyBuffer = this.renderBuffers.get("copy_buffer")![this._renderResMode];
+    const renderRes = this.renderRes[this._renderResMode];
 
-    let gl = this.gl;
-
+    let slot = 2; // first 2 slots used are blocked by bvh and mesh textures
+    slot = this.bindTextures(slot);
     this.updatePathracingUniforms(camera);
-
-    let slot = this.bindTextures();
 
     gl.bindVertexArray(this.quadVao);
     gl.viewport(0, 0, renderRes[0], renderRes[1]);
@@ -452,60 +457,55 @@ export class PathtracingRenderer {
 
   private initFramebuffers() {
     const gl = this.gl;
-    if (this.fbo !== undefined) {
-      gl.deleteFramebuffer(this.fbo);
-      gl.deleteFramebuffer(this.copyFbo);
-      gl.deleteFramebuffer(this.fbo_lr);
-      gl.deleteFramebuffer(this.copyFbo_lr);
+
+    // cleanup renderbuffers and fbos
+    for (const rb of this.renderBuffers.values()) {
+      if (rb[0]) gl.deleteTexture(rb[0]);
+      if (rb[1]) gl.deleteTexture(rb[1]);
     }
-    if (this.renderBuffer !== undefined) {
-      gl.deleteTexture(this.renderBuffer);
-      gl.deleteTexture(this.copyBuffer);
-      gl.deleteTexture(this.renderBuffer_lr);
-      gl.deleteTexture(this.copyBuffer_lr);
+    this.renderBuffers.clear();
+
+    for (const fbo of this.fbos.values()) {
+      if (fbo[0]) gl.deleteFramebuffer(fbo[0]);
+      if (fbo[1]) gl.deleteFramebuffer(fbo[1]);
+    }
+    this.fbos.clear();
+
+    function createFbo(textures: WebGLTexture[]): WebGLFramebuffer {
+      let drawBuffers: any = [];
+      const fbo = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+
+      for (let i = 0; i < textures.length; i++) {
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i, gl.TEXTURE_2D, textures[i], 0);
+        drawBuffers.push(gl.COLOR_ATTACHMENT0 + i);
+      }
+      gl.drawBuffers(drawBuffers);
+      return fbo;
     }
 
-    this.renderBuffer_lr = glu.createRenderBufferTexture(gl, null, this.renderResLow[0], this.renderResLow[1]);
-    this.fbo_lr = gl.createFramebuffer();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo_lr);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.renderBuffer_lr, 0);
-    gl.drawBuffers([
-      gl.COLOR_ATTACHMENT0
+    this.renderBuffers.set("pt_buffer", [
+      glu.createRenderBufferTexture(gl, null, this.renderRes[0][0], this.renderRes[0][1])!, // highres
+      glu.createRenderBufferTexture(gl, null, this.renderRes[1][0], this.renderRes[1][1])!  // lowres
     ]);
-    // console.log(gl.checkFramebufferStatus(gl.FRAMEBUFFER));
+    this.renderBuffers.set("copy_buffer", [
+      glu.createRenderBufferTexture(gl, null, this.renderRes[0][0], this.renderRes[0][1])!, // highres
+      glu.createRenderBufferTexture(gl, null, this.renderRes[1][0], this.renderRes[1][1])!  // lowres
+    ]);
 
-    this.copyBuffer_lr = glu.createRenderBufferTexture(gl, null, this.renderResLow[0], this.renderResLow[1]);
-    this.copyFbo_lr = gl.createFramebuffer();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.copyFbo_lr);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.copyBuffer_lr, 0);
-    gl.drawBuffers([
-      gl.COLOR_ATTACHMENT0
+    this.fbos.set("pt_fbo", [
+      createFbo([this.renderBuffers.get("pt_buffer")![0]]),
+      createFbo([this.renderBuffers.get("pt_buffer")![1]]),
     ]);
-    // console.log(gl.checkFramebufferStatus(gl.FRAMEBUFFER));
-
-    this.renderBuffer = glu.createRenderBufferTexture(gl, null, this.renderRes[0], this.renderRes[1]);
-    this.fbo = gl.createFramebuffer();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.renderBuffer, 0);
-    gl.drawBuffers([
-      gl.COLOR_ATTACHMENT0
+    this.fbos.set("copy_fbo", [
+      createFbo([this.renderBuffers.get("copy_buffer")![0]]),
+      createFbo([this.renderBuffers.get("copy_buffer")![1]]),
     ]);
-    // console.log(gl.checkFramebufferStatus(gl.FRAMEBUFFER));
-
-    this.copyBuffer = glu.createRenderBufferTexture(gl, null, this.renderRes[0], this.renderRes[1]);
-    this.copyFbo = gl.createFramebuffer();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.copyFbo);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.copyBuffer, 0);
-    gl.drawBuffers([
-      gl.COLOR_ATTACHMENT0
-    ]);
-    // console.log(gl.checkFramebufferStatus(gl.FRAMEBUFFER));
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
 
-  private async initRenderer() {
-    this.resize(Math.floor(this.canvas.width), Math.floor(this.canvas.height));
+  private async initFullscreenQuad() {
     let gl = this.gl;
     // glu.printGLInfo(gl);
 
@@ -586,7 +586,7 @@ export class PathtracingRenderer {
       pathtracingUniformBlockIdx,
       gl.UNIFORM_BLOCK_DATA_SIZE
     );
-    console.log(`Uniform Block Size: ${pathtracingUniformBlockSize}`);
+    //console.log(`Uniform Block Size: ${pathtracingUniformBlockSize}`);
     // const expectedMaterialBlockSize = 240*this.scene!.sceneData.num_materials;
 
     let texInfoBlockIdx = gl.getUniformBlockIndex(program, "TextureInfoBlock");
@@ -596,7 +596,7 @@ export class PathtracingRenderer {
       texInfoBlockIdx,
       gl.UNIFORM_BLOCK_DATA_SIZE
     );
-    console.log(`TexInfo Block Size: ${textureInfoBlockSize}`);
+    //console.log(`TexInfo Block Size: ${textureInfoBlockSize}`);
     // const expectedTextureInfoBlockSize = 32*this.scene!.sceneData.num_textures;
 
     const materialUniformBuffers = this.scene?.materialUniformBuffers!;
@@ -608,17 +608,8 @@ export class PathtracingRenderer {
         matBlockIdx,
         gl.UNIFORM_BLOCK_DATA_SIZE
       );
-      console.log(`Material_${i} Block Size: ${materialBlockSize}`);
+      //console.log(`Material_${i} Block Size: ${materialBlockSize}`);
     }
-    // const expectedMaterialBlockSize = 240*this.scene!.sceneData.num_materials;
-
-
-
-    // if(materialBlockSize != expectedMaterialBlockSize)
-    //   throw new Error(`Material uniform buffer WebGL expected size of ${materialBlockSize}doesn't match real size ${expectedMaterialBlockSize}. Check alignment and padding!`);
-    // if(textureInfoBlockSize != expectedTextureInfoBlockSize)
-    //   throw new Error(`Texture Block uniform buffer WebGL expected size of ${textureInfoBlockSize} doesn't match real size${expectedTextureInfoBlockSize}. Check alignment and padding!`);
-
 
     gl.useProgram(null);
   }
@@ -653,7 +644,7 @@ export class PathtracingRenderer {
     };
     `
 
-    console.log(this.scene.materialBufferShaderChunk);
+    // console.log(this.scene.materialBufferShaderChunk);
     const shaderChunks = new Map<string, string>([
       ['structs', structs_shader],
       ['rng', rng_shader],

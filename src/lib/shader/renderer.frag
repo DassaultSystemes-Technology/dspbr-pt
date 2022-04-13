@@ -22,23 +22,23 @@ precision highp sampler2DArray;
 in vec2 v_uv;
 
  layout(std140) uniform PathTracingUniformBlock {
-    mat4  u_mat4_ViewMatrix;
-    vec4 u_BackgroundColor;
-    vec4  u_vec3_CameraPosition;
-    vec2  u_vec2_InverseResolution;
-    ivec2 u_ibl_resolution;
-    float u_int_FrameCount;
-    float u_int_DebugMode;
-    float u_int_SheenG;
-    float u_bool_UseIBL;
+    mat4  u_u_view_mat;
+    vec4  u_background_color;
+    vec4  u_camera_pos;
+    vec2  u_inv_render_res;
+    vec2  u_ibl_resolution;
+    float u_frame_count;
+    float u_debug_mode;
+    float u_sheen_G;
+    float u_use_ibl;
     float u_ibl_rotation;
-    float u_bool_ShowBackground;
+    float u_background_from_ibl;
     float u_max_bounces;
-    float u_float_FocalLength;
-    float u_bool_forceIBLEval;
-    float u_float_ray_eps;
-    float u_int_RenderMode;
-    float  u_pad;
+    float u_focal_length;
+    float u_force_ibl_on_last_bounce;  // not used
+    float u_ray_eps;
+    float u_render_mode;
+    float u_pad;
 };
 
 uniform sampler2D u_sampler2D_PreviousTexture;
@@ -160,34 +160,34 @@ bool check_russian_roulette_path_termination(int bounce, inout vec3 path_weight)
 ///////////////////////////////////////////////////////////////////////////////
 bvh_ray calcuateViewRay(float r0, float r1) {
   // box filter
-  vec2 pixelOffset = vec2(r0, r1) * u_vec2_InverseResolution;
+  vec2 pixelOffset = vec2(r0, r1) * u_inv_render_res;
 
-  float aspect = u_vec2_InverseResolution.y / u_vec2_InverseResolution.x;
+  float aspect = u_inv_render_res.y / u_inv_render_res.x;
 
-  vec2 uv = (v_uv * vec2(aspect, 1.0) + pixelOffset) * u_vec3_CameraPosition.w;
-  vec3 fragPosView = normalize(vec3(uv.x, uv.y, -u_float_FocalLength));
+  vec2 uv = (v_uv * vec2(aspect, 1.0) + pixelOffset) * u_camera_pos.w;
+  vec3 fragPosView = normalize(vec3(uv.x, uv.y, -u_focal_length));
 
-  fragPosView = mat3(u_mat4_ViewMatrix) * fragPosView;
-  vec3 origin = u_vec3_CameraPosition.xyz;
+  fragPosView = mat3(u_u_view_mat) * fragPosView;
+  vec3 origin = u_camera_pos.xyz;
 
   return bvh_create_ray(fragPosView, origin, TFAR_MAX);
 }
 
 void main() {
-  rng_init(int(u_int_FrameCount) * int(u_max_bounces));
+  rng_init(int(u_frame_count) * int(u_max_bounces));
 
   bvh_ray r = calcuateViewRay(rng_float(), rng_float());
 
   vec4 contribution;
-  if (int(u_int_RenderMode) == RM_PT)
+  if (int(u_render_mode) == RM_PT)
     contribution = trace_pt(r);
-  if (int(u_int_RenderMode) == RM_MISPTDL)
+  if (int(u_render_mode) == RM_MISPTDL)
     contribution = trace_misptdl(r);
-  if (int(u_int_DebugMode) > 0)
+  if (int(u_debug_mode) > 0)
     contribution = trace_debug(r);
 
   vec4 previousFrameColor = texelFetch(u_sampler2D_PreviousTexture, ivec2(gl_FragCoord.xy), 0);
-  contribution = (previousFrameColor * (u_int_FrameCount - 1.0) + contribution) / u_int_FrameCount;
+  contribution = (previousFrameColor * (u_frame_count - 1.0) + contribution) / u_frame_count;
 
   out_FragColor = contribution;
 }

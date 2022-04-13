@@ -17,7 +17,7 @@ import Stats from 'three/examples/jsm/libs/stats.module.js';
 import { GUI } from 'dat.GUI';
 import { SimpleDropzone } from 'simple-dropzone';
 import { ThreeRenderer } from './three_renderer';
-import { PathtracingRenderer, WavefrontRenderer, Loader } from '../lib/index';
+import { PathtracingRenderer, Loader } from '../lib/index';
 import { ThreeSceneTranslator } from '../lib/three_scene_translator';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
@@ -60,7 +60,6 @@ class App {
 
 
   constructor() {
-    // this.scene = Assets.getScene(0).name;
     this.current_ibl = "Artist Workshop";
     this.current_scene = "";
 
@@ -136,14 +135,13 @@ class App {
       RIGHT: THREE.MOUSE.DOLLY
     }
 
-    // this.renderer = new WavefrontRenderer({ canvas: this.canvas_pt });
     this.renderer = new PathtracingRenderer({ canvas: this.canvas_pt });
     this.three_renderer = new ThreeRenderer({ canvas: this.canvas_three, powerPreference: "high-performance", alpha: true });
 
     this.renderer.pixelRatio = 0.5;
     this.renderer.maxBounces = 5;
     this.renderer.pixelRatioLowRes = 0.15;
-    this.renderer.iblRotation = 180.0;
+    // this.renderer.iblRotation = 180.0;
 
     window.addEventListener('resize', () => {
       this.resize();
@@ -361,7 +359,6 @@ class App {
   }
 
   private centerView() {
-    console.log("center view");
     if (this.controls) {
       let center = new THREE.Vector3();
       this.sceneBoundingBox.getCenter(center);
@@ -447,7 +444,6 @@ class App {
     });//.setValue(this.current_ibl);
 
     lighting.add(this.renderer, 'iblRotation').name('IBL Rotation').min(-180.0).max(180.0).step(0.1).listen();
-    // lighting.add(this.renderer, 'forceIBLEval').name('Force IBL Eval');
     lighting.open();
 
     let interator = this._gui.addFolder('Integrator');
@@ -460,9 +456,8 @@ class App {
     });
 
     interator.add(this.renderer, 'debugMode', this.renderer.debugModes).name('Debug Mode');
-    // interator.add(this.renderer, 'renderMode', this.renderer.renderModes).name('Integrator');
+    interator.add(this.renderer, 'renderMode', this.renderer.renderModes).name('Integrator');
     interator.add(this.renderer, 'maxBounces').name('Bounce Depth').min(0).max(32).step(1);
-    // interator.add(this.renderer, 'sheenG', this.renderer.sheenGModes).name('Sheen G');
     interator.add(this.renderer, 'rayEps').name('Ray Offset');
     interator.open();
 

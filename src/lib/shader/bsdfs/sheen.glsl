@@ -49,7 +49,7 @@ vec3 sheen_layer(out float base_weight, vec3 sheen_color, float sheen_roughness,
 
   float G = 1.0;
 
-  if (int(u_int_SheenG) == 0) {
+  if (int(u_sheen_G) == 0) {
     G = charlieV(alpha, cos_theta_i, cos_theta_o);
   } else {
     G = ashikhminV(alpha, cos_theta_i, cos_theta_o);
