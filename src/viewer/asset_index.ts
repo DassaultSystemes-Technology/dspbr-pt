@@ -19,6 +19,10 @@ export const scenes = {
     "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/IridescenceMetallicSpheres/glTF/IridescenceMetallicSpheres.gltf",
     "credit": "Official <a href=\"https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0/IridescenceMetallicSpheres\">glTF Sample Model</a>."
   },
+  "Iridescence Suzanne": {
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/IridescenceSuzanne/glTF/IridescenceSuzanne.gltf",
+    "credit": "Official <a href=\"https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0/IridescenceSuzanne\">glTF Sample Model</a>."
+  },
   "Stained Glass Lamp": {
     "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/StainedGlassLamp/glTF/StainedGlassLamp.gltf",
     "credit": "Official <a href=\"https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0/StainedGlassLamp\">glTF Sample Model</a>. (Copyright 2021 Wayfair LLC. <a href=\"https://creativecommons.org/licenses/by/4.0/)\">CC BY 4.0 International</a>"

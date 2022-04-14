@@ -43,21 +43,17 @@
 // }
 // #endif
 
-int sampleRow1D(sampler2D pdf, sampler2D cdf, int row, int size, inout float r, out float prop) {
-  int idx = 0;
-  float invProp = 1.0;
-  idx = binsearchCDF_rescale(cdf, row, size, r, invProp);
-  // idx = binsearchCDF(cdf, row, size, r);
 
+int sampleRow1D(sampler2D pdf, sampler2D cdf, int row, int size, inout float r, out float prop) {
+  // float invProp = 1.0;
+  // idx = binsearchCDF_rescale(cdf, row, size, r, invProp);
+  int idx = lower_bound(cdf, row, size, r);
   prop = texelFetch(pdf, ivec2(idx, row), 0).x;
 
   int x = idx; // int((1.0 - r) * float(idx) + r * (float(idx) + 1.0));
-  if (x >= size) {
-    x = size - 1;
-  }
-
-  return x;
+  return (x >= size) ? (size - 1) : x;
 }
+
 
 ivec2 ibl_sample_pixel(float r0, float r1, out float o_sample_pdf) {
   float pdfY = 1.0;
@@ -67,8 +63,20 @@ ivec2 ibl_sample_pixel(float r0, float r1, out float o_sample_pdf) {
   int y = sampleRow1D(u_sampler_env_map_yPdf, u_sampler_env_map_yCdf, 0, h, r1, pdfY);
   int x = sampleRow1D(u_sampler_env_map_pdf, u_sampler_env_map_cdf, y, w, r0, pdfX);
 
-  o_sample_pdf = float(w) * float(h) * pdfY * pdfX;
+  o_sample_pdf = u_ibl_resolution.x * u_ibl_resolution.y * pdfY * pdfX;
   return ivec2(x, y);
+}
+
+
+float ibl_pdf_pixel(ivec2 xy) {
+  float w = u_ibl_resolution.x;
+  float h = u_ibl_resolution.y;
+  return w * h * texelFetch(u_sampler_env_map_yPdf, ivec2(xy.y, 0), 0).x *
+    texelFetch(u_sampler_env_map_pdf, ivec2(xy.x, xy.y), 0).x;
+}
+
+vec3 ibl_eval_pixel(ivec2 xy) {
+  return texelFetch(u_sampler_env_map, xy, 0).xyz;
 }
 
 vec3 rotate_dir_phi(vec3 dir, bool inverse) {
@@ -80,24 +88,27 @@ vec3 rotate_dir_phi(vec3 dir, bool inverse) {
   return m * dir;
 }
 
+
+vec3 ibl_eval(vec3 dir) {
+  float pdf;
+  vec3 sample_dir = rotate_dir_phi(dir, false);
+  vec2 uv = dir_to_uv(sample_dir, pdf);
+  return texelFetch(u_sampler_env_map, ivec2(uv*u_ibl_resolution), 0).xyz; // TODO needs pdf multiply?
+}
+
+
 vec3 ibl_sample_direction(float r0, float r1, out float o_sample_pdf) {
   float sample_pdf;
   ivec2 xy = ibl_sample_pixel(r0, r1, sample_pdf);
   vec2 uv = vec2(xy) / u_ibl_resolution;
 
-  float angular_pdf;
-  vec3 sample_dir = rotate_dir_phi(uv_to_dir(uv, angular_pdf), true);
-  o_sample_pdf = sample_pdf * angular_pdf;
+  float pdf_w;
+  vec3 sample_dir = rotate_dir_phi(uv_to_dir(uv, pdf_w), true);
+  o_sample_pdf = sample_pdf * pdf_w;
 
   return sample_dir;
 }
 
-vec3 ibl_eval(vec3 dir) {
-  float pdf; // TODO needs multiply?
-  vec3 sample_dir = rotate_dir_phi(dir, false);
-  vec2 uv = dir_to_uv(sample_dir, pdf);
-  return texture(u_sampler_env_map, uv).xyz;
-}
 
 float ibl_pdf(vec3 dir) {
   float pdf_w;
@@ -106,9 +117,11 @@ float ibl_pdf(vec3 dir) {
   float w = u_ibl_resolution.x;
   float h = u_ibl_resolution.y;
 
-  float x = min((uv.x) * w, w - 1.0);
-  float y = min((uv.y) * h, h - 1.0);
+  float x = min((uv.x) * w, u_ibl_resolution.x - 1.0);
+  float y = min((uv.y) * h, u_ibl_resolution.y - 1.0);
   return w * h * texelFetch(u_sampler_env_map_yPdf, ivec2(y, 0), 0).x *
          texelFetch(u_sampler_env_map_pdf, ivec2(x, y), 0).x * pdf_w;
 }
+
+
 

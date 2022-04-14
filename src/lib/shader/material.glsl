@@ -28,10 +28,6 @@ vec2 roughness_conversion(float roughness, float anisotropy) {
   return max(a * a, vec2(MINIMUM_ROUGHNESS));
 }
 
-vec4 get_texture_value(float tex_info_id, vec2 uv) {
-  return tex_info_id < 0.0 ? vec4(1,1,1,1) : evaluateMaterialTextureValue(u_tex_infos[int(tex_info_id)], uv);
-}
-
 bool is_specular_event(MaterialClosure c) {
   return bool(c.event_type & E_SINGULAR);
 }

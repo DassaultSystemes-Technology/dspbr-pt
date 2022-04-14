@@ -8,15 +8,11 @@ vec3 eval_direct_light_contribution(in RenderState rs, float r0, float r1) {
     ibl_sample_dir = ibl_sample_direction(r0, r1, ibl_sample_pdf);
 
     float cosNL = dot(ibl_sample_dir, rs.closure.n);
-    if (bool(rs.closure.event_type & (E_REFLECTION | E_DIFFUSE)) && cosNL > EPS_COS) {
-     if (!isOccluded(rs.hitPos + rs.closure.n * u_ray_eps, ibl_sample_dir)) {
-        L = ibl_eval(ibl_sample_dir) * eval_dspbr(rs.closure, rs.wi, ibl_sample_dir) * cosNL;
+    vec3 sample_org = rs.hitPos + rs.closure.n * u_ray_eps * sign(cosNL);
+    if (abs(cosNL) > EPS_COS) {
+     if (!isOccluded(sample_org, ibl_sample_dir)) {
+        L = ibl_eval(ibl_sample_dir) * eval_dspbr(rs.closure, rs.wi, ibl_sample_dir) * abs(cosNL);
      }
-    }
-    else if (bool(rs.closure.event_type & E_TRANSMISSION) && cosNL < EPS_COS) {
-      if (!isOccluded(rs.hitPos - rs.closure.n * u_ray_eps, ibl_sample_dir)) {
-        L = eval_dspbr(rs.closure, rs.wi, ibl_sample_dir) * ibl_eval(ibl_sample_dir) * -cosNL;
-      }
     }
  }
 

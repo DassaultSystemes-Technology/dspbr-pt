@@ -9,18 +9,23 @@ vec4 trace_debug(const bvh_ray r) {
     fillRenderState(r, hit, rs);
 
     if (int(u_debug_mode) == 1) {
-      // contrib = vec3(rs.closure.albedo);
-      float pdf;
-      vec3 c;
-      vec3 sampleDir = ibl_sample_direction(rng_float(), rng_float(), pdf);
-      float pdf2 = ibl_pdf(sampleDir);
-      contrib = vec3(abs(pdf-pdf2));//rs.closure.albedo;
+      contrib = vec3(rs.closure.albedo);
+      // float pdf;
+      // float r0 = rng_float();
+      // float r1 = rng_float();
 
-      // float pdf, pdf2;
+      // ivec2 xy = ibl_sample_pixel(r0, r1, pdf);
+      // float pdf2 = ibl_pdf_pixel(xy);
+
+      // vec3 sampleDir = ibl_sample_direction(r0, r1, pdf);
+      // float pdf2 = ibl_pdf(sampleDir);
+      // contrib = vec3(abs(pdf-pdf2));//rs.closure.albedo;
+
+      // float pdf2;
       // vec2 uv = dir_to_uv(sampleDir, pdf);
       // vec3 dir = uv_to_dir(uv, pdf2);
       // contrib = vec3(abs(pdf-pdf2));
-      // contrib = abs(dir-sampleDir);
+      // contrib = abs(dir-sampleDir)*10000.0;
     }
     if (int(u_debug_mode) == 2)
       contrib = vec3(rs.closure.metallic);

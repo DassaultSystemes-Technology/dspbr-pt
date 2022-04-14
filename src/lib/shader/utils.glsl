@@ -220,7 +220,7 @@ vec3 to_linear_rgb(vec3 srgb) {
   return pow(srgb.xyz, vec3(2.2));
 }
 
-int findLowerBound(sampler2D data, int row, int size, float value)
+int lower_bound(sampler2D data, int row, int size, float value)
 {
   int idx;
   int step;
@@ -243,36 +243,63 @@ int findLowerBound(sampler2D data, int row, int size, float value)
   return first;
 }
 
-int binsearchCDF(sampler2D cdf, int row, int size, float value) {
-  if (!(value >= 0.0))
-    return 0;
-  if (!(value <= 1.0))
-    return size - 1;
+// int lower_bound(sampler2D data, int row, int size, float x) {
+//   // int lower_bound(int arr[], int N, int X)
+//     int mid;
+//     // Initialise starting index and
+//     // ending index
+//     int low = 0;
+//     int high = size;
 
-  return findLowerBound(cdf, row, size, value + 0.00000001);
-}
+//     // Till low is less than high
+//     while (low < high) {
+//         mid = low + (high - low) / 2;
+//         // If x is less than or equal
+//         // to v, then find in
+//         // left subarray
+//         float v = texelFetch(data, ivec2(mid, row), 0).x;
+//         if (x <= v) {
+//             high = mid;
+//         }
 
-// Performs a binsearch in the given array with the given number and resacles the input random number
-int binsearchCDF_rescale(sampler2D cdf, int row, int size, inout float v, out float invProp)
-{
-  int idx = binsearchCDF(cdf, row, size, v);
-  // rescale r0 to get again a random number between [0,1); here we need to keep numerical accuracy in mind but
-  // it is necessary to preserve a possible stratification from the random numbers
-  if (idx == 0)
-  {
-    invProp = 1.0 / texelFetch(cdf, ivec2(0, row), 0).x;
-    v = v * invProp;
-  }
-  else
-  {
-    float c0 = texelFetch(cdf, ivec2(idx, row), 0).x;
-    float c1 = texelFetch(cdf, ivec2(idx-1, row), 0).x;
-    invProp = 1.0 / (c0 - c1);
-    v = (v - c1) * invProp;
-  }
+//         // If x is greater v
+//         // then find in right subarray
+//         else {
+//             low = mid + 1;
+//         }
+//     }
 
-  return idx;
-}
+//     // if x is greater than arr[n-1]
+//     if(low < size && texelFetch(data, ivec2(low, row), 0).x < x) {
+//        low++;
+//     }
+
+//     // Return the lower_bound index
+//     return low;
+// }
+
+
+// // Performs a binsearch in the given array with the given number and resacles the input random number
+// int binsearchCDF_rescale(sampler2D cdf, int row, int size, inout float v, out float invProp)
+// {
+//   int idx = binsearchCDF(cdf, row, size, v);
+//   // rescale r0 to get again a random number between [0,1); here we need to keep numerical accuracy in mind but
+//   // it is necessary to preserve a possible stratification from the random numbers
+//   if (idx == 0)
+//   {
+//     invProp = 1.0 / texelFetch(cdf, ivec2(0, row), 0).x;
+//     v = v * invProp;
+//   }
+//   else
+//   {
+//     float c0 = texelFetch(cdf, ivec2(idx, row), 0).x;
+//     float c1 = texelFetch(cdf, ivec2(idx-1, row), 0).x;
+//     invProp = 1.0 / (c0 - c1);
+//     v = (v - c1) * invProp;
+//   }
+
+//   return idx;
+// }
 
 float mis_balance_heuristic(float a, float b) {
 	return a / (a + b);

@@ -35,7 +35,7 @@ in vec2 v_uv;
     float u_background_from_ibl;
     float u_max_bounces;
     float u_focal_length;
-    float u_force_ibl_on_last_bounce;  // not used
+    float u_ibl_pdf_total_sum;
     float u_ray_eps;
     float u_render_mode;
     float u_pad;

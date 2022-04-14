@@ -61,8 +61,10 @@ float dspbr_clearcoat_rho(const in MaterialClosure c, Geometry g, vec3 wi) {
 }
 
 vec3 dspbr_microfacet_brdf_ggx_smith_rho(const in MaterialClosure c, Geometry g, vec3 wi) {
-  return fresnel_schlick(c.specular_f0, c.specular_f90, dot(wi, g.n)) *
-    max(1.0-c.transparency, c.metallic);
+  float cos_theta = dot(wi, g.n);
+  vec3 iridescence_fresnel = evalIridescence(1.0, c.iridescence_ior, cos_theta, c.iridescence_thickness, c.specular_f0);
+
+  return mix(fresnel_schlick(c.specular_f0, c.specular_f90, cos_theta), iridescence_fresnel, c.iridescence) * max(1.0-c.transparency, c.metallic);
 }
 
 vec3 dspbr_microfacet_bsdf_ggx_smith_rho(const in MaterialClosure c, Geometry g, vec3 wi) {
