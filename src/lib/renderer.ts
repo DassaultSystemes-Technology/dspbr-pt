@@ -115,7 +115,7 @@ export class PathtracingRenderer {
   }
 
   public debugModes = ["None", "Albedo", "Metalness", "Roughness", "Normals", "Tangents", "Bitangents", "Transparency", "UV0", "Clearcoat", "IBL PDF", "IBL CDF", "Specular", "SpecularTint", "Fresnel_Schlick"];
-  private _debugMode: string = "Albedo";
+  private _debugMode: string = "None";
   public get debugMode() {
     return this._debugMode;
   }
@@ -311,7 +311,7 @@ export class PathtracingRenderer {
     "u_background_from_ibl": 0,
     "u_max_bounces": 0,
     "u_focal_length": 0,
-    "u_force_ibl_on_last_bounce": 0,  // not used
+    "u_ibl_pdf_total_sum": 0,
     "u_ray_eps": 0,
     "u_render_mode": 0,
     "pad": 0
@@ -336,6 +336,7 @@ export class PathtracingRenderer {
     this.pathTracingUniforms["u_focal_length"] = camera.near;
     this.pathTracingUniforms["u_ray_eps"] = this.rayEps;
     this.pathTracingUniforms["u_render_mode"] = this.renderModes.indexOf(this._renderMode);
+    this.pathTracingUniforms["u_ibl_pdf_total_sum"] = this.iblImportanceSamplingData.totalSum;
 
     const uniformValues = new Float32Array(Object.values(this.pathTracingUniforms).flat());
     this.gl.bindBuffer(this.gl.UNIFORM_BUFFER, this.pathtracingUniformBuffer);
@@ -546,7 +547,7 @@ export class PathtracingRenderer {
     this.iblImportanceSamplingData.cdf = glu.createTexture(gl, gl.TEXTURE_2D, gl.R32F, texture.image.width, texture.image.height, gl.RED, gl.FLOAT, texture.pcCDF, 0);
     this.iblImportanceSamplingData.yPdf = glu.createTexture(gl, gl.TEXTURE_2D, gl.R32F, texture.image.height, 1, gl.RED, gl.FLOAT, texture.yPDF, 0);
     this.iblImportanceSamplingData.yCdf = glu.createTexture(gl, gl.TEXTURE_2D, gl.R32F, texture.image.height, 1, gl.RED, gl.FLOAT, texture.yCDF, 0);
-    // this.iblImportanceSamplingData.totalSum = texture.totalSum;
+    this.iblImportanceSamplingData.totalSum = texture.totalSum;
 
     this.resetAccumulation();
   }
@@ -589,15 +590,17 @@ export class PathtracingRenderer {
     //console.log(`Uniform Block Size: ${pathtracingUniformBlockSize}`);
     // const expectedMaterialBlockSize = 240*this.scene!.sceneData.num_materials;
 
-    let texInfoBlockIdx = gl.getUniformBlockIndex(program, "TextureInfoBlock");
-    gl.uniformBlockBinding(program, texInfoBlockIdx, 1);
-    const textureInfoBlockSize = gl.getActiveUniformBlockParameter(
-      program,
-      texInfoBlockIdx,
-      gl.UNIFORM_BLOCK_DATA_SIZE
-    );
-    //console.log(`TexInfo Block Size: ${textureInfoBlockSize}`);
-    // const expectedTextureInfoBlockSize = 32*this.scene!.sceneData.num_textures;
+    if(this.scene!.sceneData.num_textures > 0) {
+      let texInfoBlockIdx = gl.getUniformBlockIndex(program, "TextureInfoBlock");
+      gl.uniformBlockBinding(program, texInfoBlockIdx, 1);
+      const textureInfoBlockSize = gl.getActiveUniformBlockParameter(
+        program,
+        texInfoBlockIdx,
+        gl.UNIFORM_BLOCK_DATA_SIZE
+      );
+      console.log(`TexInfo Block Size: ${textureInfoBlockSize}`);
+      // const expectedTextureInfoBlockSize = 32*this.scene!.sceneData.num_textures;
+    }
 
     const materialUniformBuffers = this.scene?.materialUniformBuffers!;
     for (let i = 0; i < materialUniformBuffers.length; i++) {
@@ -637,13 +640,6 @@ export class PathtracingRenderer {
     const uint NUM_TRIANGLES = ${this.scene.sceneData.num_triangles}u;
     `;
 
-    const materialBlock = `
-    layout(std140) uniform TextureInfoBlock
-    {
-      TexInfo u_tex_infos[${this.scene.sceneData.num_textures}];
-    };
-    `
-
     // console.log(this.scene.materialBufferShaderChunk);
     const shaderChunks = new Map<string, string>([
       ['structs', structs_shader],
@@ -654,7 +650,7 @@ export class PathtracingRenderer {
       ['material', material_shader],
       ['buffer_accessor', bufferAccessSnippet],
       ['texture_accessor', this.scene.texAccessorShaderChunk],
-      ['material_block', materialBlock + this.scene.materialBufferShaderChunk],
+      ['material_block', this.scene.materialBufferShaderChunk],
       ['dspbr', dspbr_shader],
       ['bvh', bvh_shader],
       ['lighting', lighting_shader],

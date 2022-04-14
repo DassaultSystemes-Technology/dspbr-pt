@@ -9,7 +9,6 @@ export class PathtracingSceneDataAdapterWebGL2 {
 
   private _bvhDataTexture?: WebGLTexture;
   public get bvhDataTexture() { return this._bvhDataTexture; }
-
   private _triangleDataTexture?: WebGLTexture;
   public get triangleDataTexture() { return this._triangleDataTexture; }
 
@@ -20,12 +19,11 @@ export class PathtracingSceneDataAdapterWebGL2 {
 
   private _textureInfoUniformBuffer?: WebGLBuffer;
   public get textureInfoUniformBuffer() { return this._textureInfoUniformBuffer; }
+  private _texAccessorShaderChunk: string = "";
+  public get texAccessorShaderChunk() { return this._texAccessorShaderChunk; }
 
   private _texArrayTextures: { [k: string]: WebGLTexture | null } = {};
   public get texArrayTextures() { return this._texArrayTextures; }
-
-  private _texAccessorShaderChunk: string = "";
-  public get texAccessorShaderChunk() { return this._texAccessorShaderChunk; }
 
   private _lightShaderChunk: string = "";
   public get lightShaderChunk() { return this._lightShaderChunk; }
@@ -63,13 +61,14 @@ export class PathtracingSceneDataAdapterWebGL2 {
     this._triangleDataTexture = glu.createDataTexture(gl, triangleData);
 
     this.generateTextureArrays();
+    this.generateUniformMaterialBuffers()
     this.generateLightBuffers();
-    this.generateUniformMaterialBuffers();
+
     console.timeEnd("Generate gpu data buffers");
 
-    const textureUsage = this._textureDataUsage / (1024*1024);
-    const geometryUsage = triangleData.length*4 / (1024*1024);
-    const bvhUsage = bvhData.length*4 / (1024*1024);
+    const textureUsage = this._textureDataUsage / (1024 * 1024);
+    const geometryUsage = triangleData.length * 4 / (1024 * 1024);
+    const bvhUsage = bvhData.length * 4 / (1024 * 1024);
     console.log(`GPU Memory Consumption (MB):
     Texture: ${textureUsage.toFixed(2)}
     Geometry: ${geometryUsage.toFixed(2)}
@@ -78,6 +77,7 @@ export class PathtracingSceneDataAdapterWebGL2 {
     `);
   }
 
+  // TODO I won't understand this garbage code the next time I look it. Simplify!
   private generateUniformMaterialBuffers() {
     const gl = this.gl;
 
@@ -91,15 +91,9 @@ export class PathtracingSceneDataAdapterWebGL2 {
     const materialListFlat = this._sceneData.getFlatMaterialBuffer();
     const numValuesPerMaterial = this._sceneData.materials[0].data.length;
 
-    var _textureInfoUniformBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.UNIFORM_BUFFER, _textureInfoUniformBuffer);
-    const texInfoListFlat = this._sceneData.getFlatTextureInfoBuffer();
-    gl.bufferData(gl.UNIFORM_BUFFER, texInfoListFlat, gl.STATIC_DRAW);
-    gl.bindBufferBase(gl.UNIFORM_BUFFER, 1, _textureInfoUniformBuffer);
-
     this._materialBufferShaderChunk = "";
     let numMaterialsToUpload = this._sceneData.num_materials;
-    for(let i=0; i<numRequiredMaterialBlocks; i++) {
+    for (let i = 0; i < numRequiredMaterialBlocks; i++) {
       const numMaterialsThisBlock = Math.min(materialsPerBlock, numMaterialsToUpload);
       var materialUniformBuffer = gl.createBuffer();
       this._materialBufferShaderChunk += `
@@ -113,7 +107,7 @@ export class PathtracingSceneDataAdapterWebGL2 {
       const end = start + numMaterialsThisBlock * numValuesPerMaterial;
       const materialsArraySlice = materialListFlat.slice(start, end);
       gl.bufferData(gl.UNIFORM_BUFFER, materialsArraySlice, gl.STATIC_DRAW);
-      gl.bindBufferBase(gl.UNIFORM_BUFFER, i+2, materialUniformBuffer);
+      gl.bindBufferBase(gl.UNIFORM_BUFFER, i + 2, materialUniformBuffer);
       this._materialUniformBuffers.push(materialUniformBuffer!);
 
       numMaterialsToUpload -= materialsPerBlock;
@@ -123,11 +117,11 @@ export class PathtracingSceneDataAdapterWebGL2 {
     MaterialData get_material(uint idx) {
       MaterialData data;
     `;
-    for(let i=1; i<=numRequiredMaterialBlocks; i++) {
+    for (let i = 1; i <= numRequiredMaterialBlocks; i++) {
       this._materialBufferShaderChunk +=
-      `
+        `
         if(idx < ${materialsPerBlock * i}u) {
-          return u_materials_${i-1 }[idx - ${materialsPerBlock * (i-1)}u];
+          return u_materials_${i - 1}[idx - ${materialsPerBlock * (i - 1)}u];
         }
       `;
     }
@@ -205,7 +199,6 @@ export class PathtracingSceneDataAdapterWebGL2 {
 
     this._texAccessorShaderChunk += `
     vec4 evaluateMaterialTextureValue(const in TexInfo texInfo, const in vec2 texCoord) {
-      if(texInfo.tex_array_idx < 0.0) return vec4(1.0);
     `;
 
     for (let i = 0; i < texArrays.size; i++) {
@@ -219,6 +212,31 @@ export class PathtracingSceneDataAdapterWebGL2 {
     this._texAccessorShaderChunk += `
       return vec4(1.0);
     }`
+
+    var _textureInfoUniformBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.UNIFORM_BUFFER, _textureInfoUniformBuffer);
+    const texInfoListFlat = this._sceneData.getFlatTextureInfoBuffer();
+    gl.bufferData(gl.UNIFORM_BUFFER, texInfoListFlat, gl.STATIC_DRAW);
+    gl.bindBufferBase(gl.UNIFORM_BUFFER, 1, _textureInfoUniformBuffer);
+
+    if(texArrays.size > 0) {
+      this._texAccessorShaderChunk +=
+      `layout(std140) uniform TextureInfoBlock
+      {
+        TexInfo u_tex_infos[${this.sceneData.num_textures}];
+      };
+
+      vec4 get_texture_value(float tex_info_id, vec2 uv) {
+        return tex_info_id < 0.0 ? vec4(1,1,1,1) : evaluateMaterialTextureValue(u_tex_infos[int(tex_info_id)], uv);
+      }
+      `
+    } else {
+      this._texAccessorShaderChunk += `
+      vec4 get_texture_value(float tex_info_id, vec2 uv) {
+        return vec4(1,1,1,1);
+      }
+      `
+    }
   }
 
   private generateLightBuffers() {
