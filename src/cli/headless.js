@@ -14,28 +14,39 @@
  */
 
 import 'regenerator-runtime/runtime'
-import {PathtracingRenderer, PerspectiveCamera, Loader} from '../lib/index';
+
+import {Loader, PathtracingRenderer, PerspectiveCamera} from '../lib/index';
+import {ThreeSceneTranslator} from '../lib/three_scene_translator';
 
 const {ipcRenderer} = window.require('electron');
 var path = window.require('path');
 
 let remote = window.require('electron').remote, args = remote.getGlobal('sharedObject').args;
 
-function startRenderer() {
+async function startRenderer() {
   let canvas = document.getElementById("canvas");
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
 
-  let renderer = new PathtracingRenderer({ canvas: canvas});
+  let renderer = new PathtracingRenderer({canvas : canvas});
   renderer.tonemapping = "None";
   renderer.iblRotation = args.ibl_rotation;
   renderer.maxBounces = args.bounces;
 
   try {
-    Loader.loadSceneFromUrl(args.gltf_path, false).then(gltf => {
+    const gltf = await Loader.loadSceneFromUrl(args.gltf_path, false);
+    const pathtracingSceneData = await ThreeSceneTranslator.translateThreeScene(gltf.scene, gltf);
+    renderer.setScene(pathtracingSceneData).then(() => {
+      if (args.ibl !== "None") {
+        Loader.loadIBL(args.ibl).then((ibl) => {
+          console.log("loaded ibl" + args.ibl);
+          renderer.setIBL(ibl);
+        });
+      }
+
       let cameras = [];
       const scene = gltf.scene || gltf.scenes[0];
-      gltf.scene.traverse((child) => {
+      scene.traverse((child) => {
         if (child.isCamera) {
           child.position.applyMatrix4(child.matrixWorld);
           cameras.push(child);
@@ -45,30 +56,16 @@ function startRenderer() {
       if (cameras.length > 0) {
         var camera = cameras[0];
       } else {
-        var camera =
-            new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-        this.camera.position.set(0, 0, 3);
+        var camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 0, 3);
       }
 
-      renderer.setScene(gltf.scene, gltf).then(() => {
-        if (args.ibl === "None") {
-          renderer.render(camera, args.samples, () => {}, (result) => {
-            console.log("icpRenderer Ready");
-            ipcRenderer.send('rendererReady');
-          });
-        } else {
-          Loader.loadIBL(args.ibl).then((ibl) => {
-            console.log("loaded ibl" + args.ibl);
-            renderer.setIBL(ibl);
-            renderer.render(camera, args.samples, () => {}, (result) => {
-              console.log("icpRenderer Ready");
-              ipcRenderer.send('rendererReady');
-            });
-          });
-        }
+      renderer.render(camera, args.samples, () => {}, (result) => {
+        console.log("icpRenderer Ready");
+        ipcRenderer.send('rendererReady');
       });
     });
-  } catch(error) {
+  } catch (error) {
     console.log(error);
     console.log("Skipping scene...");
   }

@@ -27,7 +27,7 @@ const parsedArgs = parseArguments(args);
 global.sharedObject = { args: parsedArgs };
 
 // app.disableHardwareAcceleration();
-app.commandLine.appendSwitch("use-angle", "gl");
+// app.commandLine.appendSwitch("use-angle", "gl");
 app.on('ready', () => createWindow(parsedArgs.res[0], parsedArgs.res[1]));
 
 const outputFile = "output.png";
@@ -108,20 +108,16 @@ function createWindow(width, height) {
   const mainWindow = new BrowserWindow({
     width: width, height: height,
     webPreferences: {
-      offscreen: true,
+      offscreen: false,
       nodeIntegration: true,
-      webSecurity: false
-    },
+      webSecurity: false,
+     },
     frame: false
   });
 
   // mainWindow.webContents.openDevTools();
 
-  mainWindow.loadURL(url.format({
-    pathname: path.join(__dirname, "../../dist/headless.html"),
-    protocol: 'file',
-    slashes: true
-  }));
+  mainWindow.loadURL(path.join(__dirname, "../../dist/headless.html"));
 
   // In main process.
   const { ipcMain } = require('electron');
