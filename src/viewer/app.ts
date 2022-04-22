@@ -118,13 +118,13 @@ class App {
       if (this.pathtracedInteraction) {
         this.interactionTimeoutId = setTimeout(() => {
           this.renderer.setLowResRenderMode(false);
-        }, 500);
+        }, 200);
       } else {
         if (this.resumePathtracing) {
           this.interactionTimeoutId = setTimeout(() => {
           this.startPathtracing();
           this.stopRasterizer();
-          }, 500);
+          }, 200);
         }
       }
     });
@@ -189,8 +189,8 @@ class App {
   }
 
   private loadDropFiles(fileMap) {
-    fileMap.forEach((value, key) => {
-      var foundHDR = false;
+      let foundHDR = false;
+      fileMap.forEach((value, key) => {
       if (key.match(/\.hdr$/)) {
         this.showLoadscreen("Loading HDR...");
         Loader.loadIBL(URL.createObjectURL(value)).then((ibl) => {
