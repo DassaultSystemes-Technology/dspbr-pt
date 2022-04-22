@@ -32,9 +32,10 @@ vec3 diffuse_bsdf_eval(const in MaterialClosure c, vec3 wi, vec3 wo, Geometry g)
   float lambert = ONE_OVER_PI;
   float coupled = coupled_diffuse(c.alpha, abs(dot(wi, g.n)), abs(dot(wo, g.n)), max_(c.f0 * c.specular_tint));
   vec3 diffuse_color = c.albedo * (1.0 - c.metallic) * (1.0 - c.transparency);
+  // return diffuse_color * lambert;
   return diffuse_color * mix(lambert, coupled, c.specular);
 }
 
 float diffuse_bsdf_pdf(vec3 wi, vec3 wo, Geometry g) {
-  return abs(dot(wo, g.n)) * ONE_OVER_PI;
+  return saturate(dot(wo, g.n)) * ONE_OVER_PI;
 }

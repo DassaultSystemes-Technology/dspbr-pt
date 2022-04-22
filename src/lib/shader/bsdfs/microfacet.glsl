@@ -136,7 +136,7 @@ vec3 eval_brdf_microfacet_ggx_smith_ms(vec3 f0, vec3 f90, vec2 alpha_uv, vec3 wi
 }
 
 vec3 eval_brdf_microfacet_ggx_smith(vec3 f0, vec3 f90, vec2 alpha, vec3 wi, vec3 wo, vec3 wh, Geometry geo) {
-  if (abs(dot(wi, geo.n)) < EPS_PDF || dot(wo, geo.n) < 0.0) {
+  if (dot(wi, geo.n) < EPS_PDF || dot(wo, geo.n) < EPS_PDF) {
     return vec3(0.0);
   }
   vec3 f = fresnel_schlick(f0, f90, dot(wi, wh));
@@ -145,25 +145,25 @@ vec3 eval_brdf_microfacet_ggx_smith(vec3 f0, vec3 f90, vec2 alpha, vec3 wi, vec3
   return (f * g * d) / abs(4.0 * dot(wi, geo.n) * dot(wo, geo.n));
 }
 
-vec3 eval_brdf_microfacet_ggx_smith_iridescence(vec3 f0, vec3 f90, vec2 alpha, float iridescence, float iridescence_ior, float iridescence_thickness, vec3 wi, vec3 wo, vec3 wh, Geometry geo) {
-  if (abs(dot(wi, geo.n)) < EPS_PDF || dot(wo, geo.n) < 0.0) {
+vec3 eval_brdf_microfacet_ggx_smith_iridescence(vec3 f0, vec3 f90, vec2 alpha, float iridescence, float iridescence_ior, float iridescence_thickness, vec3 wi, vec3 wo, vec3 wh, Geometry geo)
+{
+  if (dot(wi, geo.n) < EPS_PDF || dot(wo, geo.n) < EPS_PDF) {
     return vec3(0.0);
   }
 
-  // iridescence_base_weight = 1.0 - vec3(max(max(iridescence_fresnel.r, iridescence_fresnel.g), iridescence_fresnel.b));
-  float cos_theta =  dot(wi, wh);
-  vec3 iridescence_fresnel = evalIridescence(1.0, iridescence_ior, cos_theta, iridescence_thickness, f0);
+  // iridescence_base_weight = 1.0 - vec3(max(max(iridescence_fresnel.r, iridescence_fresnel.g),
+  // iridescence_fresnel.b));
+  vec3 iridescence_fresnel = evalIridescence(1.0, iridescence_ior, dot(wi, wh), iridescence_thickness, f0);
 
-  vec3 f = mix(fresnel_schlick(f0, f90, cos_theta), iridescence_fresnel, iridescence);
+  vec3 f = mix(fresnel_schlick(f0, f90, dot(wi, wh)), iridescence_fresnel, iridescence);
   float d = ggx_eval(alpha, wh, geo);
   float g = ggx_smith_g2(alpha, wi, wo, wh, geo, false);
   return (f * g * d) / abs(4.0 * dot(wi, geo.n) * dot(wo, geo.n));
 }
 
 
-// TODO Needs proper implementation
-vec3 eval_bsdf_microfacet_ggx_smith(vec3 specular_f0, vec3 specular_f90, vec2 alpha, const in vec3 wi, in vec3 wo, Geometry geo)
-{
+vec3 eval_bsdf_microfacet_ggx_smith(vec3 specular_f0, vec3 specular_f90, vec2 alpha, const in vec3 wi, in vec3 wo,
+                                    Geometry geo) {
   if (abs(dot(wi, geo.n)) < EPS_PDF || dot(wo, geo.n) > 0.0) {
     return vec3(0.0);
   }
@@ -172,10 +172,11 @@ vec3 eval_bsdf_microfacet_ggx_smith(vec3 specular_f0, vec3 specular_f90, vec2 al
   return eval_brdf_microfacet_ggx_smith(specular_f0, specular_f90, alpha, wi, wo_f, wh, geo);
 }
 
-// TODO Needs proper implementation
-vec3 eval_bsdf_microfacet_ggx_smith_iridescence(vec3 specular_f0, vec3 specular_f90, vec2 alpha, float iridescence, float iridescence_ior, float iridescence_thickness, const in vec3 wi, in vec3 wo, Geometry geo)
-{
-  if (abs(dot(wi, geo.n)) < EPS_PDF || dot(wo, geo.n) > 0.0) {
+
+vec3 eval_bsdf_microfacet_ggx_smith_iridescence(vec3 specular_f0, vec3 specular_f90, vec2 alpha, float iridescence,
+                                                float iridescence_ior, float iridescence_thickness, const in vec3 wi,
+                                                in vec3 wo, Geometry geo) {
+  if (dot(wi, geo.n) < EPS_PDF || dot(wo, geo.n) > 0.0) {
     return vec3(0.0);
   }
   vec3 wo_f = flip(wo, -geo.n);
@@ -184,11 +185,11 @@ vec3 eval_bsdf_microfacet_ggx_smith_iridescence(vec3 specular_f0, vec3 specular_
 }
 
 float brdf_microfacet_ggx_smith_pdf(MaterialClosure c, Geometry g, vec3 wi, vec3 wo) {
-  if(dot(wi, g.n) < EPS_PDF) return 0.0;
+  if (dot(wi, g.n) < EPS_PDF || dot(wo, g.n) < EPS_PDF)
+    return 0.0;
 
   vec3 wh = normalize(wi + wo);
-  float jacobian = 1.0 / (4.0 * abs(dot(wo, wh)));
-  return ggx_eval_vndf(c.alpha, wi, wh, g) * jacobian;
+  return ggx_eval_vndf(c.alpha, wi, wh, g) / (4.0 * abs(dot(wo, wh)));
 }
 
 vec3 sample_brdf_microfacet_ggx_smith(vec2 alpha, vec3 wi, Geometry g, vec2 uv, out float pdf) {
@@ -199,28 +200,26 @@ vec3 sample_brdf_microfacet_ggx_smith(vec2 alpha, vec3 wi, Geometry g, vec2 uv, 
   vec3 wo = to_world(wo_, g);
 
   vec3 wh = normalize(wi + wo);
-  float jacobian = 1.0 / (4.0 * abs(dot(wo, wh)));
 
-  pdf = ggx_eval_vndf(alpha, wi, wh, g) * jacobian;
+  pdf = ggx_eval_vndf(alpha, wi, wh, g) * (1.0 / (4.0 * abs(dot(wo, wh))));
   return wo;
 }
 
 vec3 fresnel_reflection(MaterialClosure c, float cos_theta, float ni, float nt) {
-  vec3 f0 = sqr((ni - nt) / (ni + nt)) * c.specular*c.specular_tint;
+  vec3 f0 = sqr((ni - nt) / (ni + nt)) * c.specular * c.specular_tint;
   vec3 f90 = vec3(c.specular);
 
   vec3 iridescence_fresnel = evalIridescence(ni, c.iridescence_ior, cos_theta, c.iridescence_thickness, f0);
-  vec3 _metal = fresnel_schlick(c.albedo, vec3(1.0), cos_theta);
   vec3 _plastic = fresnel_schlick(f0, f90, cos_theta);
   vec3 _glass = fresnel_schlick_dielectric(cos_theta, f0, f90, ni, nt, c.thin_walled);
-  return mix(mix(mix(_plastic, _glass, c.transparency), _metal, c.metallic), iridescence_fresnel, c.iridescence);
+  return mix(mix(_plastic, _glass, c.transparency), iridescence_fresnel, c.iridescence);
 }
 
 vec3 fresnel_transmission(MaterialClosure c, float cos_theta, float ni, float nt) {
   vec3 f0 = sqr((ni - nt) / (ni + nt)) * c.specular * c.specular_tint;
   vec3 f90 = vec3(c.specular);
   vec3 fr = fresnel_schlick_dielectric(cos_theta, f0, f90, ni, nt, c.thin_walled);
-  return (vec3(1.0) - fr) * c.albedo * (1.0 - c.metallic) * c.transparency;// max((1.0 - c.metallic), c.transparency);
+  return (vec3(1.0) - fr);
 }
 
 vec3 sample_bsdf_microfacet_ggx_smith(const in MaterialClosure c, vec3 wi, Geometry geo, vec3 uvw, out float pdf, inout vec3 bsdf_weight, inout int event) {
@@ -255,25 +254,24 @@ vec3 sample_bsdf_microfacet_ggx_smith(const in MaterialClosure c, vec3 wi, Geome
 
   if (uvw.z <= prob_fr) { // reflection
     wo = reflect(-wi, wh);
-    event = E_REFLECTION | (singular_event ? E_SINGULAR : 0);
-  }
-  else { // transmission
+    event = E_REFLECTION | (singular_event ? E_DELTA : 0);
+  } else { // transmission
     if (c.thin_walled) {
       // thin transmission : flip reflected direction to back side
       wo = reflect(-wi, wh);
       wo = flip(wo, geo.n);
 
-      event = E_TRANSMISSION | (singular_event ? E_SINGULAR : 0);
+      event = E_TRANSMISSION | (singular_event ? E_DELTA : 0);
     } else {
       tir = !refractIt(-wi, wh, ior_i / ior_o, wo);
 
       if (tir) {
         wo = reflect(-wi, wh);
-        event = E_REFLECTION | (singular_event ? E_SINGULAR : 0);
+        event = E_REFLECTION | (singular_event ? E_DELTA : 0);
       } else {
         event = E_TRANSMISSION;
-        event |= (ior_i == ior_o) ? E_STRAIGHT : 0; //TODO volumetric, matching ior, singular
-        event |= singular_event ? E_SINGULAR : 0; //TODO volumetric, matching ior, singular
+        event |= (ior_i == ior_o) ? E_STRAIGHT : 0;
+        event |= singular_event ? E_DELTA : 0;
       }
     }
   }
@@ -282,13 +280,14 @@ vec3 sample_bsdf_microfacet_ggx_smith(const in MaterialClosure c, vec3 wi, Geome
 
   if (bool(event & E_REFLECTION)) {
     float g2 = ggx_smith_g2(c.alpha, wi, wo, wh, geo, false);
+
     bsdf_weight *= fr / prob_fr;
     bsdf_weight *= g2 / g1;
     pdf *= prob_fr;
     pdf *= 1.0 / (4.0 * abs(cos_theta_i));
   } else if (bool(event & E_TRANSMISSION)) {
     pdf *= (1.0 - prob_fr);
-    bsdf_weight *= ft / (1.0 - prob_fr);
+    bsdf_weight *= ft / (1.0 - prob_fr) * c.albedo * c.transparency;
     float g2 = ggx_smith_g2(c.alpha, wi, wo, wh, geo, true);
     bsdf_weight *= g2 / g1;
 
@@ -298,11 +297,10 @@ vec3 sample_bsdf_microfacet_ggx_smith(const in MaterialClosure c, vec3 wi, Geome
       bsdf_weight *= sqr(ior_i / ior_o); // non symmetric adjoint brdf correction factor
       float denom = sqr(ior_i * dot(wi, wh) + ior_o * dot(wo, wh));
       pdf *= sqr(ior_o) * abs(dot(wo, wh)) / denom;
-      // bsdf_weight = vec3(1,0,1);
     }
   }
 
-  if (bool(event & (E_SINGULAR | E_STRAIGHT))) {
+  if (bool(event & (E_DELTA | E_STRAIGHT))) {
     pdf = 1.0;
   }
 
@@ -334,7 +332,8 @@ float bsdf_microfacet_ggx_smith_pdf(in MaterialClosure c, Geometry g, vec3 wi, v
     pdf *= sqr(ior_o) * abs(dot(wo, wh)) / denom;
   }
 
-  if(dot(wi, g.n) < EPS_COS) wi = flip(wi, -g.n);
+  if (dot(wi, g.n) < EPS_COS)
+    wi = flip(wi, -g.n);
   pdf *= brdf_microfacet_ggx_smith_pdf(c, g, wi, wo);
 
   return pdf;

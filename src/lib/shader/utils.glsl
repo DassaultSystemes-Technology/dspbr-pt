@@ -17,6 +17,10 @@ struct Geometry {
   vec3 n, t, b;
 };
 
+// bool has_flag(uint flags, uint mask) {
+//   return (flags & mask) != 0u;
+// }
+
 float saturate(float val) {
   return clamp(val, 0.0, 1.0);
 }
@@ -73,7 +77,7 @@ bool refractIt(vec3 i, vec3 n, float inv_eta, out vec3 wo) {
 // hemisphere
 vec3 clamp_normal(vec3 n, vec3 ng, vec3 wi) {
   vec3 ns_new = n;
-  vec3 r = reflect(-wi, n); // TODO CHECK
+  vec3 r = reflect(-wi, n);
   float v_dot_ng = dot(wi, ng);
   float r_dot_ng = dot(r, ng);
 

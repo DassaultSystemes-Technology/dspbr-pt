@@ -61,6 +61,7 @@ layout(location = 0) out vec4 out_FragColor;
 #include <texture_accessor>
 #include <rng>
 #include <constants>
+#include <lights>
 #include <utils>
 
 
@@ -90,7 +91,6 @@ void fillRenderState(const in bvh_ray r, const in bvh_hit hit, out RenderState r
 
   uint triIdx = uint(hit.triIndex);
 
-  // rs.uv1 = compute_interpolated_uv(hit.triIndex, hit.uv, 1);
   rs.wi = -r.dir;
 
   vec3 p0, p1, p2;
@@ -107,8 +107,7 @@ void fillRenderState(const in bvh_ray r, const in bvh_hit hit, out RenderState r
   configure_material(matIdx, rs, rs.closure, vertexColor);
 
   float bsdf_selection_pdf;
-  float rr_brdf = rng_float();
-  select_bsdf(rs.closure, rr_brdf, rs.wi, bsdf_selection_pdf);
+  select_bsdf(rs.closure, rng_float(), rs.wi, bsdf_selection_pdf);
   rs.closure.bsdf_selection_pdf = bsdf_selection_pdf;
 }
 
@@ -116,17 +115,20 @@ void fillRenderState(const in bvh_ray r, const in bvh_hit hit, out RenderState r
 bool sample_bsdf_bounce(inout RenderState rs, out vec3 sampleWeight, out float pdf) {
   bool ignoreBackfaces = false;//(!rs.closure.double_sided && rs.closure.backside);
 
+  sampleWeight = vec3(1.0);
+  pdf = 1.0;
   if (rng_float() > rs.closure.cutout_opacity || ignoreBackfaces) {
-    rs.closure.event_type |= E_SINGULAR;
+    rs.closure.event_type |= E_DELTA;
     rs.wo = -rs.wi;
-    pdf = 1.0;
-    sampleWeight = vec3(1.0);
     rs.closure.bsdf_selection_pdf = 1.0;
   }
   else {
     rs.wo = sample_dspbr(rs.closure, rs.wi,
                           vec3(rng_float(), rng_float(), rng_float()),
                           sampleWeight, pdf);
+
+    sampleWeight /= rs.closure.bsdf_selection_pdf;
+    pdf *= rs.closure.bsdf_selection_pdf;
 
     if (pdf < EPS_PDF) {
       sampleWeight = vec3(0.0);
@@ -144,10 +146,11 @@ bool check_russian_roulette_path_termination(int bounce, inout vec3 path_weight)
   if (bounce > RR_START_DEPTH) {
     float rr = rng_float();
     if(rr <= RR_TERMINATION_PROB) {
-      return false;
+      return true;
     }
     path_weight *= 1.0 / (1.0 - RR_TERMINATION_PROB);
   }
+  return false;
 }
 
 

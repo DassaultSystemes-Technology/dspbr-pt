@@ -1,57 +1,54 @@
-// /* @license
-//  * Copyright 2022  Dassault Systemes - All Rights Reserved.
-//  * Licensed under the Apache License, Version 2.0 (the "License");
-//  * you may not use this file except in compliance with the License.
-//  * You may obtain a copy of the License at
-//  *
-//  *     http://www.apache.org/licenses/LICENSE-2.0
-//  *
-//  * Unless required by applicable law or agreed to in writing, software
-//  * distributed under the License is distributed on an "AS IS" BASIS,
-//  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//  * See the License for the specific language governing permissions and
-//  * limitations under the License.
-//  */
+/* @license
+ * Copyright 2022  Dassault Systemes - All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-// #ifdef HAS_POINT_LIGHT
-// // For now, we only have 1 point light
-// vec3 sampleAndEvaluatePointLight(const in RenderState rs) {
-//   vec3 n = rs.closure.n;
-//   vec3 light_dir = cPointLightPosition - rs.hitPos;
-//   float dist2 = dot(light_dir, light_dir);
-//   light_dir = normalize(light_dir);
+#ifdef HAS_POINT_LIGHT
+// For now, we only have 1 point light
+vec3 sampleAndEvaluatePointLight(const in RenderState rs) {
+  vec3 n = rs.closure.n;
+  vec3 light_dir = cPointLightPosition - rs.hitPos;
+  float dist2 = dot(light_dir, light_dir);
+  light_dir = normalize(light_dir);
 
-//   float cosNL = dot(light_dir, n);
+  float cosNL = dot(light_dir, n);
 
-//   bool isVisible = isVisible(rs.hitPos + n * u_ray_eps, cPointLightPosition);
+  bool isVisible = isVisible(rs.hitPos + n * u_ray_eps, cPointLightPosition);
 
-//   // bool transmit = false;
-//   // if (cosNL < 0.0 && rs.closure.transparency > 0.0)
-//   //   transmit = true;
+  // bool transmit = false;
+  // if (cosNL < 0.0 && rs.closure.transparency > 0.0)
+  //   transmit = true;
 
-//   vec3 contrib = vec3(0.0);
-//   if (cosNL > EPS_COS && isVisible) {
-//     contrib = eval_dspbr(rs.closure, rs.wi, light_dir) * (cPointLightEmission / dist2) * cosNL;
-//   }
+  vec3 contrib = vec3(0.0);
+  if (cosNL > EPS_COS && isVisible) {
+    contrib = eval_dspbr(rs.closure, rs.wi, light_dir) * (cPointLightEmission / dist2) * cosNL;
+  }
 
-//   return contrib;
-// }
-// #else
-// // For now, we only have 1 point light
-// vec3 sampleAndEvaluatePointLight(const in RenderState rs) {
-//   return vec3(0);
-// }
-// #endif
+  return contrib;
+}
+#else
+// For now, we only have 1 point light
+vec3 sampleAndEvaluatePointLight(const in RenderState rs) {
+  return vec3(0);
+}
+#endif
 
 
 int sampleRow1D(sampler2D pdf, sampler2D cdf, int row, int size, inout float r, out float prop) {
-  // float invProp = 1.0;
-  // idx = binsearchCDF_rescale(cdf, row, size, r, invProp);
   int idx = lower_bound(cdf, row, size, r);
   prop = texelFetch(pdf, ivec2(idx, row), 0).x;
 
-  int x = idx; // int((1.0 - r) * float(idx) + r * (float(idx) + 1.0));
-  return (x >= size) ? (size - 1) : x;
+  return (idx >= size) ? (size - 1) : idx;
 }
 
 
@@ -93,7 +90,7 @@ vec3 ibl_eval(vec3 dir) {
   float pdf;
   vec3 sample_dir = rotate_dir_phi(dir, false);
   vec2 uv = dir_to_uv(sample_dir, pdf);
-  return texelFetch(u_sampler_env_map, ivec2(uv*u_ibl_resolution), 0).xyz; // TODO needs pdf multiply?
+  return texture(u_sampler_env_map, uv).xyz;
 }
 
 

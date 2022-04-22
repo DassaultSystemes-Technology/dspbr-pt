@@ -13,14 +13,15 @@
  * limitations under the License.
  */
 
-
-const int E_DIFFUSE = 1 << 0;
-const int E_SINGULAR = 1 << 1;
-const int E_REFLECTION = 1 << 2;
-const int E_TRANSMISSION = 1 << 3;
-const int E_COATING = 1 << 4;
-const int E_STRAIGHT = 1 << 5;
-
+const int E_DIFFUSE = 0x00001;
+const int E_DELTA = 0x00002;
+const int E_REFLECTION = 0x00004;
+const int E_TRANSMISSION = 0x00008;
+const int E_COATING = 0x00010;
+const int E_STRAIGHT = 0x00020;
+const int E_OPAQUE_DIELECTRIC = 0x00040;
+const int E_TRANSPARENT_DIELECTRIC = 0x00080;
+const int E_METAL = 0x00100;
 
 // Convert from roughness and anisotropy to 2d anisotropy.
 vec2 roughness_conversion(float roughness, float anisotropy) {
@@ -29,7 +30,7 @@ vec2 roughness_conversion(float roughness, float anisotropy) {
 }
 
 bool is_specular_event(MaterialClosure c) {
-  return bool(c.event_type & E_SINGULAR);
+  return bool(c.event_type & E_DELTA);
 }
 
 void configure_material(const in uint matIdx, in RenderState rs, out MaterialClosure c, vec4 vertexColor) {
@@ -60,6 +61,7 @@ void configure_material(const in uint matIdx, in RenderState rs, out MaterialClo
   c.translucency = matData.translucency;
 
   c.thin_walled = matData.thinWalled;
+  // c.ior = c.thin_walled ? 1.0 : matData.ior;
   c.ior = matData.ior;
 
   c.double_sided = matData.doubleSided;
@@ -102,7 +104,7 @@ void configure_material(const in uint matIdx, in RenderState rs, out MaterialClo
   c.backside = fix_normals(c.n, c.ng, wi);
 
   vec3 ansiotropyDirection = matData.anisotropyDirection;
-  if(matData.anisotropyDirectionTextureId >= 0.0)
+  if (matData.anisotropyDirectionTextureId >= 0.0)
     ansiotropyDirection = get_texture_value(matData.anisotropyDirectionTextureId, uv).xyz * 2.0 - vec3(1);
   ansiotropyDirection.z = 0.0;
 
@@ -127,10 +129,11 @@ void configure_material(const in uint matIdx, in RenderState rs, out MaterialClo
       matData.clearcoatRoughness * matData.clearcoatRoughness * clearcoatRoughness.x * clearcoatRoughness.x;
   c.clearcoat_alpha = max(clearcoat_alpha, MINIMUM_ROUGHNESS);
 
-  c.attenuationColor =  matData.attenuationColor;
+  c.attenuationColor = matData.attenuationColor;
   c.attenuationDistance = matData.attenuationDistance;
 
   c.iridescence = matData.iridescence * get_texture_value(matData.iridescenceTextureId, uv).x;
   c.iridescence_ior = matData.iridescenceIor;
-  c.iridescence_thickness = mix(matData.iridescenceThicknessMinimum, matData.iridescenceThicknessMaximum, get_texture_value(matData.iridescenceThicknessTextureId, uv).y);
+  c.iridescence_thickness = mix(matData.iridescenceThicknessMinimum, matData.iridescenceThicknessMaximum,
+                                get_texture_value(matData.iridescenceThicknessTextureId, uv).y);
 }

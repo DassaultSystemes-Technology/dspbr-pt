@@ -7,7 +7,7 @@ vec4 trace_pt(bvh_ray r)
   bool last_bounce_specular = true; // pinhole camera is considered singular
 
   int bounce = 0;
-  while(bounce <= int(u_max_bounces) || last_bounce_specular)
+  while(bounce <= int(u_max_bounces))
   {
     if(check_russian_roulette_path_termination(bounce, path_weight)) break;
 
@@ -22,7 +22,7 @@ vec4 trace_pt(bvh_ray r)
       }
 
       contribution += rs.closure.emission * path_weight;
-      last_bounce_specular = bool(rs.closure.event_type & E_SINGULAR);
+      last_bounce_specular = bool(rs.closure.event_type & E_DELTA);
 
       float bounce_pdf;
       vec3 bounce_weight;
