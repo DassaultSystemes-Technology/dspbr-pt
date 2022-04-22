@@ -4,14 +4,21 @@ import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { WebIO, VertexLayout, Document } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-import { weld, dequantize } from '@gltf-transform/functions';
+import { weld, dequantize, reorder } from '@gltf-transform/functions';
+import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
 
 
 export async function loadSceneFromBlobs(files: [string, File][], autoscale: boolean) {
+  await MeshoptDecoder.ready;
+  await MeshoptEncoder.ready;
 
   const io = new WebIO()
     .registerExtensions(ALL_EXTENSIONS)
-    .setVertexLayout(VertexLayout.SEPARATE); // INTERLEAVED (default) or SEPARATE
+    .setVertexLayout(VertexLayout.SEPARATE) // INTERLEAVED (default) or SEPARATE
+    .registerDependencies({
+      'meshopt.decoder': MeshoptDecoder,
+      'meshopt.encoder': MeshoptEncoder,
+    });
 
   function getFileExtension(filename: string) {
     return filename.split('.').pop();
@@ -112,11 +119,7 @@ async function precomputeIBLImportanceSamplingData(texture: any) {
   }
 
   for (let y = 0; y < h; y++) {
-    precompute1DPdfAndCdf(f, pcPDF, pcCDF, y, w);
-    sumX[y] = 0.0;
-    for (let x = 0; x < w; x++) {
-      sumX[y] += f[x + y * w];
-    }
+    sumX[y] = precompute1DPdfAndCdf(f, pcPDF, pcCDF, y, w);
   }
 
   const totalSum = precompute1DPdfAndCdf(sumX, yPDF, yCDF, 0, h);
@@ -142,12 +145,20 @@ export function loadIBL(ibl: string) {
 }
 
 export async function loadSceneFromUrl(url: string, autoscale: boolean) {
+  await MeshoptDecoder.ready;
+  await MeshoptEncoder.ready;
+
   const io = new WebIO()
     .registerExtensions(ALL_EXTENSIONS)
-    .setVertexLayout(VertexLayout.SEPARATE); // INTERLEAVED (default) or SEPARATE
+    .setVertexLayout(VertexLayout.SEPARATE) // INTERLEAVED (default) or SEPARATE
+    .registerDependencies({
+      'meshopt.decoder': MeshoptDecoder,
+      'meshopt.encoder': MeshoptEncoder,
+    });
 
   const doc = await io.read(url);
   await doc.transform(
+    dequantize(),
     weld()
   );
   const glb = await io.writeBinary(doc);
@@ -156,6 +167,7 @@ export async function loadSceneFromUrl(url: string, autoscale: boolean) {
 
 function loadScene(glb: ArrayBuffer, autoscale: boolean) {
   var loader = new GLTFLoader();
+  loader.setMeshoptDecoder(MeshoptDecoder);
   return new Promise((resolve, reject) => {
 
     loader.parse(glb, "", (gltf) => {
