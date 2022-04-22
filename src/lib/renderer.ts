@@ -398,18 +398,38 @@ export class PathtracingRenderer {
     gl.bindVertexArray(this.quadVao);
     gl.viewport(0, 0, renderRes[0], renderRes[1]);
 
-    // pathtracing render pass
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-    gl.activeTexture(gl.TEXTURE0 + slot)
-    gl.bindTexture(gl.TEXTURE_2D, copyBuffer);
-    gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_sampler2D_PreviousTexture"), slot);
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+   // pathtracing render pass
+    gl.enable(gl.SCISSOR_TEST);
+
+    const tileRes = 4;
+    const tx = tileRes || 1;
+    const ty = tileRes || 1;
+    // const totalTiles = tx * ty;
+    for ( let y = 0; y < ty; y ++ ) {
+      for ( let x = 0; x < tx; x ++ ) {
+        if (!this._isRendering) {
+          return;
+        }
+        gl.scissor(
+          Math.ceil( x * renderRes[0] / tx ),
+          Math.ceil( ( ty - y - 1 ) * renderRes[1] / ty ),
+          Math.ceil( renderRes[0] / tx ),
+          Math.ceil( renderRes[1] / ty )
+        );
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+        gl.activeTexture(gl.TEXTURE0 + slot)
+        gl.bindTexture(gl.TEXTURE_2D, copyBuffer);
+        gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_sampler2D_PreviousTexture"), slot);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      }
+    }
+    gl.disable(gl.SCISSOR_TEST);
+
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.useProgram(null);
 
-    if (!this._isRendering) {
-      return;
-    }
+
     // copy pathtracing render buffer
     // to be used as accumulation input for next frames raytracing pass
     gl.useProgram(this.copyProgram);
