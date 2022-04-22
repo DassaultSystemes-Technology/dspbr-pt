@@ -133,7 +133,7 @@ export namespace ThreeSceneTranslator {
         if ('KHR_materials_iridescence' in mat.userData.gltfExtensions) {
           let ext = mat.userData.gltfExtensions["KHR_materials_iridescence"];
           matInfo.iridescence = get_param("iridescenceFactor", ext, 1.0);
-          matInfo.iridescenceIOR = get_param("iridescenceIOR", ext, matInfo.iridescenceIOR);
+          matInfo.iridescenceIOR = get_param("iridescenceIor", ext, matInfo.iridescenceIOR);
           matInfo.iridescenceThicknessMinimum = get_param("iridescenceThicknessMinimum", ext, matInfo.iridescenceThicknessMinimum);
           matInfo.iridescenceThicknessMaximum = get_param("iridescenceThicknessMaximum", ext, matInfo.iridescenceThicknessMaximum);
           if ("iridescenceTexture" in ext) {
