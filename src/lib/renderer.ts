@@ -51,6 +51,11 @@ void main()
   gl_Position = position;
 }`;
 
+enum BufferType {
+  Front = 0,
+  Back = 1
+}
+
 class IBLImportanceSamplingData {
   pdf: WebGLTexture | null = null;
   cdf: WebGLTexture | null = null;
@@ -67,8 +72,8 @@ export interface PathtracingRendererParameters {
 }
 
 export enum RenderResMode {
-  High,
-  Low
+  High = 0,
+  Low = 1
 }
 export class PathtracingRenderer {
   private gl: any;
@@ -79,18 +84,8 @@ export class PathtracingRenderer {
   private ibl: WebGLTexture | null = null;
   private iblImportanceSamplingData: IBLImportanceSamplingData = new IBLImportanceSamplingData();
 
-  private fbos = new Map<string, WebGLFramebuffer[]>();
-  private renderBuffers = new Map<string, WebGLFramebuffer[]>();
-
-  private fbo: WebGLFramebuffer | null = null;
-  private copyFbo: WebGLFramebuffer | null = null;
-  private copyBuffer: WebGLTexture | null = null;
-  private renderBuffer: WebGLTexture | null = null;
-
-  private fbo_lr: WebGLFramebuffer | null = null;
-  private copyFbo_lr: WebGLFramebuffer | null = null;
-  private copyBuffer_lr: WebGLTexture | null = null;
-  private renderBuffer_lr: WebGLTexture | null = null;
+  private fbos = new Map<string, WebGLFramebuffer[][]>();
+  private renderBuffers = new Map<string, WebGLFramebuffer[][]>();
 
   private quadVao: WebGLVertexArrayObject | null = null;
   private ptProgram: WebGLProgram | null = null;
@@ -385,10 +380,10 @@ export class PathtracingRenderer {
       return;
     }
 
-    const fbo = this.fbos.get("pt_fbo")![this._renderResMode];
-    const copyFbo = this.fbos.get("copy_fbo")![this._renderResMode];
-    const renderBuffer = this.renderBuffers.get("pt_buffer")![this._renderResMode];
-    const copyBuffer = this.renderBuffers.get("copy_buffer")![this._renderResMode];
+    const fbo = this.fbos.get("pt_fbo")![BufferType.Front][this._renderResMode];
+    const copyFbo = this.fbos.get("pt_fbo")![BufferType.Back][this._renderResMode];
+    const renderBuffer = this.renderBuffers.get("pt_buffer")![BufferType.Front][this._renderResMode];
+    const copyBuffer = this.renderBuffers.get("pt_buffer")![BufferType.Back][this._renderResMode];
     const renderRes = this.renderRes[this._renderResMode];
 
     let slot = 2; // first 2 slots used are blocked by bvh and mesh textures
@@ -398,23 +393,23 @@ export class PathtracingRenderer {
     gl.bindVertexArray(this.quadVao);
     gl.viewport(0, 0, renderRes[0], renderRes[1]);
 
-   // pathtracing render pass
+    // pathtracing render pass
     gl.enable(gl.SCISSOR_TEST);
 
     const tileRes = 4;
     const tx = tileRes || 1;
     const ty = tileRes || 1;
     // const totalTiles = tx * ty;
-    for ( let y = 0; y < ty; y ++ ) {
-      for ( let x = 0; x < tx; x ++ ) {
+    for (let y = 0; y < ty; y++) {
+      for (let x = 0; x < tx; x++) {
         if (!this._isRendering) {
           return;
         }
         gl.scissor(
-          Math.ceil( x * renderRes[0] / tx ),
-          Math.ceil( ( ty - y - 1 ) * renderRes[1] / ty ),
-          Math.ceil( renderRes[0] / tx ),
-          Math.ceil( renderRes[1] / ty )
+          Math.ceil(x * renderRes[0] / tx),
+          Math.ceil((ty - y - 1) * renderRes[1] / ty),
+          Math.ceil(renderRes[0] / tx),
+          Math.ceil(renderRes[1] / ty)
         );
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
@@ -481,14 +476,18 @@ export class PathtracingRenderer {
 
     // cleanup renderbuffers and fbos
     for (const rb of this.renderBuffers.values()) {
-      if (rb[0]) gl.deleteTexture(rb[0]);
-      if (rb[1]) gl.deleteTexture(rb[1]);
+      if (rb[0][0]) gl.deleteTexture(rb[0][0]);
+      if (rb[1][0]) gl.deleteTexture(rb[1][0]);
+      if (rb[0][1]) gl.deleteTexture(rb[0][1]);
+      if (rb[1][1]) gl.deleteTexture(rb[1][1]);
     }
     this.renderBuffers.clear();
 
     for (const fbo of this.fbos.values()) {
-      if (fbo[0]) gl.deleteFramebuffer(fbo[0]);
-      if (fbo[1]) gl.deleteFramebuffer(fbo[1]);
+      if (fbo[0][0]) gl.deleteFramebuffer(fbo[0][0]);
+      if (fbo[1][0]) gl.deleteFramebuffer(fbo[1][0]);
+      if (fbo[1][1]) gl.deleteFramebuffer(fbo[1][1]);
+      if (fbo[0][1]) gl.deleteFramebuffer(fbo[0][1]);
     }
     this.fbos.clear();
 
@@ -505,23 +504,29 @@ export class PathtracingRenderer {
       return fbo;
     }
 
-    this.renderBuffers.set("pt_buffer", [
-      glu.createRenderBufferTexture(gl, null, this.renderRes[0][0], this.renderRes[0][1])!, // highres
-      glu.createRenderBufferTexture(gl, null, this.renderRes[1][0], this.renderRes[1][1])!  // lowres
-    ]);
-    this.renderBuffers.set("copy_buffer", [
-      glu.createRenderBufferTexture(gl, null, this.renderRes[0][0], this.renderRes[0][1])!, // highres
-      glu.createRenderBufferTexture(gl, null, this.renderRes[1][0], this.renderRes[1][1])!  // lowres
+
+    this.renderBuffers.set("ray_buffer", [
+      [glu.createRenderBufferTexture(gl, null, this.renderRes[RenderResMode.High][0], this.renderRes[RenderResMode.High][1])!,
+      glu.createRenderBufferTexture(gl, null, this.renderRes[RenderResMode.Low][0], this.renderRes[RenderResMode.Low][1])!],
+      [glu.createRenderBufferTexture(gl, null, this.renderRes[RenderResMode.High][0], this.renderRes[RenderResMode.High][1])!,
+      glu.createRenderBufferTexture(gl, null, this.renderRes[RenderResMode.Low][0], this.renderRes[RenderResMode.Low][1])!]
     ]);
 
-    this.fbos.set("pt_fbo", [
-      createFbo([this.renderBuffers.get("pt_buffer")![0]]),
-      createFbo([this.renderBuffers.get("pt_buffer")![1]]),
+    this.renderBuffers.set("pt_buffer", [
+      [glu.createRenderBufferTexture(gl, null, this.renderRes[RenderResMode.High][0], this.renderRes[RenderResMode.High][1])!,
+      glu.createRenderBufferTexture(gl, null, this.renderRes[RenderResMode.Low][0], this.renderRes[RenderResMode.Low][1])!],
+      [glu.createRenderBufferTexture(gl, null, this.renderRes[RenderResMode.High][0], this.renderRes[RenderResMode.High][1])!,
+      glu.createRenderBufferTexture(gl, null, this.renderRes[RenderResMode.Low][0], this.renderRes[RenderResMode.Low][1])!]
     ]);
-    this.fbos.set("copy_fbo", [
-      createFbo([this.renderBuffers.get("copy_buffer")![0]]),
-      createFbo([this.renderBuffers.get("copy_buffer")![1]]),
-    ]);
+
+    this.fbos.set("pt_fbo", [[
+      createFbo([this.renderBuffers.get("pt_buffer")![BufferType.Front][RenderResMode.High]]),
+      createFbo([this.renderBuffers.get("pt_buffer")![BufferType.Front][RenderResMode.Low]])
+    ],
+    [
+      createFbo([this.renderBuffers.get("pt_buffer")![BufferType.Back][RenderResMode.High]]),
+      createFbo([this.renderBuffers.get("pt_buffer")![BufferType.Back][RenderResMode.Low]])
+    ]]);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
@@ -602,23 +607,23 @@ export class PathtracingRenderer {
     let pathtracingUniformBlockIdx = gl.getUniformBlockIndex(program, "PathTracingUniformBlock");
     gl.uniformBlockBinding(program, pathtracingUniformBlockIdx, 0);
 
-    const pathtracingUniformBlockSize = gl.getActiveUniformBlockParameter(
-      program,
-      pathtracingUniformBlockIdx,
-      gl.UNIFORM_BLOCK_DATA_SIZE
-    );
+    // const pathtracingUniformBlockSize = gl.getActiveUniformBlockParameter(
+    //   program,
+    //   pathtracingUniformBlockIdx,
+    //   gl.UNIFORM_BLOCK_DATA_SIZE
+    // );
     //console.log(`Uniform Block Size: ${pathtracingUniformBlockSize}`);
     // const expectedMaterialBlockSize = 240*this.scene!.sceneData.num_materials;
 
-    if(this.scene!.sceneData.num_textures > 0) {
+    if (this.scene!.sceneData.num_textures > 0) {
       let texInfoBlockIdx = gl.getUniformBlockIndex(program, "TextureInfoBlock");
       gl.uniformBlockBinding(program, texInfoBlockIdx, 1);
-      const textureInfoBlockSize = gl.getActiveUniformBlockParameter(
-        program,
-        texInfoBlockIdx,
-        gl.UNIFORM_BLOCK_DATA_SIZE
-      );
-      console.log(`TexInfo Block Size: ${textureInfoBlockSize}`);
+      // const textureInfoBlockSize = gl.getActiveUniformBlockParameter(
+      //   program,
+      //   texInfoBlockIdx,
+      //   gl.UNIFORM_BLOCK_DATA_SIZE
+      // );
+      // console.log(`TexInfo Block Size: ${textureInfoBlockSize}`);
       // const expectedTextureInfoBlockSize = 32*this.scene!.sceneData.num_textures;
     }
 
@@ -626,11 +631,11 @@ export class PathtracingRenderer {
     for (let i = 0; i < materialUniformBuffers.length; i++) {
       let matBlockIdx = gl.getUniformBlockIndex(program, `MaterialBlock${i}`);
       gl.uniformBlockBinding(program, matBlockIdx, i + 2);
-      const materialBlockSize = gl.getActiveUniformBlockParameter(
-        program,
-        matBlockIdx,
-        gl.UNIFORM_BLOCK_DATA_SIZE
-      );
+      // const materialBlockSize = gl.getActiveUniformBlockParameter(
+      //   program,
+      //   matBlockIdx,
+      //   gl.UNIFORM_BLOCK_DATA_SIZE
+      // );
       //console.log(`Material_${i} Block Size: ${materialBlockSize}`);
     }
 

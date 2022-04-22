@@ -37,6 +37,11 @@ def run(args):
 
     files = glob.glob(scenario_path + '/*.gltf')
     hdrs = glob.glob(scenario_path + '/*.hdr')
+
+    if args.filter:
+      files = [f for f in files if args.filter in f]
+      print("Rendering filtered list of files: ", files)
+
     for file in files:
       if args.testcase and args.testcase != os.path.splitext(os.path.basename(file))[0]:
         continue;
@@ -64,6 +69,7 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Run renderer validation.')
   parser.add_argument('-s', '--scenario', type=str, help='A specific scenario to run [ball,sphere,sphere-ibl]')
   parser.add_argument('-t','--testcase', help='A specific testscase to run')
+  parser.add_argument('-f','--filter', help='A string which is being used to match scene names to render')
   args = parser.parse_args()
 
   run(args)
