@@ -143,14 +143,8 @@ bool sample_bsdf_bounce(inout RenderState rs, out vec3 sampleWeight, out float p
 
 bool check_russian_roulette_path_termination(int bounce, inout vec3 path_weight)
 {
-  if (bounce > RR_START_DEPTH) {
-    float rr = rng_float();
-    if(rr <= RR_TERMINATION_PROB) {
-      return true;
-    }
-    path_weight *= 1.0 / (1.0 - RR_TERMINATION_PROB);
-  }
-  return false;
+  path_weight *= 1.0 / (1.0 - RR_TERMINATION_PROB);
+  return (bounce > RR_START_DEPTH) && (rng_float() <= RR_TERMINATION_PROB) ? true : false;
 }
 
 

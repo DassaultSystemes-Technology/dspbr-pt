@@ -51,6 +51,9 @@ void main()
   gl_Position = position;
 }`;
 
+const TILE_RES = 4;
+const INTERACTION_TILE_RES = 1;
+
 enum BufferType {
   Front = 0,
   Back = 1
@@ -99,6 +102,9 @@ export class PathtracingRenderer {
   private _frameCount = 1;
   private _isRendering = false;
   private _currentAnimationFrameId = -1;
+  private _resetAccumulation = false;
+
+  private _tileRes = TILE_RES;
 
   private _exposure = 1.0;
   public get exposure() {
@@ -119,13 +125,13 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
-  public renderModes = ["PT", "MISPTDL"];
-  private _renderMode: string = "MISPTDL";
-  public get renderMode() {
-    return this._renderMode;
+  public integratorTypes = ["PT", "MISPTDL"];
+  private _integrator: string = "MISPTDL";
+  public get integrator() {
+    return this._integrator;
   }
-  public set renderMode(val) {
-    this._renderMode = val;
+  public set integrator(val) {
+    this._integrator = val;
     this.resetAccumulation();
   }
 
@@ -136,7 +142,7 @@ export class PathtracingRenderer {
   }
   public set tonemapping(val) {
     this._tonemapping = val;
-    this.resetAccumulation();
+    // this.resetAccumulation();
   }
 
   public sheenGModes = ["Charlie", "Ashikhmin"];
@@ -203,6 +209,16 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
+  private _iblImportanceSampling = true;
+  public get iblImportanceSampling() {
+    return this._iblImportanceSampling;
+  }
+  public set iblImportanceSampling(val) {
+    this._iblImportanceSampling = val;
+    this.integrator = val ? "MISPTDL" : "PT";
+    this.resetAccumulation();
+  }
+
   private _pixelRatio = 1.0;
   public get pixelRatio() {
     return this._pixelRatio;
@@ -210,7 +226,6 @@ export class PathtracingRenderer {
   public set pixelRatio(val) {
     this._pixelRatio = val;
     this.resize(this.canvas.width, this.canvas.height);
-    this.resetAccumulation();
   }
 
   private _pixelRatioLowRes = 0.1;
@@ -220,12 +235,18 @@ export class PathtracingRenderer {
   public set pixelRatioLowRes(val) {
     this._pixelRatioLowRes = val;
     this.resize(this.canvas.width, this.canvas.height);
-    this.resetAccumulation();
   }
 
   private _renderResMode = RenderResMode.High;
   private setLowResRenderMode(flag: boolean) {
-    this._renderResMode = flag ? RenderResMode.Low : RenderResMode.High;
+    if(flag) {
+      this._renderResMode = RenderResMode.Low;
+      this._tileRes = INTERACTION_TILE_RES;
+    } else {
+      this._renderResMode = RenderResMode.High;
+      this._tileRes = TILE_RES;
+    }
+
     this.resetAccumulation();
   }
 
@@ -249,6 +270,7 @@ export class PathtracingRenderer {
 
   constructor(parameters: PathtracingRendererParameters = {}) {
     this.canvas = parameters.canvas ? parameters.canvas : document.createElementNS('http://www.w3.org/1999/xhtml', 'canvas');
+
     this.gl = parameters.context ? parameters.context : this.canvas.getContext('webgl2', { alpha: true, powerPreference: "high-performance" });
     this.gl.getExtension('EXT_color_buffer_float');
     this.gl.getExtension('OES_texture_float_linear');
@@ -263,11 +285,15 @@ export class PathtracingRenderer {
   }
 
   resetAccumulation() {
-    this._frameCount = 1;
+    this._resetAccumulation = true;
+  }
+
+  stopRendering() {
+    cancelAnimationFrame(this._currentAnimationFrameId);
+    this._isRendering = false;
   }
 
   resize(width: number, height: number) {
-    this._isRendering = false;
     this.displayRes = [width, height];
     this.renderRes[0] = [
       Math.ceil(this.displayRes[0] * this._pixelRatio),
@@ -280,15 +306,6 @@ export class PathtracingRenderer {
 
     this.initFramebuffers();
     this.resetAccumulation();
-    this._isRendering = true;
-  }
-
-  stopRendering() {
-    this._isRendering = false;
-  };
-
-  interruptFrame() {
-    cancelAnimationFrame(this._currentAnimationFrameId);
   }
 
   private pathtracingUniformBuffer: WebGLBuffer;
@@ -330,7 +347,7 @@ export class PathtracingRenderer {
     this.pathTracingUniforms["u_inv_render_res"] = [1.0 / renderRes[0], 1.0 / renderRes[1]];
     this.pathTracingUniforms["u_focal_length"] = camera.near;
     this.pathTracingUniforms["u_ray_eps"] = this.rayEps;
-    this.pathTracingUniforms["u_render_mode"] = this.renderModes.indexOf(this._renderMode);
+    this.pathTracingUniforms["u_render_mode"] = this.integratorTypes.indexOf(this._integrator);
     this.pathTracingUniforms["u_ibl_pdf_total_sum"] = this.iblImportanceSamplingData.totalSum;
 
     const uniformValues = new Float32Array(Object.values(this.pathTracingUniforms).flat());
@@ -374,9 +391,10 @@ export class PathtracingRenderer {
     return slot;
   }
 
-  renderFrame(camera: any, num_samples: number, frameFinishedCB: (frameCount: number) => void, renderingFinishedCB: () => void) {
+  renderFrame(camera: any, num_samples: number, tile: number, frameFinishedCB: (frameCount: number) => void, renderingFinishedCB: () => void) {
     let gl = this.gl;
     if (!this._isRendering) {
+      console.log("Cancel");
       return;
     }
 
@@ -385,6 +403,17 @@ export class PathtracingRenderer {
     const renderBuffer = this.renderBuffers.get("pt_buffer")![BufferType.Front][this._renderResMode];
     const copyBuffer = this.renderBuffers.get("pt_buffer")![BufferType.Back][this._renderResMode];
     const renderRes = this.renderRes[this._renderResMode];
+
+    if(this._resetAccumulation) {
+      this._frameCount = 1;
+      tile = 0;
+      this._resetAccumulation = false;
+      gl.clearColor(0, 0, 0, 0);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, copyFbo);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    }
 
     let slot = 2; // first 2 slots used are blocked by bvh and mesh textures
     slot = this.bindTextures(slot);
@@ -395,35 +424,26 @@ export class PathtracingRenderer {
 
     // pathtracing render pass
     gl.enable(gl.SCISSOR_TEST);
+    const tx = this._tileRes || 1;
+    const ty = this._tileRes || 1;
+    const tilex = tile % this._tileRes;
+    const tiley = Math.floor(tile / this._tileRes);
 
-    const tileRes = 4;
-    const tx = tileRes || 1;
-    const ty = tileRes || 1;
-    // const totalTiles = tx * ty;
-    for (let y = 0; y < ty; y++) {
-      for (let x = 0; x < tx; x++) {
-        if (!this._isRendering) {
-          return;
-        }
-        gl.scissor(
-          Math.ceil(x * renderRes[0] / tx),
-          Math.ceil((ty - y - 1) * renderRes[1] / ty),
-          Math.ceil(renderRes[0] / tx),
-          Math.ceil(renderRes[1] / ty)
-        );
+    gl.scissor(
+      Math.ceil(tilex * renderRes[0] / tx),
+      Math.ceil((ty - tiley - 1) * renderRes[1] / ty),
+      Math.ceil(renderRes[0] / tx),
+      Math.ceil(renderRes[1] / ty)
+    );
 
-        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-        gl.activeTexture(gl.TEXTURE0 + slot)
-        gl.bindTexture(gl.TEXTURE_2D, copyBuffer);
-        gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_sampler2D_PreviousTexture"), slot);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-      }
-    }
-    gl.disable(gl.SCISSOR_TEST);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.activeTexture(gl.TEXTURE0 + slot)
+    gl.bindTexture(gl.TEXTURE_2D, copyBuffer);
+    gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_sampler2D_PreviousTexture"), slot);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.useProgram(null);
-
 
     // copy pathtracing render buffer
     // to be used as accumulation input for next frames raytracing pass
@@ -434,6 +454,7 @@ export class PathtracingRenderer {
     gl.uniform1i(gl.getUniformLocation(this.copyProgram, "tex"), slot);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.disable(gl.SCISSOR_TEST);
 
     // display render pass
     gl.useProgram(this.displayProgram);
@@ -449,7 +470,9 @@ export class PathtracingRenderer {
     gl.useProgram(null);
     gl.bindVertexArray(null);
 
-    this._frameCount++;
+    if (tile == (this._tileRes*this._tileRes)-1) {
+      this._frameCount++;
+    }
 
     if (num_samples !== -1 && this._frameCount >= num_samples) {
       renderingFinishedCB(); // finished rendering num_samples
@@ -458,17 +481,14 @@ export class PathtracingRenderer {
 
     frameFinishedCB(this._frameCount);
     this._currentAnimationFrameId = requestAnimationFrame(() => {
-      this.renderFrame(camera, num_samples, frameFinishedCB, renderingFinishedCB)
+      this.renderFrame(camera, num_samples, ++tile % (this._tileRes * this._tileRes), frameFinishedCB, renderingFinishedCB)
     });
   };
 
   render(camera: any, num_samples: number, frameFinishedCB: (frameCount: number) => void, renderingFinishedCB: () => void) {
     this._isRendering = true;
     this.resetAccumulation();
-
-    this._currentAnimationFrameId = requestAnimationFrame(() => {
-      this.renderFrame(camera, num_samples, frameFinishedCB, renderingFinishedCB)
-    }); // start render loop
+    this.renderFrame(camera, num_samples, 0, frameFinishedCB, renderingFinishedCB);
   }
 
   private initFramebuffers() {
@@ -503,14 +523,6 @@ export class PathtracingRenderer {
       gl.drawBuffers(drawBuffers);
       return fbo;
     }
-
-
-    this.renderBuffers.set("ray_buffer", [
-      [glu.createRenderBufferTexture(gl, null, this.renderRes[RenderResMode.High][0], this.renderRes[RenderResMode.High][1])!,
-      glu.createRenderBufferTexture(gl, null, this.renderRes[RenderResMode.Low][0], this.renderRes[RenderResMode.Low][1])!],
-      [glu.createRenderBufferTexture(gl, null, this.renderRes[RenderResMode.High][0], this.renderRes[RenderResMode.High][1])!,
-      glu.createRenderBufferTexture(gl, null, this.renderRes[RenderResMode.Low][0], this.renderRes[RenderResMode.Low][1])!]
-    ]);
 
     this.renderBuffers.set("pt_buffer", [
       [glu.createRenderBufferTexture(gl, null, this.renderRes[RenderResMode.High][0], this.renderRes[RenderResMode.High][1])!,
@@ -582,6 +594,7 @@ export class PathtracingRenderer {
     this.stopRendering();
 
     this.scene = new PathtracingSceneDataAdapterWebGL2(this.gl, sceneData);
+
     this.scene.generateGPUBuffers();
 
     await this.initializeShaders();

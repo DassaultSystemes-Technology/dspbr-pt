@@ -21,6 +21,7 @@ import { PathtracingRenderer, Loader } from '../lib/index';
 import { ThreeSceneTranslator } from '../lib/three_scene_translator';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as Assets from './asset_index';
 
 if (!window.File || !window.FileReader || !window.FileList || !window.Blob) {
@@ -53,14 +54,14 @@ class App {
   autoRotate = false;
   interactionScale = 0.2;
   interactionTimeoutId: any;
-  pathtracedInteraction = true;
+  pathtracedInteraction = false;
   resumePathtracing = false;
-
   sceneBoundingBox: THREE.Box3;
+  showGroundPlane = false;
 
 
   constructor() {
-    this.current_ibl = "Artist Workshop";
+    this.current_ibl = "Footprint Court";
     this.current_scene = "";
 
     this.container = document.createElement('div');
@@ -97,34 +98,31 @@ class App {
     });
 
     this.controls.addEventListener('start', () => {
-
       if (this.pathtracing) {
         if (this.pathtracedInteraction) {
-          //this.renderer.interruptFrame();
+          this.renderer.stopRendering();
           clearTimeout(this.interactionTimeoutId);
           this.renderer.setLowResRenderMode(true);
-          //this.startPathtracing();
+          this.startPathtracing();
         } else {
-          clearTimeout(this.interactionTimeoutId);
-          this.stopPathtracing();
           this.startRasterizer();
+          clearTimeout(this.interactionTimeoutId);
           this.resumePathtracing = true;
         }
       }
-
     });
 
     this.controls.addEventListener('end', () => {
       if (this.pathtracedInteraction) {
         this.interactionTimeoutId = setTimeout(() => {
           this.renderer.setLowResRenderMode(false);
-        }, 200);
+        }, 100);
       } else {
         if (this.resumePathtracing) {
           this.interactionTimeoutId = setTimeout(() => {
-          this.startPathtracing();
-          this.stopRasterizer();
-          }, 200);
+            this.startPathtracing();
+            this.stopRasterizer();
+          }, 100);
         }
       }
     });
@@ -138,10 +136,10 @@ class App {
     this.renderer = new PathtracingRenderer({ canvas: this.canvas_pt });
     this.three_renderer = new ThreeRenderer({ canvas: this.canvas_three, powerPreference: "high-performance", alpha: true });
 
-    this.renderer.pixelRatio = 0.5;
+    this.renderer.pixelRatio = 1.0;
     this.renderer.maxBounces = 5;
     this.renderer.pixelRatioLowRes = 0.15;
-    // this.renderer.iblRotation = 180.0;
+    this.renderer.iblRotation = 180.0;
 
     window.addEventListener('resize', () => {
       this.resize();
@@ -172,15 +170,18 @@ class App {
     if (window.location.hash) {
       const uris = window.location.hash.split("#");
 
-      if (uris.length == 2) {
-        this.loadScenario(uris[1], this.current_ibl);
-        this.hideStartpage();
+      let ibl = this.current_ibl;
+      for (const u of uris) {
+        if (u == "ground") {
+          this.showGroundPlane = true;
+        }
+        if (u.includes("ibl")) {
+          ibl = u.replace("ibl:", "");
+        }
       }
-      else if (uris.length == 3) {
-        this.loadScenario(uris[1], uris[2]);
-        this.hideStartpage();
-        console.log(uris);
-      }
+
+      this.loadScenario(uris[1], ibl);
+      this.hideStartpage();
     }
   }
 
@@ -189,10 +190,10 @@ class App {
   }
 
   private loadDropFiles(fileMap) {
-      let foundHDR = false;
-      fileMap.forEach((value, key) => {
+    let foundHDR = false;
+    fileMap.forEach((value, key) => {
       if (key.match(/\.hdr$/)) {
-        this.showLoadscreen("Loading HDR...");
+        this.showStatusScreen("Loading HDR...");
         Loader.loadIBL(URL.createObjectURL(value)).then((ibl) => {
           this.renderer.setIBL(ibl);
           this.three_renderer.setIBL(ibl);
@@ -205,15 +206,33 @@ class App {
         if (this.pathtracing)
           this.stopPathtracing();
 
-        this.showLoadscreen("Loading Scene...");
+        this.showStatusScreen("Loading Scene...");
         const files: [string, File][] = Array.from(fileMap);
         Loader.loadSceneFromBlobs(files, this.autoScaleScene).then((gltf) => {
           this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
           this.updateCameraFromBoundingBox();
           this.centerView();
 
-          ThreeSceneTranslator.translateThreeScene(gltf.scene, gltf).then((pathtracingSceneData) => {
-            this.renderer.setScene(pathtracingSceneData);
+          gltf.scene.traverse((c: any) => {
+            if (c.material) {
+              if (c.material instanceof THREE.MeshPhysicalMaterial) {
+                if (c.material.transmission > 0.5) {
+                  const material = c.material;
+                  c.material.transmission = 1.0;
+                  material.roughness *= 0.1;
+                  material.metalness = 0.0;
+                  material.ior = 1.8;
+                  material.color.set(0xffffff);
+                  material.clearcoat = 0.0;
+                } else {
+                  c.material.roughness *= 0.1;
+                }
+              }
+            }
+          });
+
+          ThreeSceneTranslator.translateThreeScene(gltf.scene, gltf).then(async (pathtracingSceneData) => {
+            await this.renderer.setScene(pathtracingSceneData);
             if (this.pathtracing)
               this.startPathtracing();
 
@@ -236,11 +255,26 @@ class App {
     });
   }
 
+  private addGroundPlane(scene) {
+    const floorPlane = new THREE.Mesh(
+      new THREE.PlaneBufferGeometry(),
+      new THREE.MeshStandardMaterial({
+        transparent: false,
+        color: 0x080808,
+        roughness: 0.0,
+        metalness: 0.0
+      })
+    );
+    floorPlane.scale.setScalar((this.sceneBoundingBox.max.x - this.sceneBoundingBox.min.x) * 3.0);
+    floorPlane.rotation.x = - Math.PI / 2;
+    floorPlane.position.y = this.sceneBoundingBox.min.y - 0.01;
+    scene.add(floorPlane);
+  }
 
   private async loadScenario(sceneUrl, iblUrl) {
     if (this.pathtracing)
       this.stopPathtracing();
-    this.showLoadscreen("Loading Scene...");
+    this.showStatusScreen("Loading Scene...");
 
     const sceneKey = sceneUrl.replaceAll('%20', ' ');
     if (sceneKey in Assets.scenes) {
@@ -259,16 +293,23 @@ class App {
       this.setIBLInfo(iblUrl);
     }
 
-    const gltf = await Loader.loadSceneFromUrl(sceneUrl, this.autoScaleScene);
+    const gltf = await Loader.loadSceneFromUrl(sceneUrl, this.autoScaleScene) as GLTF;
     const ibl = await Loader.loadIBL(iblUrl);
 
     this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
     this.updateCameraFromBoundingBox();
     this.centerView();
+
+    // const floorTex = this.generateRadialFloorTexture(2048);
+    if (this.showGroundPlane) {
+      this.addGroundPlane(gltf.scene);
+      this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
+    }
+
     this.renderer.setIBL(ibl);
 
     const pathtracingSceneData = await ThreeSceneTranslator.translateThreeScene(gltf.scene, gltf);
-    this.renderer.setScene(pathtracingSceneData);
+    await this.renderer.setScene(pathtracingSceneData);
     if (this.pathtracing)
       this.startPathtracing();
 
@@ -294,8 +335,7 @@ class App {
   }
 
   private startRasterizer() {
-    if (this.pathtracing)
-      this.stopPathtracing();
+    this.stopPathtracing();
     this.three_renderer.render(this.camera, () => {
       var destCtx = this.canvas.getContext("2d");
       destCtx.drawImage(this.canvas_three, 0, 0);
@@ -417,7 +457,6 @@ class App {
       this.controls.autoRotate = value;
       this.renderer.resetAccumulation();
     });
-
     scene.open();
 
     const ibl_names = Object.keys(Assets.ibls);
@@ -444,6 +483,7 @@ class App {
     });//.setValue(this.current_ibl);
 
     lighting.add(this.renderer, 'iblRotation').name('IBL Rotation').min(-180.0).max(180.0).step(0.1).listen();
+    lighting.add(this.renderer, 'iblImportanceSampling').name('Importance Sampling');
     lighting.open();
 
     let interator = this._gui.addFolder('Integrator');
@@ -456,7 +496,7 @@ class App {
     });
 
     interator.add(this.renderer, 'debugMode', this.renderer.debugModes).name('Debug Mode');
-    interator.add(this.renderer, 'renderMode', this.renderer.renderModes).name('Integrator');
+    // interator.add(this.renderer, 'renderMode', this.renderer.renderModes).name('Integrator');
     interator.add(this.renderer, 'maxBounces').name('Bounce Depth').min(0).max(32).step(1);
     interator.add(this.renderer, 'rayEps').name('Ray Offset');
     interator.open();
@@ -472,7 +512,7 @@ class App {
     display.add(this.renderer, 'enableGamma').name('Gamma');
 
     display.add(this.renderer, 'pixelRatio').name('Pixel Ratio').min(0.1).max(1.0);
-    display.add(this, 'pathtracedInteraction').name('Pathtraced Interaction');
+    display.add(this, 'pathtracedInteraction').name('Pathtraced Navigation');
     display.add(this.renderer, 'pixelRatioLowRes').name('Interaction Ratio').min(0.1).max(1.0).step(0.1);
     display.open();
 
@@ -497,8 +537,8 @@ class App {
     // GUI.toggleHide();
   }
 
-  showLoadscreen(msg: string) {
-    this.status.innerText = "Loading Scene...";
+  showStatusScreen(msg: string) {
+    this.status.innerText = msg;
     this.loadscreen.style.visibility = "visible";
     this.spinner.style.visibility = "visible";
   }
