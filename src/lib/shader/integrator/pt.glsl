@@ -1,4 +1,4 @@
-vec4 trace_pt(bvh_ray r)
+vec4 trace(bvh_ray r)
 {
   bvh_hit hit;
   vec3 path_weight = vec3(1.0);

@@ -91,7 +91,9 @@ export class PathtracingRenderer {
   private renderBuffers = new Map<string, WebGLFramebuffer[][]>();
 
   private quadVao: WebGLVertexArrayObject | null = null;
-  private ptProgram: WebGLProgram | null = null;
+  private renderPrograms = new Map<string, WebGLProgram>();
+  private renderProgram: WebGLProgram | null = null;
+  private debugProgram: WebGLProgram | null = null;
   private copyProgram: WebGLProgram | null = null;
   private displayProgram: WebGLProgram | null = null;
   private quadVertexBuffer: WebGLBuffer | null = null;
@@ -122,6 +124,11 @@ export class PathtracingRenderer {
   }
   public set debugMode(val) {
     this._debugMode = val;
+    if(val != "None") {
+      this.renderProgram = this.renderPrograms.get("debug_program")!;
+    } else {
+     this.iblImportanceSampling = this.iblImportanceSampling;
+    }
     this.resetAccumulation();
   }
 
@@ -215,7 +222,11 @@ export class PathtracingRenderer {
   }
   public set iblImportanceSampling(val) {
     this._iblImportanceSampling = val;
-    this.integrator = val ? "MISPTDL" : "PT";
+    if(val) {
+      this.renderProgram = this.renderPrograms.get("misptdl_program")!;
+    } else {
+      this.renderProgram = this.renderPrograms.get("pt_program")!;
+    }
     this.resetAccumulation();
   }
 
@@ -360,30 +371,30 @@ export class PathtracingRenderer {
     let gl = this.gl;
 
     let slot = startSlot;
-    gl.useProgram(this.ptProgram);
+    gl.useProgram(this.renderProgram);
 
     gl.activeTexture(gl.TEXTURE0 + slot)
     gl.bindTexture(gl.TEXTURE_2D, this.ibl);
-    gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_sampler_env_map"), slot++);
+    gl.uniform1i(gl.getUniformLocation(this.renderProgram, "u_sampler_env_map"), slot++);
 
     gl.activeTexture(gl.TEXTURE0 + slot)
     gl.bindTexture(gl.TEXTURE_2D, this.iblImportanceSamplingData.pdf);
-    gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_sampler_env_map_pdf"), slot++);
+    gl.uniform1i(gl.getUniformLocation(this.renderProgram, "u_sampler_env_map_pdf"), slot++);
 
     gl.activeTexture(gl.TEXTURE0 + slot)
     gl.bindTexture(gl.TEXTURE_2D, this.iblImportanceSamplingData.cdf);
-    gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_sampler_env_map_cdf"), slot++);
+    gl.uniform1i(gl.getUniformLocation(this.renderProgram, "u_sampler_env_map_cdf"), slot++);
 
     gl.activeTexture(gl.TEXTURE0 + slot)
     gl.bindTexture(gl.TEXTURE_2D, this.iblImportanceSamplingData.yPdf);
-    gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_sampler_env_map_yPdf"), slot++);
+    gl.uniform1i(gl.getUniformLocation(this.renderProgram, "u_sampler_env_map_yPdf"), slot++);
 
     gl.activeTexture(gl.TEXTURE0 + slot)
     gl.bindTexture(gl.TEXTURE_2D, this.iblImportanceSamplingData.yCdf);
-    gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_sampler_env_map_yCdf"), slot++);
+    gl.uniform1i(gl.getUniformLocation(this.renderProgram, "u_sampler_env_map_yCdf"), slot++);
 
     for (let t in this.scene?.texArrayTextures) {
-      gl.uniform1i(gl.getUniformLocation(this.ptProgram, t), slot);
+      gl.uniform1i(gl.getUniformLocation(this.renderProgram, t), slot);
       gl.activeTexture(gl.TEXTURE0 + slot++);
       gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.scene?.texArrayTextures[t]);
     }
@@ -439,7 +450,7 @@ export class PathtracingRenderer {
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
     gl.activeTexture(gl.TEXTURE0 + slot)
     gl.bindTexture(gl.TEXTURE_2D, copyBuffer);
-    gl.uniform1i(gl.getUniformLocation(this.ptProgram, "u_sampler2D_PreviousTexture"), slot);
+    gl.uniform1i(gl.getUniformLocation(this.renderProgram, "u_sampler2D_PreviousTexture"), slot);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -598,13 +609,16 @@ export class PathtracingRenderer {
     this.scene.generateGPUBuffers();
 
     await this.initializeShaders();
-    this.bindGPUBuffersAndTextures();
+
+    this.renderPrograms.forEach(program => {
+      this.bindGPUBuffersAndTextures(program);
+    })
+
     this.resetAccumulation();
   }
 
-  private bindGPUBuffersAndTextures() {
+  private bindGPUBuffersAndTextures(program: WebGLProgram) {
     const gl = this.gl;
-    const program = this.ptProgram;
 
     gl.useProgram(program);
 
@@ -678,6 +692,16 @@ export class PathtracingRenderer {
     const uint NUM_TRIANGLES = ${this.scene.sceneData.num_triangles}u;
     `;
 
+    const pt_trace = `
+      vec4 contribution = trace_pt(r);
+    `
+    const debug_trace = `
+      vec4 contribution = trace_debug(r);
+    `
+    const misptdl_trace = `
+      vec4 contribution = trace_misptdl(r);
+    `
+
     // console.log(this.scene.materialBufferShaderChunk);
     const shaderChunks = new Map<string, string>([
       ['structs', structs_shader],
@@ -697,15 +721,23 @@ export class PathtracingRenderer {
       ['sheen', sheen_shader],
       ['fresnel', fresnel_shader],
       ['iridescence', iridescence_shader],
-      ['debug_integrator', debug_integrator_shader],
-      ['pt_integrator', pt_integrator_shader],
-      ['misptdl_integrator', misptdl_integrator_shader],
-      ['mesh_constants', meshConstants],
+      ['mesh_constants', meshConstants]
     ]);
+
+    const debugShaderMap = new Map<string, string>(shaderChunks);
+    debugShaderMap.set('integrator', debug_integrator_shader);
+    const ptShaderMap = new Map<string, string>(shaderChunks);
+    ptShaderMap.set('integrator', pt_integrator_shader);
+    const misptdlShaderMap = new Map<string, string>(shaderChunks);
+    misptdlShaderMap.set('integrator', misptdl_integrator_shader);
 
     this.copyProgram = await glu.createProgramFromSource(this.gl, vertexShader, copy_shader);
     this.displayProgram = await glu.createProgramFromSource(this.gl, vertexShader, display_shader);
-    this.ptProgram = await glu.createProgramFromSource(this.gl, vertexShader, render_shader, shaderChunks);
+    this.renderPrograms.set("pt_program", await glu.createProgramFromSource(this.gl, vertexShader, render_shader, ptShaderMap));
+    this.renderPrograms.set("debug_program", await glu.createProgramFromSource(this.gl, vertexShader, render_shader, debugShaderMap));
+    this.renderPrograms.set("misptdl_program", await glu.createProgramFromSource(this.gl, vertexShader, render_shader, misptdlShaderMap));
+
+    this.renderProgram =  this.renderPrograms.get("misptdl_program")!;
 
     console.timeEnd("Pathtracing shader generation");
   }

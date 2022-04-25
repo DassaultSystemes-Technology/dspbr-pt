@@ -17,10 +17,6 @@ struct Geometry {
   vec3 n, t, b;
 };
 
-// bool has_flag(uint flags, uint mask) {
-//   return (flags & mask) != 0u;
-// }
-
 float saturate(float val) {
   return clamp(val, 0.0, 1.0);
 }
@@ -182,23 +178,6 @@ vec3 sampleHemisphereUniform(vec2 uv, out float pdf) {
   pdf = ONE_OVER_TWO_PI;
   return vec3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
   }
-
-// mat3 get_onb2(vec3 n) {
-//     // http://orbit.dtu.dk/files/126824972/onb_frisvad_jgt2012_v2.pdf
-//     vec3 b1, b2;
-//     if (n.z < -0.9999999) // Handle the singularity
-//     {
-//         b1 = vec3(0.0, -1.0, 0.0);
-//         b2 = vec3(-1.0, 0.0, 0.0);
-//          return mat3(b1, b2, n);
-//     }
-//     float a = 1.0 / (1.0 + n.z);
-//     float b = -n.x*n.y*a;
-//     b1 = vec3(1.0f - n.x*n.x*a, -n.x, b);
-//     b2 = vec3(b, 1.0 - n.y*n.y*a, -n.y);
-
-//     return mat3(b1, b2, n);
-// }
 
 vec3 compute_triangle_normal(in vec3 p0, in vec3 p1, in vec3 p2) {
   vec3 e0 = p2 - p0;

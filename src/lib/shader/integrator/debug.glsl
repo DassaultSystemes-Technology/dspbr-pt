@@ -1,5 +1,5 @@
 
-vec4 trace_debug(const bvh_ray r) {
+vec4 trace(const bvh_ray r) {
   bvh_hit hit;
 
   vec4 color = vec4(0);

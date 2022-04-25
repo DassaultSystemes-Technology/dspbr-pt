@@ -26,7 +26,7 @@ vec3 eval_direct_light_contribution(in RenderState rs, float r0, float r1) {
   return L;
 }
 
-vec4 trace_misptdl(bvh_ray ray) {
+vec4 trace(bvh_ray ray) {
 
   bvh_hit hit;
   vec3 path_weight = vec3(1.0);

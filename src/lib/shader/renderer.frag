@@ -148,9 +148,9 @@ bool check_russian_roulette_path_termination(int bounce, inout vec3 path_weight)
 }
 
 
-#include <debug_integrator>
-#include <pt_integrator>
-#include <misptdl_integrator>
+// #include <debug_integrator>
+// #include <pt_integrator>
+// #include <misptdl_integrator>
 
 ///////////////////////////////////////////////////////////////////////////////
 // Ray Generation
@@ -170,18 +170,14 @@ bvh_ray calcuateViewRay(float r0, float r1) {
   return bvh_create_ray(fragPosView, origin, TFAR_MAX);
 }
 
+#include <integrator>
+
 void main() {
   rng_init(int(u_frame_count) * int(u_max_bounces));
 
   bvh_ray r = calcuateViewRay(rng_float(), rng_float());
 
-  vec4 contribution;
-  if (int(u_render_mode) == RM_PT)
-    contribution = trace_pt(r);
-  if (int(u_render_mode) == RM_MISPTDL)
-    contribution = trace_misptdl(r);
-  if (int(u_debug_mode) > 0)
-    contribution = trace_debug(r);
+  vec4 contribution = trace(r);
 
   vec4 previousFrameColor = texelFetch(u_sampler2D_PreviousTexture, ivec2(gl_FragCoord.xy), 0);
   contribution = (previousFrameColor * (u_frame_count - 1.0) + contribution) / u_frame_count;
