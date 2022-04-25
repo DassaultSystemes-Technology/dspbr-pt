@@ -169,7 +169,7 @@ vec3 sample_dspbr(inout MaterialClosure c, vec3 wi, in vec3 uvw, inout vec3 bsdf
     bsdf_over_pdf *= diffuse_bsdf_eval(c, wi, wo, g);
     bsdf_over_pdf *= 1.0 / pdf;
     bsdf_over_pdf *= abs(dot(wo, g.n));
-    // bsdf_over_pdf *= (1.0 - c.metallic) * (1.0 - c.transparency);
+    bsdf_over_pdf *= (1.0 - c.metallic) * (1.0 - c.transparency);
 
     vec3 wh = normalize(wi + wo);
 
@@ -233,7 +233,6 @@ vec3 sample_dspbr(inout MaterialClosure c, vec3 wi, in vec3 uvw, inout vec3 bsdf
     bsdf_over_pdf += eval_brdf_microfacet_ggx_smith_ms(c.specular_f0, c.specular_f90, c.alpha, wi, wo, g);
 
     bsdf_over_pdf *= abs(dot(wo, g.n));
-    bsdf_over_pdf *= (1.0-c.transparency) * c.metallic;
   }
   else if (bool(c.event_type & E_COATING)) {
     wo = sample_brdf_microfacet_ggx_smith(vec2(c.clearcoat_alpha), wi, g, uvw.xy, pdf);

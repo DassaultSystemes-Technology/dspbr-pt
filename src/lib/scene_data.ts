@@ -52,7 +52,15 @@ export class PathtracingSceneData {
         texArray.push(tex);
         texIdx = texArray.length - 1;
       }
-      texInfo.texArrayIdx = this._texArrays.size-1;
+
+      let i=0;
+      // find index of element in map (js map stores entries in insertion order)
+      // TODO find better alternative
+      for(let key of this._texArrays.keys()) {
+        if(key == res) break;
+        i++
+      }
+      texInfo.texArrayIdx = i;
       texInfo.texIdx = texIdx;
     } else {
       this._texArrays.set(res, [tex]);

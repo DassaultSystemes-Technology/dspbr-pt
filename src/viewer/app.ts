@@ -61,7 +61,7 @@ class App {
 
 
   constructor() {
-    this.current_ibl = "Footprint Court";
+    this.current_ibl = "Artist Workshop";
     this.current_scene = "";
 
     this.container = document.createElement('div');
@@ -212,24 +212,6 @@ class App {
           this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
           this.updateCameraFromBoundingBox();
           this.centerView();
-
-          gltf.scene.traverse((c: any) => {
-            if (c.material) {
-              if (c.material instanceof THREE.MeshPhysicalMaterial) {
-                if (c.material.transmission > 0.5) {
-                  const material = c.material;
-                  c.material.transmission = 1.0;
-                  material.roughness *= 0.1;
-                  material.metalness = 0.0;
-                  material.ior = 1.8;
-                  material.color.set(0xffffff);
-                  material.clearcoat = 0.0;
-                } else {
-                  c.material.roughness *= 0.1;
-                }
-              }
-            }
-          });
 
           ThreeSceneTranslator.translateThreeScene(gltf.scene, gltf).then(async (pathtracingSceneData) => {
             await this.renderer.setScene(pathtracingSceneData);
