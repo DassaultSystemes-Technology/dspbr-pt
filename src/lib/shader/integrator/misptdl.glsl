@@ -32,7 +32,6 @@ vec4 trace(bvh_ray ray) {
   vec3 path_weight = vec3(1.0);
   vec3 L = vec3(0.0);
   float last_bounce_pdf = 0.0;
-  float last_bsdf_selection_pdf = 0.0;
 
   if (!bvh_intersect_nearest(ray, hit)) { // primary camera ray
     if (u_background_from_ibl > 0.0)
@@ -75,7 +74,6 @@ vec4 trace(bvh_ray ray) {
 
     if (bvh_intersect_nearest(ray, hit)) { // primary camera ray
       fillRenderState(ray, hit, rs);
-      last_bsdf_selection_pdf = rs.closure.bsdf_selection_pdf;
       bounce++;
     } else {
       float ibl_sample_pdf = ibl_pdf(ray.dir);

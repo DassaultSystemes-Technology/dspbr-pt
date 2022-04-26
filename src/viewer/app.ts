@@ -150,12 +150,12 @@ class App {
     dropCtrlOverlay.on('dropstart', () => {
       this.hideStartpage();
     });
-    dropCtrlOverlay.on('drop', ({ files }) => this.loadDropFiles(files));
+    dropCtrlOverlay.on('drop', async ({ files }) => { await this.loadSceneFromDrop(files) });
 
 
     const dropCtrlCanvas = new SimpleDropzone(this.canvas, input);
-    dropCtrlCanvas.on('drop', ({ files }) => {
-      this.loadDropFiles(files);
+    dropCtrlCanvas.on('drop', async ({ files }) => {
+      await this.loadSceneFromDrop(files);
     });
     // dropCtrl.on('droperror', () => this.hideSpinner());
     this.container.addEventListener('dragover', function (e) {
@@ -180,61 +180,13 @@ class App {
         }
       }
 
-      this.loadScenario(uris[1], ibl);
+      this.loadSceneFromUri(uris[1], ibl);
       this.hideStartpage();
     }
   }
 
   private currentIblUrl() {
     return Assets.ibls[this.current_ibl].url;
-  }
-
-  private loadDropFiles(fileMap) {
-    let foundHDR = false;
-    fileMap.forEach((value, key) => {
-      if (key.match(/\.hdr$/)) {
-        this.showStatusScreen("Loading HDR...");
-        Loader.loadIBL(URL.createObjectURL(value)).then((ibl) => {
-          this.renderer.setIBL(ibl);
-          this.three_renderer.setIBL(ibl);
-          this.setIBLInfo(value.name);
-          this.hideLoadscreen();
-          foundHDR = true;
-        });
-      }
-      if (key.match(/\.glb$/) || key.match(/\.gltf$/)) {
-        if (this.pathtracing)
-          this.stopPathtracing();
-
-        this.showStatusScreen("Loading Scene...");
-        const files: [string, File][] = Array.from(fileMap);
-        Loader.loadSceneFromBlobs(files, this.autoScaleScene).then((gltf) => {
-          this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
-          this.updateCameraFromBoundingBox();
-          this.centerView();
-
-          ThreeSceneTranslator.translateThreeScene(gltf.scene, gltf).then(async (pathtracingSceneData) => {
-            await this.renderer.setScene(pathtracingSceneData);
-            if (this.pathtracing)
-              this.startPathtracing();
-
-            this.three_renderer.setScene(new THREE.Scene().add(gltf.scene));
-            if (!this.pathtracing) {
-              this.startRasterizer();
-            }
-            this.hideLoadscreen();
-          });
-
-          if (!foundHDR) {
-            Loader.loadIBL(this.currentIblUrl()).then((ibl) => {
-              this.setIBLInfo(this.current_ibl, Assets.ibls[this.current_ibl].credit)
-              this.renderer.setIBL(ibl);
-              this.three_renderer.setIBL(ibl);
-            });
-          }
-        });
-      }
-    });
   }
 
   private addGroundPlane(scene) {
@@ -247,17 +199,35 @@ class App {
         metalness: 0.0
       })
     );
-    floorPlane.scale.setScalar((this.sceneBoundingBox.max.x - this.sceneBoundingBox.min.x) * 3.0);
+    floorPlane.scale.setScalar((this.sceneBoundingBox.max.x - this.sceneBoundingBox.min.x) * 5.0);
     floorPlane.rotation.x = - Math.PI / 2;
     floorPlane.position.y = this.sceneBoundingBox.min.y - 0.01;
     scene.add(floorPlane);
   }
 
-  private async loadScenario(sceneUrl, iblUrl) {
-    if (this.pathtracing)
-      this.stopPathtracing();
-    this.showStatusScreen("Loading Scene...");
+  private async loadSceneFromDrop(fileMap) {
+    let ibl = null;
+    let gltf = null;
+    for(const [key, value] of fileMap) {
+      if (key.match(/\.hdr$/)) {
+        this.showStatusScreen("Loading HDR...");
+        ibl = await Loader.loadIBL(URL.createObjectURL(value));
+      }
+      if (key.match(/\.glb$/) || key.match(/\.gltf$/)) {
+        this.showStatusScreen("Loading Scene...");
+        const files: [string, File][] = Array.from(fileMap);
+        gltf = await Loader.loadSceneFromBlobs(files, this.autoScaleScene);
 
+        if (!ibl)
+          ibl = await Loader.loadIBL(this.currentIblUrl());
+      }
+    }
+
+    await this.loadScenario(gltf, ibl);
+  }
+
+  private async loadSceneFromUri(sceneUrl, iblUrl) {
+    this.showStatusScreen("Loading Scene...");
     const sceneKey = sceneUrl.replaceAll('%20', ' ');
     if (sceneKey in Assets.scenes) {
       const scene = Assets.scenes[sceneKey];
@@ -277,6 +247,13 @@ class App {
 
     const gltf = await Loader.loadSceneFromUrl(sceneUrl, this.autoScaleScene) as GLTF;
     const ibl = await Loader.loadIBL(iblUrl);
+
+    await this.loadScenario(gltf, ibl)
+  }
+
+  private async loadScenario(gltf: GLTF, ibl: any) {
+    if (this.pathtracing)
+      this.stopPathtracing();
 
     this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
     this.updateCameraFromBoundingBox();
@@ -428,7 +405,7 @@ class App {
     let scene = this._gui.addFolder('Scene');
     scene.add(this, "current_scene", scene_names).name('Scene').onChange((value) => {
       const sceneInfo = Assets.scenes[value];
-      this.loadScenario(sceneInfo.url, this.current_ibl);
+      this.loadSceneFromUri(sceneInfo.url, this.current_ibl);
       this.setSceneInfo(value, sceneInfo.credit);
       this.hideStartpage();
     });
