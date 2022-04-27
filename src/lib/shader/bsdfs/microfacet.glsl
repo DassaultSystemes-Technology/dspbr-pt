@@ -145,8 +145,8 @@ vec3 eval_brdf_microfacet_ggx_smith(vec3 f0, vec3 f90, vec2 alpha, vec3 wi, vec3
   return (f * g * d) / abs(4.0 * dot(wi, geo.n) * dot(wo, geo.n));
 }
 
-vec3 eval_brdf_microfacet_ggx_smith_iridescence(vec3 f0, vec3 f90, vec2 alpha, float iridescence, float iridescence_ior, float iridescence_thickness, vec3 wi, vec3 wo, vec3 wh, Geometry geo)
-{
+vec3 eval_brdf_microfacet_ggx_smith_iridescence(vec3 f0, vec3 f90, vec2 alpha, float iridescence, float iridescence_ior,
+                                                float iridescence_thickness, vec3 wi, vec3 wo, vec3 wh, Geometry geo) {
   if (dot(wi, geo.n) < EPS_PDF || dot(wo, geo.n) < EPS_PDF) {
     return vec3(0.0);
   }
@@ -161,7 +161,6 @@ vec3 eval_brdf_microfacet_ggx_smith_iridescence(vec3 f0, vec3 f90, vec2 alpha, f
   return (f * g * d) / abs(4.0 * dot(wi, geo.n) * dot(wo, geo.n));
 }
 
-
 vec3 eval_bsdf_microfacet_ggx_smith(vec3 specular_f0, vec3 specular_f90, vec2 alpha, const in vec3 wi, in vec3 wo,
                                     Geometry geo) {
   if (abs(dot(wi, geo.n)) < EPS_PDF || dot(wo, geo.n) > 0.0) {
@@ -172,7 +171,6 @@ vec3 eval_bsdf_microfacet_ggx_smith(vec3 specular_f0, vec3 specular_f90, vec2 al
   return eval_brdf_microfacet_ggx_smith(specular_f0, specular_f90, alpha, wi, wo_f, wh, geo);
 }
 
-
 vec3 eval_bsdf_microfacet_ggx_smith_iridescence(vec3 specular_f0, vec3 specular_f90, vec2 alpha, float iridescence,
                                                 float iridescence_ior, float iridescence_thickness, const in vec3 wi,
                                                 in vec3 wo, Geometry geo) {
@@ -181,7 +179,8 @@ vec3 eval_bsdf_microfacet_ggx_smith_iridescence(vec3 specular_f0, vec3 specular_
   }
   vec3 wo_f = flip(wo, -geo.n);
   vec3 wh = normalize(wi + wo_f);
-  return eval_brdf_microfacet_ggx_smith_iridescence(specular_f0, specular_f90, alpha, iridescence, iridescence_ior, iridescence_thickness, wi, wo_f, wh, geo);
+  return eval_brdf_microfacet_ggx_smith_iridescence(specular_f0, specular_f90, alpha, iridescence, iridescence_ior,
+                                                    iridescence_thickness, wi, wo_f, wh, geo);
 }
 
 float brdf_microfacet_ggx_smith_pdf(MaterialClosure c, Geometry g, vec3 wi, vec3 wo) {
@@ -222,7 +221,8 @@ vec3 fresnel_transmission(MaterialClosure c, float cos_theta, float ni, float nt
   return vec3(1.0) - fr;
 }
 
-vec3 sample_bsdf_microfacet_ggx_smith(const in MaterialClosure c, vec3 wi, Geometry geo, vec3 uvw, out float pdf, inout vec3 bsdf_weight, inout int event) {
+vec3 sample_bsdf_microfacet_ggx_smith(const in MaterialClosure c, vec3 wi, Geometry geo, vec3 uvw, out float pdf,
+                                      inout vec3 bsdf_weight, inout int event) {
 
   pdf = 1.0;
   vec3 wi_ = to_local(wi, geo);
@@ -238,9 +238,6 @@ vec3 sample_bsdf_microfacet_ggx_smith(const in MaterialClosure c, vec3 wi, Geome
     ior_i = c.ior;
     ior_o = 1.0;
   }
-
-  vec3 f0 = sqr((ior_i - ior_o) / (ior_i + ior_o)) * c.specular * c.specular_tint;
-  vec3 _iridescence = evalIridescence(ior_i, c.iridescence_ior, cos_theta_i, c.iridescence_thickness, f0);
 
   vec3 fr = fresnel_reflection(c, cos_theta_i, ior_i, ior_o);
   vec3 ft = fresnel_transmission(c, cos_theta_i, ior_i, ior_o);
@@ -285,11 +282,13 @@ vec3 sample_bsdf_microfacet_ggx_smith(const in MaterialClosure c, vec3 wi, Geome
   if (bool(event & E_REFLECTION)) {
     float g2 = ggx_smith_g2(c.alpha, wi, wo, wh, geo, false);
 
-    float iridescence_base_weight = 1.0 - max_(_iridescence);
+    // vec3 f0 = sqr((ior_i - ior_o) / (ior_i + ior_o)) * c.specular * c.specular_tint;
+    // vec3 _iridescence = evalIridescence(ior_i, c.iridescence_ior, cos_theta_i, c.iridescence_thickness, f0);
+    // float iridescence_base_weight = 1.0 - max_(_iridescence);
 
     bsdf_weight *= fr / prob_fr;
-    bsdf_weight *= g2 / g1 * iridescence_base_weight;
-    pdf *= prob_fr / (4.0 * abs(dot(wo, wh))) ;
+    bsdf_weight *= g2 / g1; // * iridescence_base_weight;
+    pdf *= prob_fr / (4.0 * abs(dot(wo, wh)));
   } else if (bool(event & E_TRANSMISSION)) {
     pdf *= (1.0 - prob_fr);
     bsdf_weight *= ft / (1.0 - prob_fr) * c.albedo * c.transparency;
