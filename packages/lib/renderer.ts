@@ -19,27 +19,27 @@ import { PathtracingSceneDataAdapterWebGL2 } from './scene_data_adapter_webgl2'
 
 import * as glu from './gl_utils';
 
-import shader_constants from '/packages/lib/shader/constants.glsl';
-import copy_shader from '/packages/lib/shader/copy.glsl';
-import display_shader from '/packages/lib/shader/display.frag';
+import shader_constants from './shader/constants.glsl';
+import copy_shader from './shader/copy.glsl';
+import display_shader from './shader/display.frag';
 
-import structs_shader from '/packages/lib/shader/structs.glsl';
-import rng_shader from '/packages/lib/shader/rng.glsl';
-import utils_shader from '/packages/lib/shader/utils.glsl';
-import material_shader from '/packages/lib/shader/material.glsl';
-import dspbr_shader from '/packages/lib/shader/dspbr.glsl';
-import bvh_shader from '/packages/lib/shader/bvh.glsl';
-import lighting_shader from '/packages/lib/shader/lighting.glsl';
-import diffuse_shader from '/packages/lib/shader/bsdfs/diffuse.glsl';
-import microfacet_shader from '/packages/lib/shader/bsdfs/microfacet.glsl';
-import sheen_shader from '/packages/lib/shader/bsdfs/sheen.glsl';
-import fresnel_shader from '/packages/lib/shader/bsdfs/fresnel.glsl';
-import iridescence_shader from '/packages/lib/shader/bsdfs/iridescence.glsl';
+import structs_shader from './shader/structs.glsl';
+import rng_shader from './shader/rng.glsl';
+import utils_shader from './shader/utils.glsl';
+import material_shader from './shader/material.glsl';
+import dspbr_shader from './shader/dspbr.glsl';
+import bvh_shader from './shader/bvh.glsl';
+import lighting_shader from './shader/lighting.glsl';
+import diffuse_shader from './shader/bsdfs/diffuse.glsl';
+import microfacet_shader from './shader/bsdfs/microfacet.glsl';
+import sheen_shader from './shader/bsdfs/sheen.glsl';
+import fresnel_shader from './shader/bsdfs/fresnel.glsl';
+import iridescence_shader from './shader/bsdfs/iridescence.glsl';
 
-import render_shader from '/packages/lib/shader/renderer.frag';
-import debug_integrator_shader from '/packages/lib/shader/integrator/debug.glsl';
-import pt_integrator_shader from '/packages/lib/shader/integrator/pt.glsl';
-import misptdl_integrator_shader from '/packages/lib/shader/integrator/misptdl.glsl';
+import render_shader from './shader/renderer.frag';
+import debug_integrator_shader from './shader/integrator/debug.glsl';
+import pt_integrator_shader from './shader/integrator/pt.glsl';
+import misptdl_integrator_shader from './shader/integrator/misptdl.glsl';
 
 let vertexShader = ` #version 300 es
 layout(location = 0) in vec4 position;

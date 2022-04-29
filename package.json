@@ -1,12 +1,12 @@
 {
   "name": "dspbr-pt-dev",
   "private": true,
-  "description": "A WebGL2 Enterprise PBR sample renderer and utilities",
+  "description": "dspbr-pt renderer and utilities",
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
-    "clean": "rimraf demos/",
+    "clean": "rimraf demos/ && rimraf packages/dspbr-pt/dist",
     "build": "yarn run clean && yarn workspaces foreach run build",
     "dev": "yarn workspace dspbr-pt-viewer run dev"
   },

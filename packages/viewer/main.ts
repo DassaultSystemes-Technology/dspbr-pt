@@ -28,7 +28,7 @@ if (!window.File || !window.FileReader || !window.FileList || !window.Blob) {
   alert('The File APIs are not fully supported in this browser.');
 }
 
-class App {
+class DemoViewer {
   _gui: any;
   _stats: any | null;
   canvas: HTMLCanvasElement;
@@ -518,4 +518,4 @@ class App {
   }
 }
 
-let app = new App();
+let app = new DemoViewer();

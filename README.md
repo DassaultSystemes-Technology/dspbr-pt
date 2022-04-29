@@ -4,7 +4,7 @@
 A WebGL2 GPU path-tracer that runs in your browser.<br>
 Features physical materials by implementing the [Enterprise PBR Shading Model (DSPBR)](https://github.com/DassaultSystemes-Technology/EnterprisePBRShadingModel)
 
-[Demo Viewer (glTF drag&drop)](https://dassaultsystemes-technology.github.io/dspbr-pt/demo/dev)
+[Demo Viewer (glTF drag&drop)](https://dassaultsystemes-technology.github.io/dspbr-pt/demo/dist)
 
 [Minimal Demo](https://dassaultsystemes-technology.github.io/dspbr-pt/demo/dist/simple.html) [[ Code ](https://dassaultsystemes-technology.github.io/dspbr-pt/demo/simple.js)]
 
