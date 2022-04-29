@@ -1,0 +1,37 @@
+{
+  "name": "dspbr-pt-viewer",
+  "private": true,
+  "devDependencies": {
+    "@parcel/transformer-glsl": "^2.4.1",
+    "parcel": "^2.5.0",
+    "patch-package": "^6.4.7",
+    "rimraf": "^3.0.2"
+  },
+  "dependencies": {
+    "@gltf-transform/core": "^2.1.4",
+    "@gltf-transform/extensions": "^2.1.4",
+    "@gltf-transform/functions": "^2.1.4",
+    "@types/three": "^0.139.0",
+    "dat.gui": "^0.7.9",
+    "dspbr-pt": "0.4.0",
+    "meshoptimizer": "^0.17.0",
+    "simple-dropzone": "^0.8.1",
+    "three": "^0.139.2"
+  },
+  "browserslist": [
+    "last 1 Chrome version"
+  ],
+  "scripts": {
+    "dev": "rimraf dist && parcel index.html --public-url / --port 3000 --open",
+    "build": "parcel build --target viewer",
+    "postinstall": "npx patch-package"
+  },
+  "targets": {
+    "viewer": {
+      "source": "index.html",
+      "distDir": "../../dist",
+      "publicUrl": "./",
+      "sourceMap": false
+    }
+  }
+}

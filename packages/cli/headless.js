@@ -15,8 +15,10 @@
 
 import 'regenerator-runtime/runtime'
 
-import {Loader, PathtracingRenderer, PerspectiveCamera} from '../lib/index';
-import {ThreeSceneTranslator} from '../lib/three_scene_translator';
+import {PathtracingRenderer, ThreeSceneTranslator} from 'dspbr-pt';
+import {FloatType, PerspectiveCamera} from 'three'
+import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
+import {RGBELoader} from 'three/examples/jsm/loaders/RGBELoader.js';
 
 const {ipcRenderer} = window.require('electron');
 var path = window.require('path');
@@ -34,11 +36,12 @@ async function startRenderer() {
   renderer.maxBounces = args.bounces;
 
   try {
-    const gltf = await Loader.loadSceneFromUrl(args.gltf_path, false);
+    const gltf = await new GLTFLoader().loadAsync(args.gltf_path);
+    gltf.scene.updateMatrixWorld();
     const pathtracingSceneData = await ThreeSceneTranslator.translateThreeScene(gltf.scene, gltf);
     renderer.setScene(pathtracingSceneData).then(() => {
       if (args.ibl !== "None") {
-        Loader.loadIBL(args.ibl).then((ibl) => {
+        new RGBELoader().setDataType(FloatType).loadAsync(args.ibl).then((ibl) => {
           console.log("loaded ibl" + args.ibl);
           renderer.setIBL(ibl);
         });
@@ -58,6 +61,7 @@ async function startRenderer() {
       } else {
         var camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(0, 0, 3);
+        camera.updateMatrixWorld();
       }
 
       renderer.render(camera, args.samples, () => {}, (result) => {

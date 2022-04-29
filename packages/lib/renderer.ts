@@ -19,27 +19,27 @@ import { PathtracingSceneDataAdapterWebGL2 } from './scene_data_adapter_webgl2'
 
 import * as glu from './gl_utils';
 
-import shader_constants from '/src/lib/shader/constants.glsl';
-import copy_shader from '/src/lib/shader/copy.glsl';
-import display_shader from '/src/lib/shader/display.frag';
+import shader_constants from '/packages/lib/shader/constants.glsl';
+import copy_shader from '/packages/lib/shader/copy.glsl';
+import display_shader from '/packages/lib/shader/display.frag';
 
-import structs_shader from '/src/lib/shader/structs.glsl';
-import rng_shader from '/src/lib/shader/rng.glsl';
-import utils_shader from '/src/lib/shader/utils.glsl';
-import material_shader from '/src/lib/shader/material.glsl';
-import dspbr_shader from '/src/lib/shader/dspbr.glsl';
-import bvh_shader from '/src/lib/shader/bvh.glsl';
-import lighting_shader from '/src/lib/shader/lighting.glsl';
-import diffuse_shader from '/src/lib/shader/bsdfs/diffuse.glsl';
-import microfacet_shader from '/src/lib/shader/bsdfs/microfacet.glsl';
-import sheen_shader from '/src/lib/shader/bsdfs/sheen.glsl';
-import fresnel_shader from '/src/lib/shader/bsdfs/fresnel.glsl';
-import iridescence_shader from '/src/lib/shader/bsdfs/iridescence.glsl';
+import structs_shader from '/packages/lib/shader/structs.glsl';
+import rng_shader from '/packages/lib/shader/rng.glsl';
+import utils_shader from '/packages/lib/shader/utils.glsl';
+import material_shader from '/packages/lib/shader/material.glsl';
+import dspbr_shader from '/packages/lib/shader/dspbr.glsl';
+import bvh_shader from '/packages/lib/shader/bvh.glsl';
+import lighting_shader from '/packages/lib/shader/lighting.glsl';
+import diffuse_shader from '/packages/lib/shader/bsdfs/diffuse.glsl';
+import microfacet_shader from '/packages/lib/shader/bsdfs/microfacet.glsl';
+import sheen_shader from '/packages/lib/shader/bsdfs/sheen.glsl';
+import fresnel_shader from '/packages/lib/shader/bsdfs/fresnel.glsl';
+import iridescence_shader from '/packages/lib/shader/bsdfs/iridescence.glsl';
 
-import render_shader from '/src/lib/shader/renderer.frag';
-import debug_integrator_shader from '/src/lib/shader/integrator/debug.glsl';
-import pt_integrator_shader from '/src/lib/shader/integrator/pt.glsl';
-import misptdl_integrator_shader from '/src/lib/shader/integrator/misptdl.glsl';
+import render_shader from '/packages/lib/shader/renderer.frag';
+import debug_integrator_shader from '/packages/lib/shader/integrator/debug.glsl';
+import pt_integrator_shader from '/packages/lib/shader/integrator/pt.glsl';
+import misptdl_integrator_shader from '/packages/lib/shader/integrator/misptdl.glsl';
 
 let vertexShader = ` #version 300 es
 layout(location = 0) in vec4 position;
@@ -124,10 +124,10 @@ export class PathtracingRenderer {
   }
   public set debugMode(val) {
     this._debugMode = val;
-    if(val != "None") {
+    if (val != "None") {
       this.renderProgram = this.renderPrograms.get("debug_program")!;
     } else {
-     this.iblImportanceSampling = this.iblImportanceSampling;
+      this.iblImportanceSampling = this.iblImportanceSampling;
     }
     this.resetAccumulation();
   }
@@ -222,7 +222,7 @@ export class PathtracingRenderer {
   }
   public set iblImportanceSampling(val) {
     this._iblImportanceSampling = val;
-    if(val) {
+    if (val) {
       this.renderProgram = this.renderPrograms.get("misptdl_program")!;
     } else {
       this.renderProgram = this.renderPrograms.get("pt_program")!;
@@ -250,7 +250,7 @@ export class PathtracingRenderer {
 
   private _renderResMode = RenderResMode.High;
   private setLowResRenderMode(flag: boolean) {
-    if(flag) {
+    if (flag) {
       this._renderResMode = RenderResMode.Low;
       this._tileRes = INTERACTION_TILE_RES;
     } else {
@@ -415,7 +415,7 @@ export class PathtracingRenderer {
     const copyBuffer = this.renderBuffers.get("pt_buffer")![BufferType.Back][this._renderResMode];
     const renderRes = this.renderRes[this._renderResMode];
 
-    if(this._resetAccumulation) {
+    if (this._resetAccumulation) {
       this._frameCount = 1;
       tile = 0;
       this._resetAccumulation = false;
@@ -481,7 +481,7 @@ export class PathtracingRenderer {
     gl.useProgram(null);
     gl.bindVertexArray(null);
 
-    if (tile == (this._tileRes*this._tileRes)-1) {
+    if (tile == (this._tileRes * this._tileRes) - 1) {
       this._frameCount++;
     }
 
@@ -575,6 +575,69 @@ export class PathtracingRenderer {
     gl.bindVertexArray(null);
   }
 
+  private precompute1DPdfAndCdf(data: Float32Array, pdf: Float32Array,
+    cdf: Float32Array, row: number, num: number) {
+
+    const rowIdx = row * num;
+    let sum = 0;
+    for (let i = 0; i < num; i++) {
+      sum += data[rowIdx + i];
+    }
+
+    if (sum == 0)
+      sum = 1;
+
+    for (let i = 0; i < num; i++) {
+      pdf[rowIdx + i] = data[rowIdx + i] / sum;
+    }
+
+    cdf[rowIdx] = pdf[rowIdx];
+    for (let i = 1; i < num; i++) {
+      cdf[rowIdx + i] = cdf[rowIdx + i - 1] + pdf[rowIdx + i];
+    }
+
+    cdf[rowIdx + num - 1] = 1;
+    return sum;
+  }
+
+  private async precomputeIBLImportanceSamplingData(texture: any) {
+    console.time("Precomputing IBL importance sampling data...");
+    const image = texture.image;
+    const w = image.width;
+    const h = image.height;
+
+    const f = new Float32Array(w * h);
+    const sumX = new Float32Array(h);
+
+    const pdf = new Float32Array(w * h);
+    const cdf = new Float32Array(w * h);
+    const yPdf = new Float32Array(h);
+    const yCdf = new Float32Array(h);
+
+    const numChannels = 4;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w * numChannels; x++) {
+        // relative luminance of rbg pixel value
+        const rgbIdx = (x + y * w) * numChannels;
+        f[x + y * w] = image.data[rgbIdx] * 0.299 + image.data[rgbIdx + 1] * 0.587 + image.data[rgbIdx + 2] * 0.114;
+      }
+    }
+
+    for (let y = 0; y < h; y++) {
+      sumX[y] = this.precompute1DPdfAndCdf(f, pdf, cdf, y, w);
+    }
+
+    const totalSum = this.precompute1DPdfAndCdf(sumX, yPdf, yCdf, 0, h);
+
+    texture["pdf"] = pdf;
+    texture["cdf"] = cdf;
+    texture["yPdf"] = yPdf;
+    texture["yCdf"] = yCdf;
+    texture["totalSum"] = totalSum;
+
+    console.timeEnd("Precomputing IBL importance sampling data...");
+  }
+
   setIBL(texture: any) {
     let gl = this.gl;
     if (this.ibl !== undefined) {
@@ -590,11 +653,13 @@ export class PathtracingRenderer {
     this.iblImportanceSamplingData.width = texture.image.width;
     this.iblImportanceSamplingData.height = texture.image.height;
 
+    this.precomputeIBLImportanceSamplingData(texture);
+
     //Importance sampling buffers
-    this.iblImportanceSamplingData.pdf = glu.createTexture(gl, gl.TEXTURE_2D, gl.R32F, texture.image.width, texture.image.height, gl.RED, gl.FLOAT, texture.pcPDF, 0);
-    this.iblImportanceSamplingData.cdf = glu.createTexture(gl, gl.TEXTURE_2D, gl.R32F, texture.image.width, texture.image.height, gl.RED, gl.FLOAT, texture.pcCDF, 0);
-    this.iblImportanceSamplingData.yPdf = glu.createTexture(gl, gl.TEXTURE_2D, gl.R32F, texture.image.height, 1, gl.RED, gl.FLOAT, texture.yPDF, 0);
-    this.iblImportanceSamplingData.yCdf = glu.createTexture(gl, gl.TEXTURE_2D, gl.R32F, texture.image.height, 1, gl.RED, gl.FLOAT, texture.yCDF, 0);
+    this.iblImportanceSamplingData.pdf = glu.createTexture(gl, gl.TEXTURE_2D, gl.R32F, texture.image.width, texture.image.height, gl.RED, gl.FLOAT, texture.pdf, 0);
+    this.iblImportanceSamplingData.cdf = glu.createTexture(gl, gl.TEXTURE_2D, gl.R32F, texture.image.width, texture.image.height, gl.RED, gl.FLOAT, texture.cdf, 0);
+    this.iblImportanceSamplingData.yPdf = glu.createTexture(gl, gl.TEXTURE_2D, gl.R32F, texture.image.height, 1, gl.RED, gl.FLOAT, texture.yPdf, 0);
+    this.iblImportanceSamplingData.yCdf = glu.createTexture(gl, gl.TEXTURE_2D, gl.R32F, texture.image.height, 1, gl.RED, gl.FLOAT, texture.yCdf, 0);
     this.iblImportanceSamplingData.totalSum = texture.totalSum;
 
     this.resetAccumulation();
@@ -737,7 +802,7 @@ export class PathtracingRenderer {
     this.renderPrograms.set("debug_program", await glu.createProgramFromSource(this.gl, vertexShader, render_shader, debugShaderMap));
     this.renderPrograms.set("misptdl_program", await glu.createProgramFromSource(this.gl, vertexShader, render_shader, misptdlShaderMap));
 
-    this.renderProgram =  this.renderPrograms.get("misptdl_program")!;
+    this.renderProgram = this.renderPrograms.get("misptdl_program")!;
 
     console.timeEnd("Pathtracing shader generation");
   }

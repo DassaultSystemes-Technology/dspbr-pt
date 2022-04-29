@@ -117,7 +117,7 @@ function createWindow(width, height) {
 
   // mainWindow.webContents.openDevTools();
 
-  mainWindow.loadURL(path.join(__dirname, "../../dist/headless.html"));
+  mainWindow.loadURL(path.join(__dirname, "./dist/headless.html"));
 
   // In main process.
   const { ipcMain } = require('electron');

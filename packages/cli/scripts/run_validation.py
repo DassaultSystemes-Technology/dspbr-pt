@@ -51,7 +51,7 @@ def run(args):
       file  = file.replace('\\', '/')
       out_image  = out_image.replace('\\', '/')
 
-      render_call = ['npm', 'run', 'render', '--', '--', "../"+ file, '--res', '400', '400', '--samples', '128', '-b', '32'];
+      render_call = ['yarn', 'run', 'render', '--', '--', "../"+ file, '--res', '400', '400', '--samples', '128', '-b', '32'];
       if len(hdrs) > 0:
         ibl_path = '../' + hdrs[0].replace('\\', '/')
         subprocess.run(render_call + ['--ibl', ibl_path], shell=True)

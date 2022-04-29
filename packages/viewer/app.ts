@@ -17,11 +17,11 @@ import Stats from 'three/examples/jsm/libs/stats.module.js';
 import { GUI } from 'dat.GUI';
 import { SimpleDropzone } from 'simple-dropzone';
 import { ThreeRenderer } from './three_renderer';
-import { PathtracingRenderer, Loader } from '../lib/index';
-import { ThreeSceneTranslator } from '../lib/three_scene_translator';
+import { PathtracingRenderer, ThreeSceneTranslator } from 'dspbr-pt';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import {loadSceneFromBlobs, loadSceneFromUrl, loadIBL} from './scene_loader';
 import * as Assets from './asset_index';
 
 if (!window.File || !window.FileReader || !window.FileList || !window.Blob) {
@@ -211,15 +211,15 @@ class App {
     for(const [key, value] of fileMap) {
       if (key.match(/\.hdr$/)) {
         this.showStatusScreen("Loading HDR...");
-        ibl = await Loader.loadIBL(URL.createObjectURL(value));
+        ibl = await loadIBL(URL.createObjectURL(value));
       }
       if (key.match(/\.glb$/) || key.match(/\.gltf$/)) {
         this.showStatusScreen("Loading Scene...");
         const files: [string, File][] = Array.from(fileMap);
-        gltf = await Loader.loadSceneFromBlobs(files, this.autoScaleScene);
+        gltf = await loadSceneFromBlobs(files, this.autoScaleScene);
 
         if (!ibl)
-          ibl = await Loader.loadIBL(this.currentIblUrl());
+          ibl = await loadIBL(this.currentIblUrl());
       }
     }
 
@@ -245,8 +245,8 @@ class App {
       this.setIBLInfo(iblUrl);
     }
 
-    const gltf = await Loader.loadSceneFromUrl(sceneUrl, this.autoScaleScene) as GLTF;
-    const ibl = await Loader.loadIBL(iblUrl);
+    const gltf = await loadSceneFromUrl(sceneUrl, this.autoScaleScene) as GLTF;
+    const ibl = await loadIBL(iblUrl);
 
     await this.loadScenario(gltf, ibl)
   }
@@ -429,7 +429,7 @@ class App {
         this.three_renderer.showBackground = false;
         this.renderer.showBackground = false;
       } else {
-        Loader.loadIBL(iblInfo.url).then((ibl) => {
+        loadIBL(iblInfo.url).then((ibl) => {
           this.renderer.setIBL(ibl);
           this.renderer.exposure = iblInfo.intensity ?? 1.0;
           this.renderer.iblRotation = iblInfo.rotation ?? 180.0;

@@ -8,7 +8,7 @@ import { weld, dequantize, reorder } from '@gltf-transform/functions';
 import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
 
 
-export async function loadSceneFromBlobs(files: [string, File][], autoscale: boolean) {
+export async function loadSceneFromBlobs(files: [string, File][], autoscale?: boolean) {
   await MeshoptDecoder.ready;
   await MeshoptEncoder.ready;
 
@@ -70,81 +70,13 @@ export async function loadSceneFromBlobs(files: [string, File][], autoscale: boo
   return loadScene(processed_glb.buffer, autoscale);
 }
 
-function precompute1DPdfAndCdf(data: Float32Array, pdf: Float32Array,
-  cdf: Float32Array, row: number, num: number) {
-
-  const rowIdx = row * num;
-  let sum = 0;
-  for (let i = 0; i < num; i++) {
-    sum += data[rowIdx + i];
-  }
-
-  if (sum == 0)
-    sum = 1;
-
-  for (let i = 0; i < num; i++) {
-    pdf[rowIdx + i] = data[rowIdx + i] / sum;
-  }
-
-  cdf[rowIdx] = pdf[rowIdx];
-  for (let i = 1; i < num; i++) {
-    cdf[rowIdx + i] = cdf[rowIdx + i - 1] + pdf[rowIdx + i];
-  }
-
-  cdf[rowIdx + num - 1] = 1;
-  return sum;
-}
-
-async function precomputeIBLImportanceSamplingData(texture: any) {
-  console.time("Precomputing IBL importance sampling data...");
-  const image = texture.image;
-  const w = image.width;
-  const h = image.height;
-
-  const f = new Float32Array(w * h);
-  const sumX = new Float32Array(h);
-
-  const pcPDF = new Float32Array(w * h);
-  const pcCDF = new Float32Array(w * h);
-  const yPDF = new Float32Array(h);
-  const yCDF = new Float32Array(h);
-
-  const numChannels = 4;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w * numChannels; x++) {
-      // relative luminance of rbg pixel value
-      const rgbIdx = (x + y * w) * numChannels;
-      f[x + y * w] = image.data[rgbIdx] * 0.299 + image.data[rgbIdx + 1] * 0.587 + image.data[rgbIdx + 2] * 0.114;
-    }
-  }
-
-  for (let y = 0; y < h; y++) {
-    sumX[y] = precompute1DPdfAndCdf(f, pcPDF, pcCDF, y, w);
-  }
-
-  const totalSum = precompute1DPdfAndCdf(sumX, yPDF, yCDF, 0, h);
-
-  texture["pcPDF"] = pcPDF;
-  texture["pcCDF"] = pcCDF;
-  texture["yPDF"] = yPDF;
-  texture["yCDF"] = yCDF;
-  texture["totalSum"] = totalSum;
-
-  console.timeEnd("Precomputing IBL importance sampling data...");
-}
-
 export function loadIBL(ibl: string) {
-  return new Promise((resolve) => {
-    new RGBELoader()
-      .setDataType(THREE.FloatType)
-      .load(ibl, (texture) => {
-        precomputeIBLImportanceSamplingData(texture);
-        resolve(texture);
-      });
-  });
+  return new RGBELoader()
+    .setDataType(THREE.FloatType)
+    .loadAsync(ibl);
 }
 
-export async function loadSceneFromUrl(url: string, autoscale: boolean) {
+export async function loadSceneFromUrl(url: string, autoscale?: boolean) {
   await MeshoptDecoder.ready;
   await MeshoptEncoder.ready;
 
@@ -165,7 +97,7 @@ export async function loadSceneFromUrl(url: string, autoscale: boolean) {
   return loadScene(glb.buffer, autoscale);
 }
 
-function loadScene(glb: ArrayBuffer, autoscale: boolean) {
+function loadScene(glb: ArrayBuffer, autoscale?: boolean) {
   var loader = new GLTFLoader();
   loader.setMeshoptDecoder(MeshoptDecoder);
   return new Promise((resolve, reject) => {
@@ -181,13 +113,13 @@ function loadScene(glb: ArrayBuffer, autoscale: boolean) {
         ));
       }
 
-      var bbox = new THREE.Box3().setFromObject(scene);
-      const minValue = Math.min(bbox.min.x, Math.min(bbox.min.y, bbox.min.z));
-      const maxValue = Math.max(bbox.max.x, Math.max(bbox.max.y, bbox.max.z));
-      const deltaValue = maxValue - minValue;
-      let scale = 1.0 / deltaValue;
       // Normalize scene dimensions (needed for easy rt precision control)
       if (autoscale) {
+        var bbox = new THREE.Box3().setFromObject(scene);
+        const minValue = Math.min(bbox.min.x, Math.min(bbox.min.y, bbox.min.z));
+        const maxValue = Math.max(bbox.max.x, Math.max(bbox.max.y, bbox.max.z));
+        const deltaValue = maxValue - minValue;
+        let scale = 1.0 / deltaValue;
         scene.scale.set(scale, scale, scale);
       }
 

@@ -1,0 +1,15 @@
+{
+  "name": "dspbr-pt-demos",
+  "private": true,
+  "dependencies": {
+    "dat.gui": "^0.7.9",
+    "dspbr-pt": "0.4.0",
+    "three": "^0.139.2"
+  },
+  "devDependencies": {
+    "parcel": "^2.5.0"
+  },
+  "scripts": {
+    "build": "parcel build *.html --dist-dir ../../dist --public-url ./"
+  }
+}

@@ -1,13 +1,11 @@
 node_modules/
 dist/
+.yarn/
 .cache/
 *.png
-package
 EnterprisePBRShadingModel/
 validation*/
-debug.log
 .vscode/settings.json
-tmp/
 assets/
 demo/
 .parcel-cache

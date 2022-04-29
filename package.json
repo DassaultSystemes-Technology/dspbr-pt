@@ -1,68 +1,15 @@
 {
-  "name": "dspbr-pt",
-  "version": "0.3.5",
-  "description": "A WebGL2 Enterprise PBR sample renderer",
-  "dependencies": {
-    "@gltf-transform/core": "^2.1.4",
-    "@gltf-transform/extensions": "^2.1.4",
-    "@gltf-transform/functions": "^2.1.4",
-    "@types/three": "^0.139.0",
-    "meshoptimizer": "^0.17.0",
-    "three": "^0.139.2"
-  },
-  "devDependencies": {
-    "@parcel/transformer-glsl": "^2.4.1",
-    "argparse": "^2.0.1",
-    "buffer": "^6.0.3",
-    "dat.gui": "^0.7.9",
-    "electron": "^8.5.5",
-    "electron-serve": "^1.1.0",
-    "open": "^8.4.0",
-    "os-browserify": "^0.3.0",
-    "parcel": "^2.5.0",
-    "patch-package": "^6.4.7",
-    "regenerator-runtime": "^0.13.9",
-    "shx": "^0.3.4",
-    "simple-dropzone": "^0.8.1"
-  },
-  "browserslist": [
-    "last 1 Chrome version"
+  "name": "dspbr-pt-dev",
+  "private": true,
+  "description": "A WebGL2 Enterprise PBR sample renderer and utilities",
+  "workspaces": [
+    "packages/*"
   ],
   "scripts": {
-    "clean": "shx rm -rf dist/*",
-    "dev": "npm run clean && parcel src/viewer/index.html --port 3000 --public-url / --open",
-    "build-lib": "npm run clean && parcel build src/lib/index.ts --dist-dir dist/ --public-url ./ --no-source-maps",
-    "build-viewer": "npm run clean && parcel build --target viewer",
-    "build-cli": "npm run clean && parcel build --target cli",
-    "validation": "npm run build-cli && python scripts/run_validation.py",
-    "prepublishOnly": "shx mv README.md src/viewer/README.md && shx cp src/lib/README.md README.md",
-    "postpublish": "shx mv src/viewer/README.md README.md",
-    "render": "electron src/cli/offscreen.js --enable-logging",
-    "postinstall": "npx patch-package"
+    "clean": "rimraf demos/",
+    "build": "yarn run clean && yarn workspaces foreach run build",
+    "dev": "yarn workspace dspbr-pt-viewer run dev"
   },
-  "targets": {
-    "viewer": {
-      "source": "src/viewer/index.html",
-      "distDir": "./dist",
-      "publicUrl": "./",
-      "sourceMap": false
-    },
-    "cli": {
-      "source": "src/cli/headless.html",
-      "distDir": "./dist",
-      "publicUrl": "./",
-      "optimize": false
-    }
-  },
-  "source": "src/lib/index.ts",
-  "types": "dist/index.d.ts",
-  "main": "dist/index.js",
-  "files": [
-    "/dist",
-    "!/src/",
-    "!/node_modules/",
-    "!.DS_Store"
-  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/DassaultSystemes-Technology/dspbr-pt"
@@ -72,5 +19,13 @@
   "bugs": {
     "url": "https://github.com/DassaultSystemes-Technology/dspbr-pt/issues"
   },
-  "homepage": "https://github.com/DassaultSystemes-Technology/dspbr-pt#readme"
+  "homepage": "https://github.com/DassaultSystemes-Technology/dspbr-pt#readme",
+  "devDependencies": {
+    "@parcel/packager-ts": "2.5.0",
+    "@parcel/transformer-typescript-types": "2.5.0",
+    "os-browserify": "^0.3.0",
+    "rimraf": "^3.0.2",
+    "typescript": ">=3.0.0"
+  },
+  "packageManager": "yarn@3.2.0"
 }

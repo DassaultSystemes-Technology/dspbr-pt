@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <title>Minimal Example</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+  <style>
+    body {
+      margin: 0;
+      background-color: #111;
+      color: #fff;
+      font-family: Monospace;
+      font-size: 13px;
+      overscroll-behavior: none;
+    }
+
+    a {
+      color: rgb(255, 0, 212);
+      text-decoration: none;
+      pointer-events: auto;
+      font-weight: bolder ;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    #info {
+      position: absolute;
+      top: 0px;
+      width: 100%;
+      padding: 10px;
+      box-sizing: border-box;
+      text-align: center;
+    }
+
+    #bottom-info {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      padding: 10px;
+      box-sizing: border-box;
+      text-align: left;
+    }
+
+    #stats {
+      position: 'absolute';
+      top: '0px';
+      cursor: "default";
+    }
+  </style>
+</head>
+
+<body>
+  <div id="info">Minimal Example<br><a href="https://github.com/DassaultSystemes-Technology/dspbr-pt">dspbr-pt</a></div>
+
+  <div id="viewport"></div>
+  <div id="bottom-info">
+    <div id="ibl-info"></div>
+    <div id="scene-info"></div>
+  </div>
+
+  <script src="simple.js" type="module"></script>
+</body>
+
+</html>

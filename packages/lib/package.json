@@ -1,0 +1,33 @@
+{
+  "name": "dspbr-pt",
+  "version": "0.4.0",
+  "description": "A WebGL2 GPU path-tracer that runs in your browser.<br>Features physical materials by implementing the [Enterprise PBR Shading Model (DSPBR)](https://github.com/DassaultSystemes-Technology/EnterprisePBRShadingModel)",
+  "dependencies": {
+    "three": "^0.139.2"
+  },
+  "devDependencies": {
+    "@parcel/transformer-glsl": "^2.4.1",
+    "parcel": "^2.5.0"
+  },
+  "source": "index.ts",
+  "types": "dist/index.d.ts",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "parcel build index.ts --dist-dir dist/ --public-url ./ --no-source-maps"
+  },
+  "files": [
+    "/dist/*",
+    "!/node_modules/",
+    "!.DS_Store"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DassaultSystemes-Technology/dspbr-pt"
+  },
+  "author": "Bastian Sdorra <bastian.SDORRA@3ds.com>",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/DassaultSystemes-Technology/dspbr-pt/issues"
+  },
+  "homepage": "https://github.com/DassaultSystemes-Technology/dspbr-pt#readme"
+}
