@@ -27,5 +27,8 @@
     "rimraf": "^3.0.2",
     "typescript": ">=3.0.0"
   },
-  "packageManager": "yarn@3.2.0"
+  "packageManager": "yarn@3.2.0",
+  "resolutions": {
+    "@gltf-transform/extensions": "patch:@gltf-transform/extensions@npm:2.1.4#.yarn/patches/@gltf-transform-extensions-npm-2.1.4-295216e8ed.patch"
+  }
 }

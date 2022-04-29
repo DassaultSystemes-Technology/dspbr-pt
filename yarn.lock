@@ -82,13 +82,23 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@gltf-transform/extensions@npm:^2.1.4":
+"@gltf-transform/extensions@npm:2.1.4":
   version: 2.1.4
   resolution: "@gltf-transform/extensions@npm:2.1.4"
   dependencies:
     "@gltf-transform/core": ^2.1.4
     ktx-parse: ^0.2.2
   checksum: 245037bb9d400d2511820d83140850fd79f0422b0f63a04a1ed75c74b9becf0a1d02b4278663c068872aac542a958551e96a3b65da8071fdfe5cd257fe1ea9ea
+  languageName: node
+  linkType: hard
+
+"@gltf-transform/extensions@patch:@gltf-transform/extensions@npm:2.1.4#.yarn/patches/@gltf-transform-extensions-npm-2.1.4-295216e8ed.patch::locator=dspbr-pt-dev%40workspace%3A.":
+  version: 2.1.4
+  resolution: "@gltf-transform/extensions@patch:@gltf-transform/extensions@npm%3A2.1.4#.yarn/patches/@gltf-transform-extensions-npm-2.1.4-295216e8ed.patch::version=2.1.4&hash=bea693&locator=dspbr-pt-dev%40workspace%3A."
+  dependencies:
+    "@gltf-transform/core": ^2.1.4
+    ktx-parse: ^0.2.2
+  checksum: d9919a6bfb992d322c2e11e8054cac69027bf350220cb3b946a4f05aee5dcd4a76e6437d94bedd5db7dc9f1b7f6a2cff11d5814eaf8d983dc015e5d0e4f675b3
   languageName: node
   linkType: hard
 
