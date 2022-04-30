@@ -5,7 +5,7 @@
   "devDependencies": {
     "argparse": "^2.0.1",
     "buffer": "^6.0.3",
-    "electron": "^8.5.5",
+    "electron": "^13.6.6",
     "electron-serve": "^1.1.0",
     "open": "^8.4.0",
     "parcel": "^2.5.0",
