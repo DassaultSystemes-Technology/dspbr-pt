@@ -1,4 +1,4 @@
-import {GUI} from 'dat.GUI';
+import {GUI} from 'dat.gui';
 import {ThreeSceneTranslator} from 'dspbr-pt';
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';

@@ -14,7 +14,7 @@
  */
 
 import Stats from 'three/examples/jsm/libs/stats.module.js';
-import { GUI } from 'dat.GUI';
+import { GUI } from 'dat.gui';
 import { SimpleDropzone } from 'simple-dropzone';
 import { ThreeRenderer } from './three_renderer';
 import { PathtracingRenderer, ThreeSceneTranslator } from 'dspbr-pt';
