@@ -19,7 +19,7 @@ async function main() {
       "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/DamagedHelmet/glTF/DamagedHelmet.gltf";
 
   const ibl_url =
-      "https://raw.githubusercontent.com/DassaultSystemes-Technology/dspbr-pt/demo/demo/assets/env/artist_workshop_1k.hdr";
+      "https://raw.githubusercontent.com/DassaultSystemes-Technology/dspbr-pt/main/assets/ibl/artist_workshop_1k.hdr";
 
   const ibl = await new RGBELoader().setDataType(THREE.FloatType).loadAsync(ibl_url);
   renderer.setIBL(ibl);
