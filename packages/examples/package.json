@@ -7,9 +7,11 @@
     "three": "^0.139.2"
   },
   "devDependencies": {
-    "parcel": "^2.5.0"
+    "parcel": "^2.5.0",
+    "rimraf": "^3.0.2"
   },
   "scripts": {
-    "build": "parcel build *.html --dist-dir ../../dist --public-url ./"
+    "build": "parcel build *.html --dist-dir ../../dist --public-url ./",
+    "dev": "rimraf dist && parcel *.html --public-url / --port 3000 --open"
   }
 }
