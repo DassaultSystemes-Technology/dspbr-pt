@@ -1,13 +1,12 @@
-# Enterprise PBR Sample Renderer ([Demo Viewer](https://dassaultsystemes-technology.github.io/dspbr-pt/demo/dev))
+# Enterprise PBR Sample Renderer ([Demo Viewer](https://dassaultsystemes-technology.github.io/dspbr-pt/index.html))
 <!-- |  [Validation Report](https://dassaultsystemes-technology.github.io/dspbr-pt/report/)) -->
 
 A WebGL2 GPU path-tracer that runs in your browser.<br>
 Features physical materials by implementing the [Enterprise PBR Shading Model (DSPBR)](https://github.com/DassaultSystemes-Technology/EnterprisePBRShadingModel)
 
-[Demo Viewer (glTF drag&drop)](https://dassaultsystemes-technology.github.io/dspbr-pt/demo/dev)
+[Demo Viewer (glTF drag&drop)](https://dassaultsystemes-technology.github.io/dspbr-pt/index.html)
 
-[Minimal Demo](https://dassaultsystemes-technology.github.io/dspbr-pt/demo/dist/simple.html) [[ Code ](https://dassaultsystemes-technology.github.io/dspbr-pt/demo/simple.js)]
-
+[Minimal Demo](https://dassaultsystemes-technology.github.io/dspbr-pt/simple.html) [[ Code ](https://github.com/DassaultSystemes-Technology/dspbr-pt/blob/main/packages/examples/simple.js)]
 
 ## Features
 * Browser-based, unbiased[*](#Notes) GPU path-tracing
