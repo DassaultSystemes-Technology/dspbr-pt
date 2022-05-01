@@ -1,6 +1,5 @@
 
 import * as THREE from 'three';
-import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { WebIO, VertexLayout, Document } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
@@ -68,12 +67,6 @@ export async function loadSceneFromBlobs(files: [string, File][], autoscale?: bo
 
   const processed_glb = await io.writeBinary(doc);
   return loadScene(processed_glb.buffer, autoscale);
-}
-
-export function loadIBL(ibl: string) {
-  return new RGBELoader()
-    .setDataType(THREE.FloatType)
-    .loadAsync(ibl);
 }
 
 export async function loadSceneFromUrl(url: string, autoscale?: boolean) {

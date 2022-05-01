@@ -124,7 +124,7 @@ vec3 average_fresnel(vec3 f0, vec3 f90) {
   return 20. / 21. * f0 + 1. / 21. * f90;
 }
 
-vec3 eval_brdf_microfacet_ggx_smith_ms(vec3 f0, vec3 f90, vec2 alpha_uv, vec3 wi, vec3 wo, Geometry g) {
+vec3 eval_brdf_microfacet_ggx_ms(vec3 f0, vec3 f90, vec2 alpha_uv, vec3 wi, vec3 wo, Geometry g) {
   float alpha = sqrt(alpha_uv.x * alpha_uv.y);
   float Ewi = directional_albedo_ggx(alpha, abs(dot(wi, g.n)));
   float Ewo = directional_albedo_ggx(alpha, abs(dot(wo, g.n)));
@@ -145,7 +145,7 @@ vec3 eval_brdf_microfacet_ggx_smith(vec3 f0, vec3 f90, vec2 alpha, vec3 wi, vec3
   return (f * g * d) / abs(4.0 * dot(wi, geo.n) * dot(wo, geo.n));
 }
 
-vec3 eval_brdf_microfacet_ggx_smith_iridescence(vec3 f0, vec3 f90, vec2 alpha, float iridescence, float iridescence_ior,
+vec3 eval_brdf_microfacet_ggx(vec3 f0, vec3 f90, vec2 alpha, float iridescence, float iridescence_ior,
                                                 float iridescence_thickness, vec3 wi, vec3 wo, vec3 wh, Geometry geo) {
   if (dot(wi, geo.n) < EPS_PDF || dot(wo, geo.n) < EPS_PDF) {
     return vec3(0.0);
@@ -171,7 +171,7 @@ vec3 eval_bsdf_microfacet_ggx_smith(vec3 specular_f0, vec3 specular_f90, vec2 al
   return eval_brdf_microfacet_ggx_smith(specular_f0, specular_f90, alpha, wi, wo_f, wh, geo);
 }
 
-vec3 eval_bsdf_microfacet_ggx_smith_iridescence(vec3 specular_f0, vec3 specular_f90, vec2 alpha, float iridescence,
+vec3 eval_btdf_microfacet_ggx(vec3 specular_f0, vec3 specular_f90, vec2 alpha, float iridescence,
                                                 float iridescence_ior, float iridescence_thickness, const in vec3 wi,
                                                 in vec3 wo, Geometry geo) {
   if (dot(wi, geo.n) < EPS_PDF || dot(wo, geo.n) > 0.0) {
@@ -179,7 +179,7 @@ vec3 eval_bsdf_microfacet_ggx_smith_iridescence(vec3 specular_f0, vec3 specular_
   }
   vec3 wo_f = flip(wo, -geo.n);
   vec3 wh = normalize(wi + wo_f);
-  return eval_brdf_microfacet_ggx_smith_iridescence(specular_f0, specular_f90, alpha, iridescence, iridescence_ior,
+  return eval_brdf_microfacet_ggx(specular_f0, specular_f90, alpha, iridescence, iridescence_ior,
                                                     iridescence_thickness, wi, wo_f, wh, geo);
 }
 
@@ -263,7 +263,7 @@ vec3 sample_bsdf_microfacet_ggx_smith(const in MaterialClosure c, vec3 wi, Geome
 
       event = E_TRANSMISSION | (singular_event ? E_DELTA : 0);
     } else {
-      tir = !refractIt(-wi, wh, ior_i / ior_o, wo);
+      wo = refractIt(-wi, wh, ior_i / ior_o, tir);
 
       if (tir) {
         wo = reflect(-wi, wh);

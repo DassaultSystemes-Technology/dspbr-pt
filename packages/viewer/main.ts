@@ -19,9 +19,10 @@ import { SimpleDropzone } from 'simple-dropzone';
 import { ThreeRenderer } from './three_renderer';
 import { PathtracingRenderer, ThreeSceneTranslator } from 'dspbr-pt';
 import * as THREE from 'three';
+import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { loadSceneFromBlobs, loadSceneFromUrl, loadIBL } from './scene_loader';
+import { loadSceneFromBlobs, loadSceneFromUrl } from './scene_loader';
 import * as Assets from './asset_index';
 
 if (!window.File || !window.FileReader || !window.FileList || !window.Blob) {
@@ -31,7 +32,7 @@ if (!window.File || !window.FileReader || !window.FileList || !window.Blob) {
 if (process.env['NODE_ENV'] == 'dev') {
   console.log("Local development: Replacing Asset URLs...");
   for (let [_, ibl] of Object.entries(Assets.ibls)) {
-    if(ibl["url"]) {
+    if (ibl["url"]) {
       ibl["url"] = ibl["url"].replace("https://raw.githubusercontent.com/DassaultSystemes-Technology/dspbr-pt/main/assets", '');
     }
   }
@@ -49,30 +50,28 @@ class DemoViewer {
   status: HTMLElement | null;
   loadscreen: HTMLElement | null;
   scene: string;
-  current_ibl: string;
-  current_scene: string;
   camera: THREE.PerspectiveCamera;
   controls: OrbitControls;
+  sceneBoundingBox: THREE.Box3;
 
   renderer: any;
   three_renderer: ThreeRenderer;
 
-  useControls: true;
+  default_ibl_name = "Artist Workshop";
+  current_ibl = null;
+  current_scene = null;
+  useControls = true;
   pathtracing = true;
   autoScaleScene = false;
   autoRotate = false;
   interactionScale = 0.2;
-  interactionTimeoutId: any;
+  interactionTimeoutId = null;
   pathtracedInteraction = false;
   resumePathtracing = false;
-  sceneBoundingBox: THREE.Box3;
   showGroundPlane = false;
 
 
   constructor() {
-    this.current_ibl = "Artist Workshop";
-    this.current_scene = "";
-
     this.container = document.createElement('div');
     document.body.appendChild(this.container);
     this.canvas = document.createElement('canvas');
@@ -159,12 +158,11 @@ class DemoViewer {
     dropCtrlOverlay.on('dropstart', () => {
       this.hideStartpage();
     });
-    dropCtrlOverlay.on('drop', async ({ files }) => { await this.loadSceneFromDrop(files) });
-
+    dropCtrlOverlay.on('drop', async ({ files }) => { await this.loadDropFiles(files) });
 
     const dropCtrlCanvas = new SimpleDropzone(this.canvas, input);
     dropCtrlCanvas.on('drop', async ({ files }) => {
-      await this.loadSceneFromDrop(files);
+      await this.loadDropFiles(files);
     });
     // dropCtrl.on('droperror', () => this.hideSpinner());
     this.container.addEventListener('dragover', function (e) {
@@ -189,13 +187,106 @@ class DemoViewer {
         }
       }
 
-      this.loadSceneFromUri(uris[1], ibl);
+      if (ibl) this.loadIbl(ibl);
+      this.loadSceneFromUrl(uris[1]);
+
       this.hideStartpage();
+    } else {
+      this.loadIbl(this.default_ibl_name);
     }
   }
 
-  private currentIblUrl() {
-    return Assets.ibls[this.current_ibl].url;
+  private async loadDropFiles(fileMap) {
+    for (const [key, value] of fileMap) {
+      if (key.match(/\.hdr$/)) {
+        this.showStatusScreen("Loading HDR...");
+        await this.loadIbl(URL.createObjectURL(value));
+        this.hideLoadscreen();
+      }
+      if (key.match(/\.glb$/) || key.match(/\.gltf$/)) {
+        this.showStatusScreen("Loading Scene...");
+        const files: [string, File][] = Array.from(fileMap);
+        const gltf = await loadSceneFromBlobs(files, this.autoScaleScene) as GLTF;
+        this.loadScene(gltf);
+      }
+    }
+  }
+
+  private async loadSceneFromUrl(sceneUrl) {
+    this.showStatusScreen("Loading Scene...");
+    const sceneKey = sceneUrl.replaceAll('%20', ' ');
+    if (sceneKey in Assets.scenes) {
+      const scene = Assets.scenes[sceneKey];
+      this.setSceneInfo(sceneKey, scene.credit);
+      sceneUrl = scene.url;
+    } else {
+      this.setSceneInfo(sceneUrl);
+    }
+
+    const gltf = await loadSceneFromUrl(sceneUrl, this.autoScaleScene) as GLTF;
+    this.loadScene(gltf);
+  }
+
+  private async loadScene(gltf: GLTF) {
+    this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
+    this.updateCameraFromBoundingBox();
+    this.centerView();
+
+    // const floorTex = this.generateRadialFloorTexture(2048);
+    if (this.showGroundPlane) {
+      this.addGroundPlane(gltf.scene);
+      this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
+    }
+
+    const pathtracingSceneData = await ThreeSceneTranslator.translateThreeScene(gltf.scene, gltf);
+    await this.renderer.setScene(pathtracingSceneData);
+    if (this.pathtracing)
+      this.startPathtracing();
+
+    this.three_renderer.setScene(new THREE.Scene().add(gltf.scene));
+    if (!this.pathtracing) {
+      this.startRasterizer();
+    }
+
+    this.hideLoadscreen();
+  }
+
+  private async loadIbl(url: string) {
+    const setIbl = (ibl: any) => {
+      this.renderer.setIBL(ibl);
+      this.three_renderer.setIBL(ibl);
+      this.current_ibl = ibl;
+      this.renderer.useIBL = true;
+      this.three_renderer.useIBL(true);
+      this.three_renderer.showBackground = true;
+      this.renderer.showBackground = true;
+    };
+
+    if (url == "None") {
+      this.renderer.useIBL = false;
+      this.three_renderer.showBackground = false;
+      this.renderer.showBackground = false;
+      return;
+    }
+
+    url = url.replaceAll('%20', ' ');
+    console.log(`Loading ${url}`);
+    if (url in Assets.ibls) {
+      const iblInfo = Assets.ibls[url];
+      new RGBELoader()
+        .setDataType(THREE.FloatType)
+        .loadAsync(iblInfo.url).then((ibl) => {
+          setIbl(ibl);
+          this.renderer.exposure = iblInfo.intensity ?? 1.0;
+          this.renderer.iblRotation = iblInfo.rotation ?? 180.0;
+        });
+    } else {
+      new RGBELoader()
+        .setDataType(THREE.FloatType)
+        .loadAsync(url).then((ibl) => {
+          setIbl(ibl);
+        });
+    }
   }
 
   private addGroundPlane(scene) {
@@ -213,88 +304,6 @@ class DemoViewer {
     floorPlane.position.y = this.sceneBoundingBox.min.y - 0.01;
     scene.add(floorPlane);
   }
-
-  private async loadSceneFromDrop(fileMap) {
-    let ibl = null;
-    let gltf = null;
-    for (const [key, value] of fileMap) {
-      if (key.match(/\.hdr$/)) {
-        this.showStatusScreen("Loading HDR...");
-        ibl = await loadIBL(URL.createObjectURL(value));
-      }
-      if (key.match(/\.glb$/) || key.match(/\.gltf$/)) {
-        this.showStatusScreen("Loading Scene...");
-        const files: [string, File][] = Array.from(fileMap);
-        gltf = await loadSceneFromBlobs(files, this.autoScaleScene);
-
-        if (!ibl)
-          ibl = await loadIBL(this.currentIblUrl());
-      }
-    }
-
-    await this.loadScenario(gltf, ibl);
-  }
-
-  private async loadSceneFromUri(sceneUrl, iblUrl) {
-    this.showStatusScreen("Loading Scene...");
-    const sceneKey = sceneUrl.replaceAll('%20', ' ');
-    if (sceneKey in Assets.scenes) {
-      const scene = Assets.scenes[sceneKey];
-      this.setSceneInfo(sceneKey, scene.credit);
-      sceneUrl = scene.url;
-    } else {
-      this.setSceneInfo(sceneUrl);
-    }
-    const iblKey = iblUrl.replaceAll('%20', ' ');
-    if (iblKey in Assets.ibls) {
-      const ibl = Assets.ibls[iblKey];
-      this.setIBLInfo(iblKey, ibl.credit);
-      iblUrl = ibl.url;
-    } else {
-      this.setIBLInfo(iblUrl);
-    }
-
-    const gltf = await loadSceneFromUrl(sceneUrl, this.autoScaleScene) as GLTF;
-    const ibl = await loadIBL(iblUrl);
-
-    await this.loadScenario(gltf, ibl)
-  }
-
-  private async loadScenario(gltf?: GLTF, ibl?: any) {
-    if (this.pathtracing)
-      this.stopPathtracing();
-
-    if(ibl) {
-      this.renderer.setIBL(ibl);
-      this.three_renderer.setIBL(ibl);
-    }
-
-    if(gltf) {
-      this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
-      this.updateCameraFromBoundingBox();
-      this.centerView();
-
-      // const floorTex = this.generateRadialFloorTexture(2048);
-      if (this.showGroundPlane) {
-        this.addGroundPlane(gltf.scene);
-        this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
-      }
-
-
-      const pathtracingSceneData = await ThreeSceneTranslator.translateThreeScene(gltf.scene, gltf);
-      await this.renderer.setScene(pathtracingSceneData);
-      if (this.pathtracing)
-        this.startPathtracing();
-
-      this.three_renderer.setScene(new THREE.Scene().add(gltf.scene));
-      if (!this.pathtracing) {
-        this.startRasterizer();
-      }
-    }
-
-    this.hideLoadscreen();
-  }
-
 
   private initStats() {
     this._stats = new (Stats as any)();
@@ -418,9 +427,7 @@ class DemoViewer {
     const scene_names = Object.keys(Assets.scenes);
     let scene = this._gui.addFolder('Scene');
     scene.add(this, "current_scene", scene_names).name('Scene').onChange((value) => {
-      const sceneInfo = Assets.scenes[value];
-      this.loadSceneFromUri(sceneInfo.url, this.current_ibl);
-      this.setSceneInfo(value, sceneInfo.credit);
+      this.loadSceneFromUrl(value);
       this.hideStartpage();
     });
 
@@ -435,24 +442,7 @@ class DemoViewer {
     const ibl_names = Object.keys(Assets.ibls);
     let lighting = this._gui.addFolder('Lighting');
     lighting.add(this, "current_ibl", ibl_names).name('IBL').onChange((value) => {
-      const iblInfo = Assets.ibls[value];
-      console.log(`Loading ${value}`);
-      this.setIBLInfo(value, iblInfo.credit);
-      if (value == "None") {
-        this.renderer.useIBL = false;
-        this.three_renderer.showBackground = false;
-        this.renderer.showBackground = false;
-      } else {
-        loadIBL(iblInfo.url).then((ibl) => {
-          this.renderer.setIBL(ibl);
-          this.renderer.exposure = iblInfo.intensity ?? 1.0;
-          this.renderer.iblRotation = iblInfo.rotation ?? 180.0;
-          this.three_renderer.setIBL(ibl);
-          this.renderer.useIBL = true;
-          this.three_renderer.showBackground = true;
-          this.renderer.showBackground = true;
-        });
-      }
+      this.loadIbl(value);
     });
 
     lighting.add(this.renderer, 'iblRotation').name('IBL Rotation').min(-180.0).max(180.0).step(0.1).listen();

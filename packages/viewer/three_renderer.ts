@@ -129,22 +129,25 @@ export class ThreeRenderer {
     this.renderer.setSize(width, height);
   }
 
-  setIBL(tex: any) {
-    if (!this.scene) {
-      return;
-    }
+  private updateSceneIbl() {
+    if(!this.scene) return;
+    this.scene.background = this.ibl;
+    this.scene.environment  = this.ibl;
+  }
 
+  setIBL(tex: any) {
     if (this.ibl !== undefined) {
       this.ibl.dispose();
     }
 
     this.ibl = this.pmremGenerator.fromEquirectangular(tex).texture;
-    this.scene.background = this.ibl;
-    this.scene.environment  = this.ibl;
+
+    this.updateSceneIbl();
   }
 
   setScene(scene) {
     this.scene = scene;
+    this.updateSceneIbl();
   }
 
 }
