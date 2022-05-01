@@ -4,13 +4,14 @@ vec3 eval_direct_light_contribution(in RenderState rs, float r0, float r1) {
   vec3 ibl_sample_dir;
   vec3 L = vec3(0);
 
+  vec3 n = rs.closure.backside ? -rs.closure.n : rs.closure.n;
+
   if (u_use_ibl > 0.0) {
     ibl_sample_dir = ibl_sample_direction(r0, r1, ibl_sample_pdf);
 
     float cosNL = dot(ibl_sample_dir, rs.closure.n);
-    vec3 sample_org = rs.hitPos + rs.closure.n * u_ray_eps;
     if (cosNL > EPS_COS && ibl_sample_pdf > EPS_PDF) {
-      if (!isOccluded(sample_org, ibl_sample_dir)) {
+      if (!isOccluded(rs.hitPos, ibl_sample_dir)) {
         L = ibl_eval(ibl_sample_dir) * eval_dspbr(rs.closure, rs.wi, ibl_sample_dir) * cosNL / ibl_sample_pdf;
 
         float brdf_sample_pdf = dspbr_pdf(rs.closure, rs.wi, ibl_sample_dir);

@@ -36,18 +36,10 @@ export class PathtracingSceneData {
   public addTexture(tex: Texture): number {
     let texInfo = new TexInfo();
 
-    let findTextureInList = (tex: Texture, texList: Texture[]) => {
-      for (let i = 0; i < texList.length; i++) {
-        if (tex.uuid === texList[i].uuid)
-          return i;
-      }
-      return -1;
-    };
-
     let res = [tex.image.width, tex.image.height].join(',');
     if (this._texArrays.has(res)) {
       let texArray = this._texArrays.get(res)!;
-      let texIdx = findTextureInList(tex, texArray!);
+      let texIdx = texArray.findIndex(t => t.uuid == tex.uuid);
       if (texIdx < 0) {
         texArray.push(tex);
         texIdx = texArray.length - 1;

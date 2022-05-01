@@ -162,6 +162,9 @@ vec3 sample_dspbr(inout MaterialClosure c, vec3 wi, in vec3 uvw, inout vec3 bsdf
 
   vec3 wo;
 
+  float bsdf_selection_pdf;
+  select_bsdf(c, rng_float(), wi, bsdf_selection_pdf);
+
   if(bool(c.event_type & E_DIFFUSE)) { //diffuse reflection
     int event;
     wo = diffuse_bsdf_sample(c, wi, g, uvw, bsdf_over_pdf, pdf);
@@ -235,6 +238,9 @@ vec3 sample_dspbr(inout MaterialClosure c, vec3 wi, in vec3 uvw, inout vec3 bsdf
     bsdf_over_pdf *= clearcoat / pdf;
     bsdf_over_pdf *= abs(dot(wo, g.n));
   }
+
+  pdf *= bsdf_selection_pdf;
+  bsdf_over_pdf /= bsdf_selection_pdf;
 
   return wo;
 }

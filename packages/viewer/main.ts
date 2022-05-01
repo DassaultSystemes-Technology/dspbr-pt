@@ -191,8 +191,6 @@ class DemoViewer {
       this.loadSceneFromUrl(uris[1]);
 
       this.hideStartpage();
-    } else {
-      this.loadIbl(this.default_ibl_name);
     }
   }
 
@@ -443,7 +441,7 @@ class DemoViewer {
     let lighting = this._gui.addFolder('Lighting');
     lighting.add(this, "current_ibl", ibl_names).name('IBL').onChange((value) => {
       this.loadIbl(value);
-    });
+    }).setValue(this.default_ibl_name);
 
     lighting.add(this.renderer, 'iblRotation').name('IBL Rotation').min(-180.0).max(180.0).step(0.1).listen();
     lighting.add(this.renderer, 'iblImportanceSampling').name('Importance Sampling');

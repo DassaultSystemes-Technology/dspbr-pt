@@ -105,10 +105,6 @@ void fillRenderState(const in bvh_ray r, const in bvh_hit hit, out RenderState r
 
   uint matIdx = get_material_idx(triIdx);
   configure_material(matIdx, rs, rs.closure, vertexColor);
-
-  float bsdf_selection_pdf;
-  select_bsdf(rs.closure, rng_float(), rs.wi, bsdf_selection_pdf);
-  rs.closure.bsdf_selection_pdf = bsdf_selection_pdf;
 }
 
 
@@ -125,9 +121,6 @@ bool sample_bsdf_bounce(inout RenderState rs, out vec3 sampleWeight, out float p
     rs.wo = sample_dspbr(rs.closure, rs.wi,
                           vec3(rng_float(), rng_float(), rng_float()),
                           sampleWeight, pdf);
-
-    sampleWeight /= rs.closure.bsdf_selection_pdf;
-    pdf *= rs.closure.bsdf_selection_pdf;
 
     if (pdf < EPS_PDF) {
       sampleWeight = vec3(0.0);

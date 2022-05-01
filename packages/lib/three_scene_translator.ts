@@ -90,6 +90,7 @@ export namespace ThreeSceneTranslator {
     matInfo.ior = mat.ior || matInfo.ior;
 
     if (gltf) {
+      // console.log(`Parsing Extensions`);
       const setTextureTransformFromExt = (texInfo: TexInfo, ext: any) => {
         if ("extensions" in ext && "KHR_texture_transform" in ext.extensions) {
           let transform = ext.extensions["KHR_texture_transform"];
@@ -123,6 +124,7 @@ export namespace ThreeSceneTranslator {
       const parseExtensions = (name: string, parseFunc: Function) => {
         const ext = findExtension(name, mat);
         if (ext) {
+          // console.log(`  ${name}`);
           parseFunc(ext);
         }
       };
