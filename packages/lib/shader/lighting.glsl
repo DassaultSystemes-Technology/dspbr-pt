@@ -23,18 +23,20 @@ vec3 sampleAndEvaluatePointLight(const in RenderState rs) {
 
   float cosNL = dot(light_dir, n);
 
-  bool isVisible = isVisible(rs.hitPos + n * u_ray_eps, cPointLightPosition);
+  bool isVisible = isVisible(rs.hitPos, cPointLightPosition);
 
-  // bool transmit = false;
-  // if (cosNL < 0.0 && rs.closure.transparency > 0.0)
-  //   transmit = true;
-
-  vec3 contrib = vec3(0.0);
-  if (cosNL > EPS_COS && isVisible) {
-    contrib = eval_dspbr(rs.closure, rs.wi, light_dir) * (cPointLightEmission / dist2) * cosNL;
+  vec3 L = vec3(0.0);
+  if (abs(cosNL) > EPS_COS && isVisible) {
+    L = eval_dspbr(rs.closure, rs.wi, light_dir) * (cPointLightEmission / dist2) * abs(cosNL);
   }
+    // if (cosNL < 0.0 && has_flag(rs.closure.event_type, E_TRANSMISSION))
+    // }
+    // if(cosNL > 0.0 && has_flag(rs.closure.event_type, E_REFLECTION) {
+    //   L = eval_dspbr(rs.closure, rs.wi, light_dir) * (cPointLightEmission / dist2) * cosNL;
 
-  return contrib;
+    // }
+
+  return L;
 }
 #else
 // For now, we only have 1 point light

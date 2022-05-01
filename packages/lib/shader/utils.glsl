@@ -57,15 +57,20 @@ vec3 to_world(vec3 v, Geometry g) {
   return g.t * v.x + g.b * v.y + g.n * v.z;
 }
 
-bool refractIt(vec3 i, vec3 n, float inv_eta, out vec3 wo) {
-  float cosi = dot(-i, n);
+bool has_flag(int flags, int mask) {
+  return (flags & mask) > 0;
+}
+// wi points towards surface
+vec3 refractIt(vec3 wi, vec3 n, float inv_eta, out bool tir) {
+  tir = false;
+  float cosi = dot(-wi, n);
   float cost2 = 1.0 - inv_eta * inv_eta * (1.0 - cosi * cosi);
-  vec3 t = inv_eta * i + ((inv_eta * cosi - sqrt(abs(cost2))) * n);
+  vec3 wo = inv_eta * wi + ((inv_eta * cosi - sqrt(abs(cost2))) * n);
   if (cost2 <= 0.0) {
-    return false;
+    tir = true;
+    wo = reflect(wi, n);
   }
-  wo = t;
-  return true;
+  return wo;
 }
 
 // Bends shading normal n into the direction of the geometry normal ng
@@ -200,7 +205,7 @@ vec4 rotation_to_tangent(float angle, vec3 normal, vec4 tangent) {
 }
 
 vec3 to_linear_rgb(vec3 srgb) {
-  return pow(srgb.xyz, vec3(2.2));
+  return pow(srgb, vec3(2.2));
 }
 
 int lower_bound(sampler2D data, int row, int size, float value)

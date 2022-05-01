@@ -115,14 +115,13 @@ void fillRenderState(const in bvh_ray r, const in bvh_hit hit, out RenderState r
 bool sample_bsdf_bounce(inout RenderState rs, out vec3 sampleWeight, out float pdf) {
   bool ignoreBackfaces = false;//(!rs.closure.double_sided && rs.closure.backside);
 
-  sampleWeight = vec3(1.0);
   pdf = 1.0;
+  sampleWeight = vec3(1.0);
   if (rng_float() > rs.closure.cutout_opacity || ignoreBackfaces) {
     rs.closure.event_type |= E_DELTA;
     rs.wo = -rs.wi;
     rs.closure.bsdf_selection_pdf = 1.0;
-  }
-  else {
+  } else {
     rs.wo = sample_dspbr(rs.closure, rs.wi,
                           vec3(rng_float(), rng_float(), rng_float()),
                           sampleWeight, pdf);
@@ -137,7 +136,8 @@ bool sample_bsdf_bounce(inout RenderState rs, out vec3 sampleWeight, out float p
     }
   }
 
-  return true;
+  rs.hitPos = rs.hitPos + fix_normal(rs.ng, rs.wo) * u_ray_eps;
+   return true;
 }
 
 

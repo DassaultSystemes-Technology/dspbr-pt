@@ -60,17 +60,17 @@ vec4 trace(bvh_ray ray) {
     L += rs.closure.emission * path_weight;
     last_bounce_specular = bool(rs.closure.event_type & E_DELTA);
 
-    if (!last_bounce_specular) {
-      L += eval_direct_light_contribution(rs, rng_float(), rng_float()) * path_weight;
-    }
-
     vec3 bounce_weight;
     if (!sample_bsdf_bounce(rs, bounce_weight, last_bounce_pdf))
       return vec4(L, 1.0); // absorped
 
+    if (!last_bounce_specular) {
+      L += eval_direct_light_contribution(rs, rng_float(), rng_float()) * path_weight;
+    }
+
     path_weight *= bounce_weight;
 
-    ray = bvh_create_ray(rs.wo, rs.hitPos + fix_normal(rs.ng, rs.wo) * u_ray_eps, TFAR_MAX);
+    ray = bvh_create_ray(rs.wo, rs.hitPos, TFAR_MAX);
 
     if (bvh_intersect_nearest(ray, hit)) { // primary camera ray
       fillRenderState(ray, hit, rs);

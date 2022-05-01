@@ -55,10 +55,10 @@ void configure_material(const in uint matIdx, in RenderState rs, out MaterialClo
     c.cutout_opacity = 1.0;
   }
 
-  vec4 transmission = get_texture_value(matData.transmissionTextureId, uv);
-  c.transparency = matData.transparency * transmission.x;
+  c.transparency = matData.transparency * get_texture_value(matData.transmissionTextureId, uv).x;
 
-  c.translucency = matData.translucency;
+  c.translucency = matData.translucency * get_texture_value(matData.translucencyTextureId, uv).w;
+  c.translucencyColor = to_linear_rgb(get_texture_value(matData.translucencyColorTextureId, uv).xyz);
 
   c.thin_walled = matData.thinWalled;
   // c.ior = c.thin_walled ? 1.0 : matData.ior;

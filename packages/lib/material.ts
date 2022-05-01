@@ -1,6 +1,6 @@
 
 export class MaterialData {
-  private _data = new Float32Array(60);
+  private _data = new Float32Array(64);
 
   public get data() {
     return this._data;
@@ -195,6 +195,13 @@ export class MaterialData {
     return [...this._data.slice(36, 39)];
   }
 
+  public set translucencyTextureId(val: number) {
+    this._data[39] = val;
+  }
+  public get translucencyTextureId() {
+    return this._data[39];
+  }
+
   public set iridescence(val: number) {
     this._data[40] = val;
   }
@@ -335,6 +342,21 @@ export class MaterialData {
     return this._data[59];
   }
 
+  public set translucencyColor(val: number[]) {
+    this._data[60] = val[0];
+    this._data[61] = val[1];
+    this._data[62] = val[2];
+  }
+  public get translucencyColor() {
+    return [...this._data.slice(60, 63)];
+  }
+
+  public set translucencyColorTextureId(val: number) {
+    this._data[63] = val;
+  }
+  public get translucencyColorTextureId() {
+    return this._data[63];
+  }
 
   constructor() {
     this.albedo = [1, 1, 1];
@@ -371,7 +393,7 @@ export class MaterialData {
     this.thinWalled = 1;
 
     this.anisotropyDirection = [1,0,0];
-    // this.pad = 0.0; // data[39] not used
+    this.translucencyTextureId = -1;
 
     this.iridescence = 0.0;
     this.iridescenceIOR = 1.3;
@@ -397,6 +419,9 @@ export class MaterialData {
     this.anisotropyDirectionTextureId = -1;
     this.iridescenceTextureId = -1;
     this.iridescenceThicknessTextureId = -1;
+
+    this.translucencyColor = [1, 1, 1];
+    this.translucencyColorTextureId = -1;
   }
 }
 

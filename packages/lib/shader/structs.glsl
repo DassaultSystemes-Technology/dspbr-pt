@@ -35,7 +35,7 @@ struct MaterialData {
   bool thinWalled; // 35
 
   vec3 anisotropyDirection; // 36
-  float pad; // 39
+  float translucencyTextureId; // 39
 
   // 11
   float iridescence; // 40
@@ -62,6 +62,9 @@ struct MaterialData {
   float anisotropyDirectionTextureId;
   float iridescenceTextureId;
   float iridescenceThicknessTextureId;
+
+  vec3 translucencyColor; // 60
+  float translucencyColorTextureId;
 };
 
 struct TexInfo {
@@ -106,6 +109,7 @@ struct MaterialClosure {
   float iridescence;
   float iridescence_ior;
   float iridescence_thickness;
+  vec3 translucencyColor;
 };
 
 struct RenderState {
