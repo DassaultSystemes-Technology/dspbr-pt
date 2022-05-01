@@ -3,9 +3,11 @@
   "private": true,
   "devDependencies": {
     "@parcel/transformer-glsl": "^2.4.1",
+    "cross-env": "^7.0.3",
     "parcel": "^2.5.0",
     "patch-package": "^6.4.7",
-    "rimraf": "^3.0.2"
+    "rimraf": "^3.0.2",
+    "shx": "^0.3.4"
   },
   "dependencies": {
     "@gltf-transform/core": "^2.1.4",
@@ -22,7 +24,8 @@
     "last 1 Chrome version"
   ],
   "scripts": {
-    "dev": "rimraf dist && parcel index.html --public-url / --port 3000 --open",
+    "copy-assets": "shx cp -R ../../assets dist",
+    "dev": "rimraf dist && yarn run copy-assets && cross-env NODE_ENV=dev parcel index.html --public-url / --port 3000 --open",
     "build": "parcel build --target viewer",
     "postinstall": "npx patch-package"
   },

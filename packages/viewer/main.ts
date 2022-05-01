@@ -21,11 +21,20 @@ import { PathtracingRenderer, ThreeSceneTranslator } from 'dspbr-pt';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import {loadSceneFromBlobs, loadSceneFromUrl, loadIBL} from './scene_loader';
+import { loadSceneFromBlobs, loadSceneFromUrl, loadIBL } from './scene_loader';
 import * as Assets from './asset_index';
 
 if (!window.File || !window.FileReader || !window.FileList || !window.Blob) {
   alert('The File APIs are not fully supported in this browser.');
+}
+
+if (process.env['NODE_ENV'] == 'dev') {
+  console.log("Local development: Replacing Asset URLs...");
+  for (let [_, ibl] of Object.entries(Assets.ibls)) {
+    if(ibl["url"]) {
+      ibl["url"] = ibl["url"].replace("https://raw.githubusercontent.com/DassaultSystemes-Technology/dspbr-pt/main/assets", '');
+    }
+  }
 }
 
 class DemoViewer {
@@ -208,7 +217,7 @@ class DemoViewer {
   private async loadSceneFromDrop(fileMap) {
     let ibl = null;
     let gltf = null;
-    for(const [key, value] of fileMap) {
+    for (const [key, value] of fileMap) {
       if (key.match(/\.hdr$/)) {
         this.showStatusScreen("Loading HDR...");
         ibl = await loadIBL(URL.createObjectURL(value));
@@ -251,31 +260,36 @@ class DemoViewer {
     await this.loadScenario(gltf, ibl)
   }
 
-  private async loadScenario(gltf: GLTF, ibl: any) {
+  private async loadScenario(gltf?: GLTF, ibl?: any) {
     if (this.pathtracing)
       this.stopPathtracing();
 
-    this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
-    this.updateCameraFromBoundingBox();
-    this.centerView();
-
-    // const floorTex = this.generateRadialFloorTexture(2048);
-    if (this.showGroundPlane) {
-      this.addGroundPlane(gltf.scene);
-      this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
+    if(ibl) {
+      this.renderer.setIBL(ibl);
+      this.three_renderer.setIBL(ibl);
     }
 
-    this.renderer.setIBL(ibl);
+    if(gltf) {
+      this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
+      this.updateCameraFromBoundingBox();
+      this.centerView();
 
-    const pathtracingSceneData = await ThreeSceneTranslator.translateThreeScene(gltf.scene, gltf);
-    await this.renderer.setScene(pathtracingSceneData);
-    if (this.pathtracing)
-      this.startPathtracing();
+      // const floorTex = this.generateRadialFloorTexture(2048);
+      if (this.showGroundPlane) {
+        this.addGroundPlane(gltf.scene);
+        this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
+      }
 
-    this.three_renderer.setScene(new THREE.Scene().add(gltf.scene));
-    this.three_renderer.setIBL(ibl);
-    if (!this.pathtracing) {
-      this.startRasterizer();
+
+      const pathtracingSceneData = await ThreeSceneTranslator.translateThreeScene(gltf.scene, gltf);
+      await this.renderer.setScene(pathtracingSceneData);
+      if (this.pathtracing)
+        this.startPathtracing();
+
+      this.three_renderer.setScene(new THREE.Scene().add(gltf.scene));
+      if (!this.pathtracing) {
+        this.startRasterizer();
+      }
     }
 
     this.hideLoadscreen();
@@ -439,7 +453,7 @@ class DemoViewer {
           this.renderer.showBackground = true;
         });
       }
-    });//.setValue(this.current_ibl);
+    });
 
     lighting.add(this.renderer, 'iblRotation').name('IBL Rotation').min(-180.0).max(180.0).step(0.1).listen();
     lighting.add(this.renderer, 'iblImportanceSampling').name('Importance Sampling');
