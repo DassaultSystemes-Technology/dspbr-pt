@@ -15,9 +15,9 @@ float coupled_diffuse(vec2 alpha, float dot_wi_n, float dot_wo_n, float e0) {
   return (1.0 - Ewo) * (1.0 - Ewi) / (PI * (1.0 - Eavg));
 }
 
-vec3 diffuse_bsdf_eval(const in MaterialClosure c, vec3 wi, vec3 wo, Geometry g) {
+vec3 diffuse_bsdf_eval(const in MaterialClosure c, vec3 wi, vec3 wo, Geometry g, bool transmit) {
 
- if(has_flag(c.event_type, E_REFLECTION)) {
+ if(!transmit) {
     float coupled = coupled_diffuse(c.alpha, abs(dot(wi, g.n)), abs(dot(wo, g.n)), max_(c.f0 * c.specular_tint));
     vec3 diffuse_color = c.albedo * (1.0 - c.metallic) * (1.0 - c.transparency);
     return diffuse_color * mix(ONE_OVER_PI, coupled, c.specular);
@@ -33,13 +33,14 @@ vec3 diffuse_bsdf_sample(inout MaterialClosure c, vec3 wi, Geometry g, vec3 uvw,
     pdf *= c.translucency;
     wo.z = -wo.z;
     c.event_type |= E_TRANSMISSION;
+    bsdf_weight = diffuse_bsdf_eval(c, wi, wo, g, true) / pdf;
   } else {
     pdf *= 1.0 - c.translucency;
     c.event_type |= E_REFLECTION;
+    bsdf_weight = diffuse_bsdf_eval(c, wi, wo, g, false) / pdf;
   }
 
   wo = to_world(wo, g);
-  bsdf_weight = diffuse_bsdf_eval(c, wi, wo, g) / pdf;
   return wo;
 }
 

@@ -16,18 +16,18 @@
 #ifdef HAS_POINT_LIGHT
 // For now, we only have 1 point light
 vec3 sampleAndEvaluatePointLight(const in RenderState rs) {
-  vec3 n = rs.closure.n;
   vec3 light_dir = cPointLightPosition - rs.hitPos;
   float dist2 = dot(light_dir, light_dir);
   light_dir = normalize(light_dir);
 
-  float cosNL = dot(light_dir, n);
+  vec3 n =  rs.closure.backside ? -rs.closure.n : rs.closure.n;
+  float cosNL = saturate(dot(light_dir, n));
 
   bool isVisible = isVisible(rs.hitPos, cPointLightPosition);
 
   vec3 L = vec3(0.0);
-  if (abs(cosNL) > EPS_COS && isVisible) {
-    L = eval_dspbr(rs.closure, rs.wi, light_dir) * (cPointLightEmission / dist2) * abs(cosNL);
+  if (cosNL > EPS_COS && isVisible) {
+    L = eval_dspbr(rs.closure, rs.wi, light_dir) * (cPointLightEmission / dist2) * cosNL;
   }
     // if (cosNL < 0.0 && has_flag(rs.closure.event_type, E_TRANSMISSION))
     // }

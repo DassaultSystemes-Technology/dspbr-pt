@@ -33,9 +33,9 @@ vec3 eval_dspbr(const in MaterialClosure c, vec3 wi, vec3 wo) {
   vec3 wh = normalize(wi + wo);
   Geometry g = calculateBasis(c.n, c.t);
 
-  vec3 base = diffuse_bsdf_eval(c, wi, wo, g);
+  vec3 base = vec3(0);
+  base = diffuse_bsdf_eval(c, wi, wo, g, false);
   base += eval_brdf_microfacet_ggx(c.specular_f0, c.specular_f90, c.alpha, c.iridescence, c.iridescence_ior, c.iridescence_thickness, wi, wo, wh, g);
-  // base += eval_brdf_microfacet_ggx_smith(c.specular_f0, c.specular_f90, c.alpha, wi, wo, wh, g);
   base += eval_brdf_microfacet_ggx_ms(c.specular_f0, c.specular_f90, c.alpha, wi, wo, g);
 
   base += eval_btdf_microfacet_ggx(c.specular_f0, c.specular_f90, c.alpha, c.iridescence, c.iridescence_ior, c.iridescence_thickness, wi, wo, g);
@@ -76,7 +76,7 @@ float dspbr_pdf(const in MaterialClosure c, vec3 wi, vec3 wo) {
 }
 
 vec3 dspbr_diffuse_rho(const in MaterialClosure c) {
-  return (c.albedo + c.sheen_color) * (1.0-c.metallic) * (1.0-c.transparency);
+  return (c.albedo + c.sheen_color);
 }
 
 float dspbr_clearcoat_rho(const in MaterialClosure c, Geometry g, vec3 wi) {
@@ -100,7 +100,7 @@ void select_bsdf(inout MaterialClosure c, float rr, vec3 wi, out float pdf) {
   float clearcoat_importance = dspbr_clearcoat_rho(c, g, wi);
 
   float bsdf_pdf[5];
-  bsdf_pdf[0] = diffuse_importance * (1.0 - c.metallic) * (1.0 - c.transparency); // diffuse
+  bsdf_pdf[0] = diffuse_importance * (1.0 - c.metallic) * (1.0 - c.transparency) * 0.1; // diffuse
   bsdf_pdf[1] = brdf_importance * (1.0 - c.metallic) * (1.0 - c.transparency); // opaque dielectric
   bsdf_pdf[2] = bsdf_importance * (1.0 - c.metallic) * c.transparency; // transparent dielectric
   bsdf_pdf[3] = brdf_importance * c.metallic * (1.0 - c.transparency); // metal
@@ -124,7 +124,7 @@ void select_bsdf(inout MaterialClosure c, float rr, vec3 wi, out float pdf) {
   }
 
   // bsdf_cdf[0] = 1.0;
-  // bsdf_cdf[1] = 0.0;
+  // bsdf_cdf[1] = 1.0;
   // bsdf_cdf[2] = 0.0;
   // bsdf_cdf[3] = 0.0;
   // bsdf_cdf[4] = 0.0;

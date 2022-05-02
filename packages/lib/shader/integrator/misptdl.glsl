@@ -9,7 +9,7 @@ vec3 eval_direct_light_contribution(in RenderState rs, float r0, float r1) {
   if (u_use_ibl > 0.0) {
     ibl_sample_dir = ibl_sample_direction(r0, r1, ibl_sample_pdf);
 
-    float cosNL = dot(ibl_sample_dir, rs.closure.n);
+    float cosNL = saturate(dot(ibl_sample_dir, n));
     if (cosNL > EPS_COS && ibl_sample_pdf > EPS_PDF) {
       if (!isOccluded(rs.hitPos, ibl_sample_dir)) {
         L = ibl_eval(ibl_sample_dir) * eval_dspbr(rs.closure, rs.wi, ibl_sample_dir) * cosNL / ibl_sample_pdf;
@@ -85,5 +85,5 @@ vec4 trace(bvh_ray ray) {
     }
   }
 
-  return vec4(L, 1.0);
+  return vec4(clamp(L, 0.0, 3.0), 1.0);
 }

@@ -94,11 +94,11 @@ __metadata:
 
 "@gltf-transform/extensions@patch:@gltf-transform/extensions@npm:2.1.4#.yarn/patches/@gltf-transform-extensions-npm-2.1.4-295216e8ed.patch::locator=dspbr-pt-dev%40workspace%3A.":
   version: 2.1.4
-  resolution: "@gltf-transform/extensions@patch:@gltf-transform/extensions@npm%3A2.1.4#.yarn/patches/@gltf-transform-extensions-npm-2.1.4-295216e8ed.patch::version=2.1.4&hash=bea693&locator=dspbr-pt-dev%40workspace%3A."
+  resolution: "@gltf-transform/extensions@patch:@gltf-transform/extensions@npm%3A2.1.4#.yarn/patches/@gltf-transform-extensions-npm-2.1.4-295216e8ed.patch::version=2.1.4&hash=db10f1&locator=dspbr-pt-dev%40workspace%3A."
   dependencies:
     "@gltf-transform/core": ^2.1.4
     ktx-parse: ^0.2.2
-  checksum: d9919a6bfb992d322c2e11e8054cac69027bf350220cb3b946a4f05aee5dcd4a76e6437d94bedd5db7dc9f1b7f6a2cff11d5814eaf8d983dc015e5d0e4f675b3
+  checksum: d9793083dba0fb7fdcfce6f418b5d5f1c29923dba28641160605eb0f715eaddcbe736d547f991b15dc7e5e281bbbdb9f7ece4646d037b80473cb0185c8cc7ddb
   languageName: node
   linkType: hard
 
