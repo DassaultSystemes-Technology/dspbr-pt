@@ -46,7 +46,7 @@ vec3 diffuse_bsdf_sample(inout MaterialClosure c, vec3 wi, Geometry g, vec3 uvw,
 
 
 vec3 diffuse_btdf_eval(const in MaterialClosure c, vec3 wi, vec3 wo, Geometry g) {
-  return c.albedo * (1.0 - c.metallic) * (1.0 - c.transparency) * ONE_OVER_PI;
+  return c.translucencyColor * (1.0 - c.metallic) * (1.0 - c.transparency) * ONE_OVER_PI;
 }
 
 float diffuse_bsdf_pdf(vec3 wi, vec3 wo, Geometry g) {
