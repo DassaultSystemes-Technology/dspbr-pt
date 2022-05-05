@@ -64,8 +64,8 @@ class DemoViewer {
   pathtracing = true;
   autoScaleScene = false;
   autoRotate = false;
-  interactionScale = 0.2;
   interactionTimeoutId = null;
+  interactionPixelRatio = 0.1;
   pathtracedInteraction = false;
   resumePathtracing = false;
   showGroundPlane = false;
@@ -105,12 +105,16 @@ class DemoViewer {
       this.renderer.resetAccumulation();
     });
 
+    let tmpRatio; let tmpTileRes;
     this.controls.addEventListener('start', () => {
       if (this.pathtracing) {
         if (this.pathtracedInteraction) {
           this.renderer.stopRendering();
           clearTimeout(this.interactionTimeoutId);
-          this.renderer.setLowResRenderMode(true);
+          tmpRatio = this.renderer.pixelRatio;
+          tmpTileRes = this.renderer.tileRes;
+          this.renderer.pixelRatio = this.interactionPixelRatio;
+          this.renderer.tileRes = 1;
           this.startPathtracing();
         } else {
           this.startRasterizer();
@@ -123,7 +127,8 @@ class DemoViewer {
     this.controls.addEventListener('end', () => {
       if (this.pathtracedInteraction) {
         this.interactionTimeoutId = setTimeout(() => {
-          this.renderer.setLowResRenderMode(false);
+          this.renderer.pixelRatio = tmpRatio;
+          this.renderer.tileRes = tmpTileRes;
         }, 100);
       } else {
         if (this.resumePathtracing) {
@@ -350,8 +355,8 @@ class DemoViewer {
     this.canvas.height = window.innerHeight;
     this.canvas_pt.width = window.innerWidth;
     this.canvas_pt.height = window.innerHeight;
-    this.canvas_width = window.innerWidth;
-    this.canvas_height = window.innerHeight;
+    this.canvas_three.width = window.innerWidth;
+    this.canvas_three.height = window.innerHeight;
 
     this.renderer.resize(window.innerWidth, window.innerHeight);
     this.three_renderer.resize(window.innerWidth, window.innerHeight);
@@ -460,6 +465,7 @@ class DemoViewer {
     // interator.add(this.renderer, 'renderMode', this.renderer.renderModes).name('Integrator');
     interator.add(this.renderer, 'maxBounces').name('Bounce Depth').min(0).max(32).step(1);
     interator.add(this.renderer, 'rayEps').name('Ray Offset');
+    interator.add(this.renderer, 'tileRes').name('Tile Res').min(1).max(8).step(1);
     interator.open();
 
     let display = this._gui.addFolder('Display');
@@ -474,7 +480,8 @@ class DemoViewer {
 
     display.add(this.renderer, 'pixelRatio').name('Pixel Ratio').min(0.1).max(1.0);
     display.add(this, 'pathtracedInteraction').name('Pathtraced Navigation');
-    display.add(this.renderer, 'pixelRatioLowRes').name('Interaction Ratio').min(0.1).max(1.0).step(0.1);
+    display.add(this, 'interactionPixelRatio').name('Interaction Ratio').min(0.1).max(1.0).step(0.1);
+    display.add(this.renderer, 'enableFxaa').name('Fxaa');
     display.open();
 
     let background = this._gui.addFolder('Background');

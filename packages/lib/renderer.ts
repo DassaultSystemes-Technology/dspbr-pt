@@ -22,6 +22,8 @@ import * as glu from './gl_utils';
 import shader_constants from './shader/constants.glsl';
 import copy_shader from './shader/copy.glsl';
 import display_shader from './shader/display.frag';
+import tonemap_shader from './shader/tonemap.frag';
+import fxaa_shader from './shader/fxaa.frag';
 
 import structs_shader from './shader/structs.glsl';
 import rng_shader from './shader/rng.glsl';
@@ -50,9 +52,6 @@ void main()
   v_uv = position.xy;
   gl_Position = position;
 }`;
-
-const TILE_RES = 4;
-const INTERACTION_TILE_RES = 1;
 
 enum BufferType {
   Front = 0,
@@ -87,26 +86,25 @@ export class PathtracingRenderer {
   private ibl: WebGLTexture | null = null;
   private iblImportanceSamplingData: IBLImportanceSamplingData = new IBLImportanceSamplingData();
 
-  private fbos = new Map<string, WebGLFramebuffer[][]>();
-  private renderBuffers = new Map<string, WebGLFramebuffer[][]>();
+  private fbos = new Map<string, WebGLFramebuffer>();
+  private renderBuffers = new Map<string, WebGLFramebuffer>();
 
   private quadVao: WebGLVertexArrayObject | null = null;
   private renderPrograms = new Map<string, WebGLProgram>();
   private renderProgram: WebGLProgram | null = null;
-  private debugProgram: WebGLProgram | null = null;
   private copyProgram: WebGLProgram | null = null;
+  private fxaaProgram: WebGLProgram | null = null;
+  private tonemapProgram: WebGLProgram | null = null;
   private displayProgram: WebGLProgram | null = null;
   private quadVertexBuffer: WebGLBuffer | null = null;
 
-  private renderRes = [[0, 0], [0, 0]]; // [highres, lowres]
+  private renderRes = [0, 0]; // [highres, lowres]
   private displayRes = [0, 0];
 
   private _frameCount = 1;
   private _isRendering = false;
   private _currentAnimationFrameId = -1;
   private _resetAccumulation = false;
-
-  private _tileRes = TILE_RES;
 
   private _exposure = 1.0;
   public get exposure() {
@@ -239,28 +237,6 @@ export class PathtracingRenderer {
     this.resize(this.canvas.width, this.canvas.height);
   }
 
-  private _pixelRatioLowRes = 0.1;
-  public get pixelRatioLowRes() {
-    return this._pixelRatioLowRes;
-  }
-  public set pixelRatioLowRes(val) {
-    this._pixelRatioLowRes = val;
-    this.resize(this.canvas.width, this.canvas.height);
-  }
-
-  private _renderResMode = RenderResMode.High;
-  private setLowResRenderMode(flag: boolean) {
-    if (flag) {
-      this._renderResMode = RenderResMode.Low;
-      this._tileRes = INTERACTION_TILE_RES;
-    } else {
-      this._renderResMode = RenderResMode.High;
-      this._tileRes = TILE_RES;
-    }
-
-    this.resetAccumulation();
-  }
-
   private _backgroundColor = [0.0, 0.0, 0.0, 1.0];
   public get backgroundColor() {
     return this._backgroundColor;
@@ -277,6 +253,22 @@ export class PathtracingRenderer {
   public set rayEps(val) {
     this._rayEps = val;
     this.resetAccumulation();
+  }
+
+  private _enableFxaa = false;
+  public get enableFxaa() {
+    return this._enableFxaa;
+  }
+  public set enableFxaa(val) {
+    this._enableFxaa = val;
+  }
+
+  private _tileRes = 4;
+  public set tileRes(val: number) {
+    this._tileRes = val;
+  }
+  public get tileRes() {
+    return this._tileRes;
   }
 
   constructor(parameters: PathtracingRendererParameters = {}) {
@@ -306,14 +298,8 @@ export class PathtracingRenderer {
 
   resize(width: number, height: number) {
     this.displayRes = [width, height];
-    this.renderRes[0] = [
-      Math.ceil(this.displayRes[0] * this._pixelRatio),
-      Math.ceil(this.displayRes[1] * this._pixelRatio)
-    ];
-    this.renderRes[1] = [
-      Math.ceil(this.displayRes[0] * this._pixelRatioLowRes),
-      Math.ceil(this.displayRes[1] * this._pixelRatioLowRes)
-    ];
+    this.renderRes[0] = Math.ceil(this.displayRes[0] * this._pixelRatio);
+    this.renderRes[1] = Math.ceil(this.displayRes[1] * this._pixelRatio);
 
     this.initFramebuffers();
     this.resetAccumulation();
@@ -341,7 +327,7 @@ export class PathtracingRenderer {
   };
 
   private updatePathracingUniforms(camera: any) {
-    const renderRes = this.renderRes[this._renderResMode];
+    const renderRes = this.renderRes;
     let filmHeight = Math.tan(camera.fov * 0.5 * Math.PI / 180.0) * camera.near;
 
     this.pathTracingUniforms["u_u_view_mat"] = camera.matrixWorld.elements;
@@ -402,6 +388,13 @@ export class PathtracingRenderer {
     return slot;
   }
 
+
+  render(camera: any, num_samples: number, frameFinishedCB: (frameCount: number) => void, renderingFinishedCB: () => void) {
+    this._isRendering = true;
+    this.resetAccumulation();
+    this.renderFrame(camera, num_samples, 0, frameFinishedCB, renderingFinishedCB);
+  }
+
   renderFrame(camera: any, num_samples: number, tile: number, frameFinishedCB: (frameCount: number) => void, renderingFinishedCB: () => void) {
     let gl = this.gl;
     if (!this._isRendering) {
@@ -409,11 +402,11 @@ export class PathtracingRenderer {
       return;
     }
 
-    const fbo = this.fbos.get("pt_fbo")![BufferType.Front][this._renderResMode];
-    const copyFbo = this.fbos.get("pt_fbo")![BufferType.Back][this._renderResMode];
-    const renderBuffer = this.renderBuffers.get("pt_buffer")![BufferType.Front][this._renderResMode];
-    const copyBuffer = this.renderBuffers.get("pt_buffer")![BufferType.Back][this._renderResMode];
-    const renderRes = this.renderRes[this._renderResMode];
+    const fbo = this.fbos.get("render");
+    const copyFbo = this.fbos.get("render_");
+    const renderBuffer = this.renderBuffers.get("render");
+    const copyBuffer = this.renderBuffers.get("render_");
+    const renderRes = this.renderRes;
 
     if (this._resetAccumulation) {
       this._frameCount = 1;
@@ -464,17 +457,35 @@ export class PathtracingRenderer {
     gl.bindTexture(gl.TEXTURE_2D, renderBuffer);
     gl.uniform1i(gl.getUniformLocation(this.copyProgram, "tex"), slot);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    // gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.disable(gl.SCISSOR_TEST);
 
-    // display render pass
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbos.get("postprocess"));
+    gl.useProgram(this.tonemapProgram);
+    gl.uniform1i(gl.getUniformLocation(this.tonemapProgram, "tex"), slot); // renderbuffer
+    gl.uniform1f(gl.getUniformLocation(this.tonemapProgram, "exposure"), this._exposure);
+    gl.uniform1i(gl.getUniformLocation(this.tonemapProgram, "gamma"), this._enableGamma);
+    gl.uniform1i(gl.getUniformLocation(this.tonemapProgram, "tonemappingMode"),
+      this.tonemappingModes.indexOf(this._tonemapping));
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+    let displayBuffer = this.renderBuffers.get("postprocess");
+    if(this.enableFxaa) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbos.get("postprocess_"));
+      gl.useProgram(this.fxaaProgram);
+      gl.bindTexture(gl.TEXTURE_2D, this.renderBuffers.get("postprocess"));
+      gl.uniform1i(gl.getUniformLocation(this.fxaaProgram, "tex"), slot);
+      gl.uniform2f(gl.getUniformLocation(this.fxaaProgram, "u_inv_res"), 1.0 / this.renderRes[0], 1.0 / this.renderRes[1]);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      displayBuffer = this.renderBuffers.get("postprocess_");
+    }
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.useProgram(this.displayProgram);
     gl.viewport(0, 0, this.displayRes[0], this.displayRes[1]);
+    gl.bindTexture(gl.TEXTURE_2D, displayBuffer);
     gl.uniform1i(gl.getUniformLocation(this.displayProgram, "tex"), slot);
-    gl.uniform1f(gl.getUniformLocation(this.displayProgram, "exposure"), this._exposure);
-    gl.uniform1i(gl.getUniformLocation(this.displayProgram, "gamma"), this._enableGamma);
-    gl.uniform1i(gl.getUniformLocation(this.displayProgram, "tonemappingMode"),
-      this.tonemappingModes.indexOf(this._tonemapping));
+
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.bindTexture(gl.TEXTURE_2D, null);
 
@@ -496,29 +507,17 @@ export class PathtracingRenderer {
     });
   };
 
-  render(camera: any, num_samples: number, frameFinishedCB: (frameCount: number) => void, renderingFinishedCB: () => void) {
-    this._isRendering = true;
-    this.resetAccumulation();
-    this.renderFrame(camera, num_samples, 0, frameFinishedCB, renderingFinishedCB);
-  }
-
   private initFramebuffers() {
     const gl = this.gl;
 
     // cleanup renderbuffers and fbos
     for (const rb of this.renderBuffers.values()) {
-      if (rb[0][0]) gl.deleteTexture(rb[0][0]);
-      if (rb[1][0]) gl.deleteTexture(rb[1][0]);
-      if (rb[0][1]) gl.deleteTexture(rb[0][1]);
-      if (rb[1][1]) gl.deleteTexture(rb[1][1]);
+      if (rb) gl.deleteTexture(rb);
     }
     this.renderBuffers.clear();
 
     for (const fbo of this.fbos.values()) {
-      if (fbo[0][0]) gl.deleteFramebuffer(fbo[0][0]);
-      if (fbo[1][0]) gl.deleteFramebuffer(fbo[1][0]);
-      if (fbo[1][1]) gl.deleteFramebuffer(fbo[1][1]);
-      if (fbo[0][1]) gl.deleteFramebuffer(fbo[0][1]);
+      if (fbo) gl.deleteFramebuffer(fbo);
     }
     this.fbos.clear();
 
@@ -535,21 +534,15 @@ export class PathtracingRenderer {
       return fbo;
     }
 
-    this.renderBuffers.set("pt_buffer", [
-      [glu.createRenderBufferTexture(gl, null, this.renderRes[RenderResMode.High][0], this.renderRes[RenderResMode.High][1])!,
-      glu.createRenderBufferTexture(gl, null, this.renderRes[RenderResMode.Low][0], this.renderRes[RenderResMode.Low][1])!],
-      [glu.createRenderBufferTexture(gl, null, this.renderRes[RenderResMode.High][0], this.renderRes[RenderResMode.High][1])!,
-      glu.createRenderBufferTexture(gl, null, this.renderRes[RenderResMode.Low][0], this.renderRes[RenderResMode.Low][1])!]
-    ]);
+    this.renderBuffers.set("render", glu.createRenderBufferTexture(gl, null, this.renderRes[0], this.renderRes[1]));
+    this.renderBuffers.set("render_", glu.createRenderBufferTexture(gl, null, this.renderRes[0], this.renderRes[1]));
+    this.fbos.set("render", createFbo([this.renderBuffers.get("render")]));
+    this.fbos.set("render_", createFbo([this.renderBuffers.get("render_")]));
 
-    this.fbos.set("pt_fbo", [[
-      createFbo([this.renderBuffers.get("pt_buffer")![BufferType.Front][RenderResMode.High]]),
-      createFbo([this.renderBuffers.get("pt_buffer")![BufferType.Front][RenderResMode.Low]])
-    ],
-    [
-      createFbo([this.renderBuffers.get("pt_buffer")![BufferType.Back][RenderResMode.High]]),
-      createFbo([this.renderBuffers.get("pt_buffer")![BufferType.Back][RenderResMode.Low]])
-    ]]);
+    this.renderBuffers.set("postprocess", glu.createRenderBufferTexture(gl, null, this.renderRes[0], this.renderRes[1]));
+    this.renderBuffers.set("postprocess_", glu.createRenderBufferTexture(gl, null, this.renderRes[0], this.renderRes[1]));
+    this.fbos.set("postprocess", createFbo([this.renderBuffers.get("postprocess")]));
+    this.fbos.set("postprocess_", createFbo([this.renderBuffers.get("postprocess_")]));
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
@@ -798,6 +791,8 @@ export class PathtracingRenderer {
 
     this.copyProgram = await glu.createProgramFromSource(this.gl, vertexShader, copy_shader);
     this.displayProgram = await glu.createProgramFromSource(this.gl, vertexShader, display_shader);
+    this.tonemapProgram = await glu.createProgramFromSource(this.gl, vertexShader, tonemap_shader);
+    this.fxaaProgram = await glu.createProgramFromSource(this.gl, vertexShader, fxaa_shader);
     this.renderPrograms.set("pt_program", await glu.createProgramFromSource(this.gl, vertexShader, render_shader, ptShaderMap));
     this.renderPrograms.set("debug_program", await glu.createProgramFromSource(this.gl, vertexShader, render_shader, debugShaderMap));
     this.renderPrograms.set("misptdl_program", await glu.createProgramFromSource(this.gl, vertexShader, render_shader, misptdlShaderMap));
