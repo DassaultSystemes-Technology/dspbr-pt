@@ -18,7 +18,7 @@ import { GUI } from 'dat.gui';
 import { SimpleDropzone } from 'simple-dropzone';
 import { ThreeRenderer } from './three_renderer';
 import { PathtracingRenderer, ThreeSceneTranslator } from 'dspbr-pt';
-import * as THREE from 'three';
+import { PerspectiveCamera, Box3, Vector3, Scene, Mesh, FloatType, MOUSE, MeshStandardMaterial, PlaneBufferGeometry} from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -50,9 +50,9 @@ class DemoViewer {
   status: HTMLElement | null;
   loadscreen: HTMLElement | null;
   scene: string;
-  camera: THREE.PerspectiveCamera;
+  camera: PerspectiveCamera;
   controls: OrbitControls;
-  sceneBoundingBox: THREE.Box3;
+  sceneBoundingBox: Box3;
 
   renderer: any;
   three_renderer: ThreeRenderer;
@@ -92,7 +92,7 @@ class DemoViewer {
     this.canvas_three.height = window.innerHeight;
 
     let aspect = window.innerWidth / window.innerHeight;
-    this.camera = new THREE.PerspectiveCamera(45, aspect, 0.01, 1000);
+    this.camera = new PerspectiveCamera(45, aspect, 0.01, 1000);
 
     this.controls = new OrbitControls(this.camera, this.canvas);
     this.controls.screenSpacePanning = true;
@@ -136,9 +136,9 @@ class DemoViewer {
     });
 
     this.controls.mouseButtons = {
-      LEFT: THREE.MOUSE.ROTATE,
-      MIDDLE: THREE.MOUSE.PAN,
-      RIGHT: THREE.MOUSE.DOLLY
+      LEFT: MOUSE.ROTATE,
+      MIDDLE: MOUSE.PAN,
+      RIGHT: MOUSE.DOLLY
     }
 
     this.renderer = new PathtracingRenderer({ canvas: this.canvas_pt });
@@ -226,14 +226,14 @@ class DemoViewer {
   }
 
   private async loadScene(gltf: GLTF) {
-    this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
+    this.sceneBoundingBox = new Box3().setFromObject(gltf.scene);
     this.updateCameraFromBoundingBox();
     this.centerView();
 
     // const floorTex = this.generateRadialFloorTexture(2048);
     if (this.showGroundPlane) {
       this.addGroundPlane(gltf.scene);
-      this.sceneBoundingBox = new THREE.Box3().setFromObject(gltf.scene);
+      this.sceneBoundingBox = new Box3().setFromObject(gltf.scene);
     }
 
     const pathtracingSceneData = await ThreeSceneTranslator.translateThreeScene(gltf.scene, gltf);
@@ -241,7 +241,7 @@ class DemoViewer {
     if (this.pathtracing)
       this.startPathtracing();
 
-    this.three_renderer.setScene(new THREE.Scene().add(gltf.scene));
+    this.three_renderer.setScene(new Scene().add(gltf.scene));
     if (!this.pathtracing) {
       this.startRasterizer();
     }
@@ -272,7 +272,7 @@ class DemoViewer {
     if (url in Assets.ibls) {
       const iblInfo = Assets.ibls[url];
       new RGBELoader()
-        .setDataType(THREE.FloatType)
+        .setDataType(FloatType)
         .loadAsync(iblInfo.url).then((ibl) => {
           setIbl(ibl);
           this.renderer.exposure = iblInfo.intensity ?? 1.0;
@@ -280,7 +280,7 @@ class DemoViewer {
         });
     } else {
       new RGBELoader()
-        .setDataType(THREE.FloatType)
+        .setDataType(FloatType)
         .loadAsync(url).then((ibl) => {
           setIbl(ibl);
         });
@@ -288,9 +288,9 @@ class DemoViewer {
   }
 
   private addGroundPlane(scene) {
-    const floorPlane = new THREE.Mesh(
-      new THREE.PlaneBufferGeometry(),
-      new THREE.MeshStandardMaterial({
+    const floorPlane = new Mesh(
+      new PlaneBufferGeometry(),
+      new MeshStandardMaterial({
         transparent: false,
         color: 0x080808,
         roughness: 0.0,
@@ -350,8 +350,8 @@ class DemoViewer {
     this.canvas.height = window.innerHeight;
     this.canvas_pt.width = window.innerWidth;
     this.canvas_pt.height = window.innerHeight;
-    this.canvas_three.width = window.innerWidth;
-    this.canvas_three.height = window.innerHeight;
+    this.canvas_width = window.innerWidth;
+    this.canvas_height = window.innerHeight;
 
     this.renderer.resize(window.innerWidth, window.innerHeight);
     this.three_renderer.resize(window.innerWidth, window.innerHeight);
@@ -365,12 +365,12 @@ class DemoViewer {
     let diag = this.sceneBoundingBox.max.distanceTo(this.sceneBoundingBox.min);
     let dist = diag * 2 / Math.tan(45.0 * Math.PI / 180.0);
 
-    let center = new THREE.Vector3();
+    let center = new Vector3();
     this.sceneBoundingBox.getCenter(center);
 
     let pos = center.clone();
-    pos.add(new THREE.Vector3(0, 0, dist));
-    pos.add(new THREE.Vector3(0, diag, 0));
+    pos.add(new Vector3(0, 0, dist));
+    pos.add(new Vector3(0, diag, 0));
 
     this.camera.position.set(pos.x, pos.y, pos.z);
     this.camera.lookAt(center);
@@ -380,7 +380,7 @@ class DemoViewer {
 
   private centerView() {
     if (this.controls) {
-      let center = new THREE.Vector3();
+      let center = new Vector3();
       this.sceneBoundingBox.getCenter(center);
       this.controls.target = center;
       this.controls.update();
