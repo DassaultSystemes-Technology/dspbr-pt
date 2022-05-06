@@ -18,7 +18,7 @@ import { GUI } from 'dat.gui';
 import { SimpleDropzone } from 'simple-dropzone';
 import { ThreeRenderer } from './three_renderer';
 import { PathtracingRenderer, ThreeSceneTranslator } from 'dspbr-pt';
-import { PerspectiveCamera, Box3, Vector3, Scene, Mesh, FloatType, MOUSE, MeshStandardMaterial, PlaneBufferGeometry} from 'three';
+import { PerspectiveCamera, Box3, Vector3, Scene, Mesh, FloatType, MOUSE, MeshStandardMaterial, PlaneBufferGeometry } from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -64,12 +64,13 @@ class DemoViewer {
   pathtracing = true;
   autoScaleScene = false;
   autoRotate = false;
-  interactionTimeoutId = null;
-  interactionPixelRatio = 0.1;
-  pathtracedInteraction = false;
+  pathtracedInteraction = true;
   resumePathtracing = false;
   showGroundPlane = false;
-
+  interactionTimeoutId = null;
+  interactionPixelRatio = 0.1;
+  pixelRatio = 1.0;
+  tileRes = 4;
 
   constructor() {
     this.container = document.createElement('div');
@@ -105,38 +106,22 @@ class DemoViewer {
       this.renderer.resetAccumulation();
     });
 
-    let tmpRatio; let tmpTileRes;
     this.controls.addEventListener('start', () => {
       if (this.pathtracing) {
         if (this.pathtracedInteraction) {
-          this.renderer.stopRendering();
-          clearTimeout(this.interactionTimeoutId);
-          tmpRatio = this.renderer.pixelRatio;
-          tmpTileRes = this.renderer.tileRes;
-          this.renderer.pixelRatio = this.interactionPixelRatio;
-          this.renderer.tileRes = 1;
-          this.startPathtracing();
+          this.toggleInteractionMode(true);
         } else {
           this.startRasterizer();
-          clearTimeout(this.interactionTimeoutId);
-          this.resumePathtracing = true;
         }
       }
     });
 
     this.controls.addEventListener('end', () => {
       if (this.pathtracedInteraction) {
-        this.interactionTimeoutId = setTimeout(() => {
-          this.renderer.pixelRatio = tmpRatio;
-          this.renderer.tileRes = tmpTileRes;
-        }, 100);
+        this.toggleInteractionMode(false);
       } else {
-        if (this.resumePathtracing) {
-          this.interactionTimeoutId = setTimeout(() => {
-            this.startPathtracing();
-            this.stopRasterizer();
-          }, 100);
-        }
+        this.startPathtracing();
+        this.stopRasterizer();
       }
     });
 
@@ -199,6 +184,21 @@ class DemoViewer {
     }
   }
 
+  private toggleInteractionMode(flag: boolean, timeout?: number) {
+    if (flag) {
+      this.renderer.pixelRatio = this.interactionPixelRatio;
+      this.renderer.tileRes = 1;
+      if (timeout && !this.interactionTimeoutId) {
+        setTimeout(() => {
+          this.toggleInteractionMode(false);
+        }, timeout);
+      }
+    } else {
+      this.renderer.pixelRatio = this.pixelRatio;
+      this.renderer.tileRes = this.tileRes;
+    }
+  }
+
   private async loadDropFiles(fileMap) {
     for (const [key, value] of fileMap) {
       if (key.match(/\.hdr$/)) {
@@ -235,7 +235,6 @@ class DemoViewer {
     this.updateCameraFromBoundingBox();
     this.centerView();
 
-    // const floorTex = this.generateRadialFloorTexture(2048);
     if (this.showGroundPlane) {
       this.addGroundPlane(gltf.scene);
       this.sceneBoundingBox = new Box3().setFromObject(gltf.scene);
@@ -448,7 +447,11 @@ class DemoViewer {
       this.loadIbl(value);
     }).setValue(this.default_ibl_name);
 
-    lighting.add(this.renderer, 'iblRotation').name('IBL Rotation').min(-180.0).max(180.0).step(0.1).listen();
+    lighting.add(this.renderer, 'iblRotation').name('IBL Rotation').min(-180.0).max(180.0).step(0.1)
+      .onChange(val => {
+        this.toggleInteractionMode(true, 10.0);
+      }).listen();
+
     lighting.add(this.renderer, 'iblImportanceSampling').name('Importance Sampling');
     lighting.open();
 
@@ -465,7 +468,9 @@ class DemoViewer {
     // interator.add(this.renderer, 'renderMode', this.renderer.renderModes).name('Integrator');
     interator.add(this.renderer, 'maxBounces').name('Bounce Depth').min(0).max(32).step(1);
     interator.add(this.renderer, 'rayEps').name('Ray Offset');
-    interator.add(this.renderer, 'tileRes').name('Tile Res').min(1).max(8).step(1);
+    interator.add(this.renderer, 'tileRes').name('Tile Res').min(1).max(8).step(1).onChange(val => {
+      this.renderer.tileRes = val;
+    });
     interator.add(this.renderer, 'clampThreshold').name('Clamp Threshold').min(0.0).max(100).step(0.1);
     interator.open();
 
@@ -479,7 +484,11 @@ class DemoViewer {
     });
     display.add(this.renderer, 'enableGamma').name('Gamma');
 
-    display.add(this.renderer, 'pixelRatio').name('Pixel Ratio').min(0.1).max(1.0);
+    display.add(this, 'pixelRatio').name('Pixel Ratio').min(0.1).max(1.0).onChange(val => {
+      this.renderer.pixelRatio = val;
+    }
+
+    );
     display.add(this, 'pathtracedInteraction').name('Pathtraced Navigation');
     display.add(this, 'interactionPixelRatio').name('Interaction Ratio').min(0.1).max(1.0).step(0.1);
     display.add(this.renderer, 'enableFxaa').name('Fxaa');
