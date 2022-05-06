@@ -85,5 +85,5 @@ vec4 trace(bvh_ray ray) {
     }
   }
 
-  return vec4(clamp(L, 0.0, 3.0), 1.0);
+  return u_clamp_threshold > 0.0 ? vec4(clamp(L, 0.0, u_clamp_threshold), 1.0) : vec4(L, 1.0);
 }

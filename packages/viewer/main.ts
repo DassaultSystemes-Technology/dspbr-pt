@@ -466,6 +466,7 @@ class DemoViewer {
     interator.add(this.renderer, 'maxBounces').name('Bounce Depth').min(0).max(32).step(1);
     interator.add(this.renderer, 'rayEps').name('Ray Offset');
     interator.add(this.renderer, 'tileRes').name('Tile Res').min(1).max(8).step(1);
+    interator.add(this.renderer, 'clampThreshold').name('Clamp Threshold').min(0.0).max(100).step(0.1);
     interator.open();
 
     let display = this._gui.addFolder('Display');

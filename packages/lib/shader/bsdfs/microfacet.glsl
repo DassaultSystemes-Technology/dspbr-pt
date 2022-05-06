@@ -135,19 +135,9 @@ vec3 eval_brdf_microfacet_ggx_ms(vec3 f0, vec3 f90, vec2 alpha_uv, vec3 wi, vec3
   return ms * f;
 }
 
-vec3 eval_brdf_microfacet_ggx_smith(vec3 f0, vec3 f90, vec2 alpha, vec3 wi, vec3 wo, vec3 wh, Geometry geo) {
-  if (dot(wi, geo.n) < EPS_PDF || dot(wo, geo.n) < EPS_PDF) {
-    return vec3(0.0);
-  }
-  vec3 f = fresnel_schlick(f0, f90, dot(wi, wh));
-  float d = ggx_eval(alpha, wh, geo);
-  float g = ggx_smith_g2(alpha, wi, wo, wh, geo, false);
-  return (f * g * d) / abs(4.0 * dot(wi, geo.n) * dot(wo, geo.n));
-}
-
 vec3 eval_brdf_microfacet_ggx(vec3 f0, vec3 f90, vec2 alpha, float iridescence, float iridescence_ior,
-                                                float iridescence_thickness, vec3 wi, vec3 wo, vec3 wh, Geometry geo) {
-  if (dot(wi, geo.n) < EPS_PDF || dot(wo, geo.n) < EPS_PDF) {
+                              float iridescence_thickness, vec3 wi, vec3 wo, vec3 wh, Geometry geo) {
+  if (dot(wi, geo.n) <= 0.0 || dot(wo, geo.n) <= 0.0) {
     return vec3(0.0);
   }
 
@@ -161,29 +151,21 @@ vec3 eval_brdf_microfacet_ggx(vec3 f0, vec3 f90, vec2 alpha, float iridescence, 
   return (f * g * d) / abs(4.0 * dot(wi, geo.n) * dot(wo, geo.n));
 }
 
-vec3 eval_bsdf_microfacet_ggx_smith(vec3 specular_f0, vec3 specular_f90, vec2 alpha, const in vec3 wi, in vec3 wo,
-                                    Geometry geo) {
-  if (abs(dot(wi, geo.n)) < EPS_PDF || dot(wo, geo.n) > 0.0) {
-    return vec3(0.0);
-  }
-  vec3 wo_f = flip(wo, -geo.n);
-  vec3 wh = normalize(wi + wo_f);
-  return eval_brdf_microfacet_ggx_smith(specular_f0, specular_f90, alpha, wi, wo_f, wh, geo);
+vec3 eval_brdf_microfacet_ggx(vec3 f0, vec3 f90, vec2 alpha, vec3 wi, vec3 wo, vec3 wh, Geometry geo) {
+  return eval_brdf_microfacet_ggx(f0, f90, alpha, 0.0, 0.0, 0.0, wi, wo, wh, geo);
 }
 
-vec3 eval_btdf_microfacet_ggx(vec3 specular_f0, vec3 specular_f90, vec2 alpha, float iridescence,
-                                                float iridescence_ior, float iridescence_thickness, const in vec3 wi,
-                                                in vec3 wo, Geometry geo) {
+vec3 eval_btdf_microfacet_ggx(vec3 specular_f0, vec3 specular_f90, vec2 alpha, const in vec3 wi, in vec3 wo,
+                              Geometry geo) {
   if (dot(wi, geo.n) < EPS_PDF || dot(wo, geo.n) > 0.0) {
     return vec3(0.0);
   }
   vec3 wo_f = flip(wo, -geo.n);
   vec3 wh = normalize(wi + wo_f);
-  return eval_brdf_microfacet_ggx(specular_f0, specular_f90, alpha, iridescence, iridescence_ior,
-                                                    iridescence_thickness, wi, wo_f, wh, geo);
+  return eval_brdf_microfacet_ggx(specular_f0, specular_f90, alpha, 0.0, 1.5, 0.0, wi, wo_f, wh, geo);
 }
 
-float brdf_microfacet_ggx_smith_pdf(MaterialClosure c, Geometry g, vec3 wi, vec3 wo) {
+float pdf_brdf_microfacet_ggx(MaterialClosure c, Geometry g, vec3 wi, vec3 wo) {
   if (dot(wi, g.n) < EPS_PDF || dot(wo, g.n) < EPS_PDF)
     return 0.0;
 
@@ -191,7 +173,7 @@ float brdf_microfacet_ggx_smith_pdf(MaterialClosure c, Geometry g, vec3 wi, vec3
   return ggx_eval_vndf(c.alpha, wi, wh, g) / (4.0 * abs(dot(wo, wh)));
 }
 
-vec3 sample_brdf_microfacet_ggx_smith(vec2 alpha, vec3 wi, Geometry g, vec2 uv, out float pdf) {
+vec3 sample_brdf_microfacet_ggx(vec2 alpha, vec3 wi, Geometry g, vec2 uv, out float pdf) {
   vec3 wi_ = to_local(wi, g);
   vec3 wm_ = ggx_sample_vndf(alpha, wi_, uv);
 
@@ -338,7 +320,7 @@ float bsdf_microfacet_ggx_smith_pdf(in MaterialClosure c, Geometry g, vec3 wi, v
 
   if (dot(wi, g.n) < EPS_COS)
     wi = flip(wi, -g.n);
-  pdf *= brdf_microfacet_ggx_smith_pdf(c, g, wi, wo);
+  pdf *= pdf_brdf_microfacet_ggx(c, g, wi, wo);
 
   return pdf;
 }

@@ -38,7 +38,7 @@ in vec2 v_uv;
     float u_ibl_pdf_total_sum;
     float u_ray_eps;
     float u_render_mode;
-    float u_pad;
+    float u_clamp_threshold;
 };
 
 uniform sampler2D u_sampler2D_PreviousTexture;

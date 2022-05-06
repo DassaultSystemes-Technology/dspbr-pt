@@ -271,6 +271,16 @@ export class PathtracingRenderer {
     return this._tileRes;
   }
 
+  private _clampThreshold = 3.0;
+  public set clampThreshold(val: number) {
+    this._clampThreshold = val;
+    this.resetAccumulation();
+  }
+  public get clampThreshold() {
+    return this._clampThreshold;
+  }
+
+
   constructor(parameters: PathtracingRendererParameters = {}) {
     this.canvas = parameters.canvas ? parameters.canvas : document.createElementNS('http://www.w3.org/1999/xhtml', 'canvas');
 
@@ -323,7 +333,7 @@ export class PathtracingRenderer {
     "u_ibl_pdf_total_sum": 0,
     "u_ray_eps": 0,
     "u_render_mode": 0,
-    "pad": 0
+    "u_clamp_threshold": 0
   };
 
   private updatePathracingUniforms(camera: any) {
@@ -346,6 +356,7 @@ export class PathtracingRenderer {
     this.pathTracingUniforms["u_ray_eps"] = this.rayEps;
     this.pathTracingUniforms["u_render_mode"] = this.integratorTypes.indexOf(this._integrator);
     this.pathTracingUniforms["u_ibl_pdf_total_sum"] = this.iblImportanceSamplingData.totalSum;
+    this.pathTracingUniforms["u_clamp_threshold"] = this.clampThreshold;
 
     const uniformValues = new Float32Array(Object.values(this.pathTracingUniforms).flat());
     this.gl.bindBuffer(this.gl.UNIFORM_BUFFER, this.pathtracingUniformBuffer);
