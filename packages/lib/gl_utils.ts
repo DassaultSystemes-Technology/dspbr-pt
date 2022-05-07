@@ -120,7 +120,8 @@ export async function createProgramFromSource(gl: WebGL2RenderingContext,
   }
 }
 
-export function createDataTexture(gl: WebGL2RenderingContext, data?: Float32Array) :  WebGLTexture {
+export function createDataTexture(gl: WebGL2RenderingContext,
+  data: Float32Array) :  WebGLTexture {
   if(!data) throw Error("No data provided for data texture creation!");
 
   let maxTextureSize = getMaxTextureSize(gl);
@@ -133,7 +134,7 @@ export function createDataTexture(gl: WebGL2RenderingContext, data?: Float32Arra
   let tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, sX, sY, 0, gl.RGBA, gl.FLOAT, null);

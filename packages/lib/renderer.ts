@@ -14,8 +14,9 @@
  */
 
 // @ts-ignore
+import { SimpleTriangleBVH } from './bvh';
 import { PathtracingSceneData } from './scene_data'
-import { PathtracingSceneDataAdapterWebGL2 } from './scene_data_adapter_webgl2'
+import { PathtracingSceneDataWebGL2 } from './scene_data_webgl2'
 
 import * as glu from './gl_utils';
 
@@ -78,10 +79,10 @@ export enum RenderResMode {
   Low = 1
 }
 export class PathtracingRenderer {
-  private gl: any;
+  private gl: WebGL2RenderingContext;
   private canvas: any | undefined;
 
-  private scene?: PathtracingSceneDataAdapterWebGL2;
+  private scene?: PathtracingSceneDataWebGL2;
 
   private ibl: WebGLTexture | null = null;
   private iblImportanceSamplingData: IBLImportanceSamplingData = new IBLImportanceSamplingData();
@@ -431,7 +432,7 @@ export class PathtracingRenderer {
       gl.clear(gl.COLOR_BUFFER_BIT);
     }
 
-    let slot = 2; // first 2 slots used are blocked by bvh and mesh textures
+    let slot = 3; // first 2 slots used are blocked by bvh and mesh textures
     slot = this.bindTextures(slot);
     this.updatePathracingUniforms(camera);
 
@@ -476,7 +477,7 @@ export class PathtracingRenderer {
     gl.useProgram(this.tonemapProgram);
     gl.uniform1i(gl.getUniformLocation(this.tonemapProgram, "tex"), slot); // renderbuffer
     gl.uniform1f(gl.getUniformLocation(this.tonemapProgram, "exposure"), this._exposure);
-    gl.uniform1i(gl.getUniformLocation(this.tonemapProgram, "gamma"), this._enableGamma);
+    gl.uniform1i(gl.getUniformLocation(this.tonemapProgram, "gamma"), this._enableGamma ? 1.0 : 0.0);
     gl.uniform1i(gl.getUniformLocation(this.tonemapProgram, "tonemappingMode"),
       this.tonemappingModes.indexOf(this._tonemapping));
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
@@ -670,14 +671,45 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
+  private _bvhDataTexture: WebGLTexture;
+  private _bvhIndexTexture: WebGLTexture;
+
+  private initBvh(sceneData: PathtracingSceneData) {
+    const gl = this.gl;
+    console.time("BvhGeneration");
+    const bvh = new SimpleTriangleBVH(20);
+    bvh.build(sceneData.triangleBuffer);
+    console.timeEnd("BvhGeneration");
+
+    if (this._bvhDataTexture) {
+      gl.deleteTexture(this._bvhDataTexture);
+      gl.deleteTexture(this._bvhIndexTexture);
+    }
+
+    this._bvhDataTexture = glu.createDataTexture(gl, bvh.createAndCopyToFlattenedArray_StandardFormat());
+
+    const maxTextureSize = glu.getMaxTextureSize(gl);
+    const numIndices = bvh.m_pTriIndices.length;
+    const h = Math.ceil(numIndices / maxTextureSize);
+    const w = Math.floor(numIndices % maxTextureSize);
+
+    this._bvhIndexTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this._bvhIndexTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32I, w, h, 0, gl.RED_INTEGER, gl.INT,  bvh.m_pTriIndices);
+  }
+
   public async setScene(sceneData: PathtracingSceneData) {
     const gl = this.gl
     this.stopRendering();
 
-    this.scene = new PathtracingSceneDataAdapterWebGL2(this.gl, sceneData);
-
+    this.scene = new PathtracingSceneDataWebGL2(this.gl, sceneData);
     this.scene.generateGPUBuffers();
 
+    this.initBvh(sceneData);
     await this.initializeShaders();
 
     this.renderPrograms.forEach(program => {
@@ -694,46 +726,29 @@ export class PathtracingRenderer {
 
     let slot = 0;
     gl.activeTexture(gl.TEXTURE0 + slot);
-    gl.bindTexture(gl.TEXTURE_2D, this.scene?.bvhDataTexture);
+    gl.bindTexture(gl.TEXTURE_2D, this._bvhDataTexture);
     gl.uniform1i(gl.getUniformLocation(program, "u_sampler_bvh"), slot++);
 
     gl.activeTexture(gl.TEXTURE0 + slot);
-    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_triangle_data"), slot++);
+    gl.bindTexture(gl.TEXTURE_2D, this._bvhIndexTexture);
+    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_bvh_index"), slot++);
+
+    gl.activeTexture(gl.TEXTURE0 + slot);
     gl.bindTexture(gl.TEXTURE_2D, this.scene?.triangleDataTexture);
+    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_triangle_data"), slot++);
 
     let pathtracingUniformBlockIdx = gl.getUniformBlockIndex(program, "PathTracingUniformBlock");
     gl.uniformBlockBinding(program, pathtracingUniformBlockIdx, 0);
 
-    // const pathtracingUniformBlockSize = gl.getActiveUniformBlockParameter(
-    //   program,
-    //   pathtracingUniformBlockIdx,
-    //   gl.UNIFORM_BLOCK_DATA_SIZE
-    // );
-    //console.log(`Uniform Block Size: ${pathtracingUniformBlockSize}`);
-    // const expectedMaterialBlockSize = 240*this.scene!.sceneData.num_materials;
-
     if (this.scene!.sceneData.num_textures > 0) {
       let texInfoBlockIdx = gl.getUniformBlockIndex(program, "TextureInfoBlock");
       gl.uniformBlockBinding(program, texInfoBlockIdx, 1);
-      // const textureInfoBlockSize = gl.getActiveUniformBlockParameter(
-      //   program,
-      //   texInfoBlockIdx,
-      //   gl.UNIFORM_BLOCK_DATA_SIZE
-      // );
-      // console.log(`TexInfo Block Size: ${textureInfoBlockSize}`);
-      // const expectedTextureInfoBlockSize = 32*this.scene!.sceneData.num_textures;
     }
 
     const materialUniformBuffers = this.scene?.materialUniformBuffers!;
     for (let i = 0; i < materialUniformBuffers.length; i++) {
       let matBlockIdx = gl.getUniformBlockIndex(program, `MaterialBlock${i}`);
       gl.uniformBlockBinding(program, matBlockIdx, i + 2);
-      // const materialBlockSize = gl.getActiveUniformBlockParameter(
-      //   program,
-      //   matBlockIdx,
-      //   gl.UNIFORM_BLOCK_DATA_SIZE
-      // );
-      //console.log(`Material_${i} Block Size: ${materialBlockSize}`);
     }
 
     gl.useProgram(null);

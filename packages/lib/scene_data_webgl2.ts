@@ -2,13 +2,11 @@ import { Scene } from 'three';
 import * as glu from './gl_utils';
 import { PathtracingSceneData } from './scene_data';
 
-export class PathtracingSceneDataAdapterWebGL2 {
+export class PathtracingSceneDataWebGL2 {
   private gl: WebGL2RenderingContext;
   private _sceneData: PathtracingSceneData;
   public get sceneData() { return this._sceneData; }
 
-  private _bvhDataTexture?: WebGLTexture;
-  public get bvhDataTexture() { return this._bvhDataTexture; }
   private _triangleDataTexture?: WebGLTexture;
   public get triangleDataTexture() { return this._triangleDataTexture; }
 
@@ -37,7 +35,6 @@ export class PathtracingSceneDataAdapterWebGL2 {
 
   public clear() {
     const gl = this.gl;
-    if (this._bvhDataTexture) gl.deleteTexture(this._bvhDataTexture);
     if (this._triangleDataTexture) gl.deleteTexture(this._triangleDataTexture);
     if (this._textureInfoUniformBuffer) gl.deleteBuffer(this._textureInfoUniformBuffer);
 
@@ -55,32 +52,28 @@ export class PathtracingSceneDataAdapterWebGL2 {
     const gl = this.gl;
     this.clear();
 
-    const bvhData = this._sceneData.getFlatBvhBuffer()!;
-    this._bvhDataTexture = glu.createDataTexture(gl, bvhData);
-    const triangleData = this._sceneData.getFlatTriangleDataBuffer()!;
-    this._triangleDataTexture = glu.createDataTexture(gl, triangleData);
-
+    this._triangleDataTexture = glu.createDataTexture(gl, this._sceneData.triangleBuffer);
+ 
     this.generateTextureArrays();
     this.generateUniformMaterialBuffers()
     this.generateLightBuffers();
 
     console.timeEnd("Generate gpu data buffers");
 
-    const textureUsage = this._textureDataUsage / (1024 * 1024);
-    const geometryUsage = triangleData.length * 4 / (1024 * 1024);
-    const bvhUsage = bvhData.length * 4 / (1024 * 1024);
-    console.log(`GPU Memory Consumption (MB):
-    Texture: ${textureUsage.toFixed(2)}
-    Geometry: ${geometryUsage.toFixed(2)}
-    Bvh:      ${bvhUsage.toFixed(2)}
-    Total:    ${(textureUsage + geometryUsage + bvhUsage).toFixed(2)}
-    `);
+    // const textureUsage = this._textureDataUsage / (1024 * 1024);
+    // const geometryUsage = triangleData.length * 4 / (1024 * 1024);
+    // const bvhUsage = bvhData.length * 4 / (1024 * 1024);
+    // console.log(`GPU Memory Consumption (MB):
+    // Texture: ${textureUsage.toFixed(2)}
+    // Geometry: ${geometryUsage.toFixed(2)}
+    // Bvh:      ${bvhUsage.toFixed(2)}
+    // Total:    ${(textureUsage + geometryUsage + bvhUsage).toFixed(2)}
+    // `);
   }
 
-  // TODO I won't understand this garbage code the next time I look it. Simplify!
+  // TODO I won't understand this garbage the next time I look it. Simplify!
   private generateUniformMaterialBuffers() {
     const gl = this.gl;
-
     const numMaterials = this._sceneData.num_materials;
     const materialDataSize = this._sceneData.materials[0].data.byteLength;
     const maxBlockSize = gl.getParameter(gl.MAX_UNIFORM_BLOCK_SIZE);

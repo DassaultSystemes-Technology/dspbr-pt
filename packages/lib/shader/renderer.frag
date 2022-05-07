@@ -17,6 +17,7 @@
 precision highp int;
 precision highp float;
 precision highp sampler2D;
+precision highp isampler2D;
 precision highp sampler2DArray;
 
 in vec2 v_uv;
@@ -46,6 +47,7 @@ uniform sampler2D u_sampler2D_PreviousTexture;
 // Pathracing data buffers
 uniform sampler2D u_sampler_triangle_data;
 uniform sampler2D u_sampler_bvh;
+uniform isampler2D u_sampler_bvh_index;
 
 // Env map buffers
 uniform sampler2D u_sampler_env_map;

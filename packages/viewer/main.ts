@@ -17,7 +17,9 @@ import Stats from 'three/examples/jsm/libs/stats.module.js';
 import { GUI } from 'dat.gui';
 import { SimpleDropzone } from 'simple-dropzone';
 import { ThreeRenderer } from './three_renderer';
-import { PathtracingRenderer, ThreeSceneTranslator } from 'dspbr-pt';
+import { PathtracingRenderer, ThreeSceneAdapter} from 'dspbr-pt';
+
+
 import { PerspectiveCamera, Box3, Vector3, Scene, Mesh, FloatType, MOUSE, MeshStandardMaterial, PlaneBufferGeometry } from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
@@ -136,8 +138,7 @@ class DemoViewer {
 
     this.renderer.pixelRatio = 1.0;
     this.renderer.maxBounces = 5;
-    this.renderer.pixelRatioLowRes = 0.15;
-    this.renderer.iblRotation = 180.0;
+    // this.renderer.iblImportanceSampling = false;
 
     window.addEventListener('resize', () => {
       this.resize();
@@ -210,7 +211,7 @@ class DemoViewer {
         this.showStatusScreen("Loading Scene...");
         const files: [string, File][] = Array.from(fileMap);
         const gltf = await loadSceneFromBlobs(files, this.autoScaleScene) as GLTF;
-        this.loadScene(gltf);
+        await this.loadScene(gltf);
       }
     }
   }
@@ -227,7 +228,7 @@ class DemoViewer {
     }
 
     const gltf = await loadSceneFromUrl(sceneUrl, this.autoScaleScene) as GLTF;
-    this.loadScene(gltf);
+    await this.loadScene(gltf);
   }
 
   private async loadScene(gltf: GLTF) {
@@ -240,8 +241,10 @@ class DemoViewer {
       this.sceneBoundingBox = new Box3().setFromObject(gltf.scene);
     }
 
-    const pathtracingSceneData = await ThreeSceneTranslator.translateThreeScene(gltf.scene, gltf);
-    await this.renderer.setScene(pathtracingSceneData);
+    const sceneAdapter = new ThreeSceneAdapter(gltf.scene, gltf);
+    await sceneAdapter.init();
+
+    await this.renderer.setScene(sceneAdapter.scene);
     if (this.pathtracing)
       this.startPathtracing();
 
@@ -452,7 +455,7 @@ class DemoViewer {
         this.toggleInteractionMode(true, 10.0);
       }).listen();
 
-    lighting.add(this.renderer, 'iblImportanceSampling').name('Importance Sampling');
+    lighting.add(this.renderer, 'iblImportanceSampling').name('Importance Sampling').listen();
     lighting.open();
 
     let interator = this._gui.addFolder('Integrator');

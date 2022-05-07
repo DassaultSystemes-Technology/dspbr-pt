@@ -30,8 +30,9 @@ struct bvh_hit {
 bvh_ray bvh_create_ray(in vec3 direction, in vec3 origin, in float tfar) {
   vec3 inv_direction = vec3(1.0) / direction;
 
-  return bvh_ray(direction, origin, tfar, inv_direction,
-             ivec3((inv_direction.x < 0.0) ? 1 : 0, (inv_direction.y < 0.0) ? 1 : 0, (inv_direction.z < 0.0) ? 1 : 0));
+  return bvh_ray(
+      direction, origin, tfar, inv_direction,
+      ivec3((inv_direction.x < 0.0) ? 1 : 0, (inv_direction.y < 0.0) ? 1 : 0, (inv_direction.z < 0.0) ? 1 : 0));
 }
 
 bool intersectAABB(const in bvh_ray ray, const in vec3 aabb[2], out float tmin, out float tmax) {
@@ -78,9 +79,14 @@ bool intersectTriangle(const in bvh_ray r, in vec3 p0, in vec3 p1, in vec3 p2, c
   return (t > 0.0) && (t < tfar);
 }
 
-uint get_material_idx(const in uint triIndex) {
+uint get_material_idx(const uint triIndex) {
   ivec2 idx = getStructParameterTexCoord(triIndex, 0u, TRIANGLE_STRIDE);
   return uint(texelFetch(u_sampler_triangle_data, idx, 0).w);
+}
+
+int get_mesh_triangle_index(const int bvh_tringle_index) {
+  ivec2 idx = ivec2(bvh_tringle_index % int(MAX_TEXTURE_SIZE), bvh_tringle_index / int(MAX_TEXTURE_SIZE));
+  return int(texelFetch(u_sampler_bvh_index, idx, 0).x);
 }
 
 void get_triangle(const in uint index, out vec3 p0, out vec3 p1, out vec3 p2) {
@@ -205,10 +211,11 @@ bool intersectSceneTriangles_BVH(const in bvh_ray r, out bvh_hit hit) {
           float t = 0.0;
           vec2 uv;
           vec3 p0, p1, p2;
-          get_triangle(uint(i), p0, p1, p2);
+          int idx = get_mesh_triangle_index(i);
+          get_triangle(uint(idx), p0, p1, p2);
           if (intersectTriangle(r, p0, p1, p2, hit.tfar, t, uv)) {
             hit.tfar = t;
-            hit.triIndex = i;
+            hit.triIndex = idx;
             hit.uv = uv;
             foundHit = true;
             tfar = t;
@@ -232,15 +239,18 @@ bool intersectSceneTriangles_Bruteforce(const in bvh_ray r, out bvh_hit hit) {
 
   for (int i = 0; i < int(NUM_TRIANGLES); i++) {
     vec3 p0, p1, p2;
+
+    int idx = get_mesh_triangle_index(i);
     get_triangle(uint(i), p0, p1, p2);
 
     float t = 0.0;
     vec2 uv;
     if (intersectTriangle(r, p0, p1, p2, hit.tfar, t, uv)) {
+      // if(t < hit.tfar) {
       hit.tfar = t;
       hit.triIndex = i;
       hit.uv = uv;
-    } else {
+      // }
     }
   }
 
