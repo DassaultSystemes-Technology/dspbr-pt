@@ -220,11 +220,6 @@ export class PathtracingRenderer {
   }
   public set iblImportanceSampling(val) {
     this._iblImportanceSampling = val;
-    if (val) {
-      this.renderProgram = this.renderPrograms.get("misptdl_program")!;
-    } else {
-      this.renderProgram = this.renderPrograms.get("pt_program")!;
-    }
     this.resetAccumulation();
   }
 
@@ -413,6 +408,12 @@ export class PathtracingRenderer {
       return;
     }
 
+    if (this.iblImportanceSampling) {
+      this.renderProgram = this.renderPrograms.get("misptdl_program")!;
+    } else {
+      this.renderProgram = this.renderPrograms.get("pt_program")!;
+    }
+
     const fbo = this.fbos.get("render");
     const copyFbo = this.fbos.get("render_");
     const renderBuffer = this.renderBuffers.get("render");
@@ -481,7 +482,7 @@ export class PathtracingRenderer {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     let displayBuffer = this.renderBuffers.get("postprocess");
-    if(this.enableFxaa) {
+    if (this.enableFxaa) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbos.get("postprocess_"));
       gl.useProgram(this.fxaaProgram);
       gl.bindTexture(gl.TEXTURE_2D, this.renderBuffers.get("postprocess"));
@@ -809,6 +810,7 @@ export class PathtracingRenderer {
     this.renderPrograms.set("misptdl_program", await glu.createProgramFromSource(this.gl, vertexShader, render_shader, misptdlShaderMap));
 
     this.renderProgram = this.renderPrograms.get("misptdl_program")!;
+    // this.renderProgram = this.renderPrograms.get("pt_program")!;
 
     console.timeEnd("Pathtracing shader generation");
   }
