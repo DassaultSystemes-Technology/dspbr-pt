@@ -6,6 +6,7 @@ EnterprisePBRShadingModel/
 validation/
 .vscode/
 .parcel-cache
+glTF
 
 .pnp.*
 .yarn/*
