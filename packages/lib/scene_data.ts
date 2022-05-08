@@ -31,6 +31,17 @@ export class PathtracingSceneData {
   public get triangleBuffer() { return this._triangleBuffer; }
   public get num_triangles() { return this._triangleBuffer ? this._triangleBuffer.length / (VERTEX_STRIDE * 3) : 0 };
 
+  public getPositionBuffer() {
+    const buffer = new Float32Array(this.triangleBuffer.length/VERTEX_STRIDE * 3);
+
+    for(let i=0; i<this.triangleBuffer.length/VERTEX_STRIDE; i++) {
+      buffer[i*3+0] = this.triangleBuffer[i*VERTEX_STRIDE+0];
+      buffer[i*3+1] = this.triangleBuffer[i*VERTEX_STRIDE+1];
+      buffer[i*3+2] = this.triangleBuffer[i*VERTEX_STRIDE+2];
+    }
+    return buffer;
+  }
+
   public addTexture(tex: Texture): number {
     let texInfo = new TexInfo();
 
