@@ -45,7 +45,6 @@ export class DemoViewer extends EventEmitter {
   private sceneAdapter?: ThreeSceneAdapter;
 
   private autoScaleScene = false;
-  private showGroundPlane = false;
   private interactionTimeoutId = null;
   private tileRes = 4;
 
@@ -105,6 +104,11 @@ export class DemoViewer extends EventEmitter {
   }
   public get interactionPixelRatio() {
     return this._interactionPixelRatio;
+  }
+
+  private _showGroundPlane = false;
+  public set showGroundPlane(val: boolean) {
+    this._showGroundPlane = val;
   }
 
   constructor(params: { container: HTMLElement }) {
@@ -240,7 +244,7 @@ export class DemoViewer extends EventEmitter {
     this.updateCameraFromBoundingBox();
     this.centerView();
 
-    if (this.showGroundPlane) {
+    if (this._showGroundPlane) {
       this.addGroundPlane(gltf.scene);
       this.sceneBoundingBox = new Box3().setFromObject(gltf.scene);
     }
@@ -294,11 +298,11 @@ export class DemoViewer extends EventEmitter {
       new MeshStandardMaterial({
         transparent: false,
         color: 0x080808,
-        roughness: 0.0,
-        metalness: 0.0
+        roughness: 0.15,
+        metalness: 1.0
       })
     );
-    floorPlane.scale.setScalar((this.sceneBoundingBox.max.x - this.sceneBoundingBox.min.x) * 5.0);
+    floorPlane.scale.setScalar((this.sceneBoundingBox.max.x - this.sceneBoundingBox.min.x) * 3.1415);
     floorPlane.rotation.x = - Math.PI / 2;
     floorPlane.position.y = this.sceneBoundingBox.min.y - 0.01;
     scene.add(floorPlane);

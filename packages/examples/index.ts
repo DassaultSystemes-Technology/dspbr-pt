@@ -29,6 +29,11 @@ if (process.env['NODE_ENV'] == 'dev') {
       ibl["url"] = ibl["url"].replace("https://raw.githubusercontent.com/DassaultSystemes-Technology/dspbr-pt/main/assets", '');
     }
   }
+  for (let [_, scene] of Object.entries(Assets.scenes)) {
+    if (scene["url"]) {
+      scene["url"] = scene["url"].replace("https://raw.githubusercontent.com/DassaultSystemes-Technology/dspbr-pt/main/assets", '');
+    }
+  }
 }
 
 class Demo {
@@ -42,36 +47,44 @@ class Demo {
   private _defaultIblKey = "Artist Workshop";
   private _currentIbl = this._defaultIblKey;
   private _currentScene = "";
+  private _params: any;
 
   constructor() {
     this._container = document.createElement('div');
     this._viewer = new DemoViewer({ container: this._container });
     this._renderer = this._viewer.renderer;
     this._ui = new Pane({ title: "dspbr-pt" });
+
+    this._params = new Proxy(new URLSearchParams(window.location.search), {
+      get: (searchParams, prop) => searchParams.get(prop),
+    });
+
     this._viewer.on("sceneLoaded", (ev: any) => {
       this._scene = ev.scene;
-      this.initMaterialSelector();
+      this.initMaterialSelector(this._params);
     })
-    this.initUI();
 
-    let iblKey = this._defaultIblKey;
-    if (window.location.hash) {
-      const uris = window.location.hash.split("#");
-
-      for (const u of uris) {
-        // if (u == "ground") {
-        //   this.showGroundPlane = true;
-        // }
-        if (u.includes("ibl")) {
-          iblKey = u.replace("ibl:", "");
-        }
-      }
-
-      const url = this.resolveUrlFromIndex(uris[1]);
-      this._viewer.loadSceneFromUrl(url);
+    if(this._params.ground) {
+      this._viewer.showGroundPlane = true;
     }
 
-    this._viewer.loadIbl(this.resolveUrlFromIndex(iblKey));
+    if (this._params.scene) {
+      this._viewer.loadSceneFromUrl(this.resolveUrlFromIndex(this._params.scene));
+    }
+    if (this._params.ibl) {
+      console.log(this.resolveUrlFromIndex(this._params.ibl));
+      this._viewer.loadIbl(this.resolveUrlFromIndex(this._params.ibl));
+    }
+    else {
+      this._viewer.loadIbl(this.resolveUrlFromIndex(this._defaultIblKey));
+    }
+
+    if(this._params.rotate) {
+      this._renderer.iblRotation = this._params.rotate;
+    }
+
+
+    this.initUI();
   }
 
   private initUI() {
@@ -252,16 +265,41 @@ class Demo {
     });
   }
 
-  private paneMatFolders = [];
 
-  private initMaterialParamUI(matIdx: number) {
+  private initMaterialSelector(params: any) {
+    const materials = this._scene.materials;
+
+    const matTab = this._uiTabs.pages[1];
+    for (let child of matTab.children) {
+      console.log("dispose", child);
+      child.dispose();
+    }
+
+    const matNames = [];
+    for (let i = 0; i < materials.length; i++) {
+      matNames.push({ text: materials[i].name, value: i });
+    }
+    const opt = { name: materials[0].name };
+    matTab.addInput(opt, "name", {
+      options: matNames
+    }).on('change', (ev) => {
+      this.initMaterialParamUI(ev.value);
+    })
+
+    if (materials.length > 0) {
+      this.initMaterialParamUI(matNames[0].value, params);
+    }
+  }
+
+  private paneMatFolders = {};
+  private initMaterialParamUI(matIdx: number, params?: any) {
     const matTab = this._uiTabs.pages[1];
     const mat = this._scene.materials[matIdx];
 
-    this.paneMatFolders.forEach(p => {
-      p.dispose();
-    });
-    this.paneMatFolders = [];
+    for(let fn in this.paneMatFolders) {
+      this.paneMatFolders[fn].dispose();
+    };
+    this.paneMatFolders = {};
 
     const colors = {
       albedo: { r: mat.albedo[0] * 255, g: mat.albedo[1] * 255, b: mat.albedo[2] * 255 },
@@ -285,7 +323,7 @@ class Demo {
 
     const base = matTab.addFolder({
       title: 'Base',
-    }); this.paneMatFolders.push(base);
+    }); this.paneMatFolders['base'] = base;
 
     base.addInput(colors, "albedo").on('change', ev => {
       mat.albedo = [ev.value.r / 255.0, ev.value.g / 255.0, ev.value.b / 255.0];
@@ -304,7 +342,7 @@ class Demo {
 
     const anisotropy = matTab.addFolder({
       title: 'Anisotropy',
-    }); this.paneMatFolders.push(anisotropy);
+    }); this.paneMatFolders['anisotropy'] = anisotropy;
     anisotropy.addInput(mat, 'anisotropy', {
       step: 0.01,
       min: -1.0,
@@ -322,7 +360,7 @@ class Demo {
 
     const transmission = matTab.addFolder({
       title: 'Transmission',
-    }); this.paneMatFolders.push(transmission);
+    }); this.paneMatFolders['transmission'] = transmission;
     transmission.addInput(mat, 'transparency', basicFloatParamSettings);
     transmission.addInput(mat, 'cutoutOpacity', basicFloatParamSettings);
     transmission.addInput(mat, 'translucency', { ...basicFloatParamSettings, ...{ label: 'diffuse transmission' } });
@@ -335,7 +373,7 @@ class Demo {
 
     const sheen = matTab.addFolder({
       title: 'Sheen',
-    }); this.paneMatFolders.push(sheen);
+    }); this.paneMatFolders['sheen'] = sheen;
     sheen.addInput(mat, 'sheenRoughness', basicFloatParamSettings);
     sheen.addInput(colors, "sheenColor").on('change', ev => {
       mat.sheenColor = [ev.value.r / 255.0, ev.value.g / 255.0, ev.value.b / 255.0];
@@ -343,13 +381,13 @@ class Demo {
 
     const clearcoat = matTab.addFolder({
       title: 'Clearcoat',
-    }); this.paneMatFolders.push(clearcoat);
+    }); this.paneMatFolders['clearcoat'] = clearcoat;
     clearcoat.addInput(mat, 'clearcoat', basicFloatParamSettings);
     clearcoat.addInput(mat, 'clearcoatRoughness', basicFloatParamSettings);
 
     const volume = matTab.addFolder({
       title: 'Volume',
-    }); this.paneMatFolders.push(volume);
+    }); this.paneMatFolders['volume'] = volume;
     volume.thinWalled = mat.thinWalled > 0 ? true : false;
     volume.addInput(volume, 'thinWalled').on('change', ev => {
       mat.thinWalled = ev.value ? 1 : 0;
@@ -370,7 +408,7 @@ class Demo {
 
     const iridescence = matTab.addFolder({
       title: 'Iridescence',
-    }); this.paneMatFolders.push(iridescence);
+    }); this.paneMatFolders['iridescence'] = iridescence;
     iridescence.addInput(mat, 'iridescence', basicFloatParamSettings);
     iridescence.addInput(mat, 'iridescenceIOR', {
       min: 0,
@@ -387,36 +425,26 @@ class Demo {
       max: 1200,
       step: 1
     });
-  }
 
-  private matSelectorUI?:  any;
-  private initMaterialSelector() {
-    const materials = this._scene.materials;
+    if (params && params.unfold) {
+      this._uiTabs.pages[1].selected = true;
 
-    if(this.matSelectorUI) this.matSelectorUI.dispose();
+      for(let fn in this.paneMatFolders) {
+        this.paneMatFolders[fn].expanded = false;
+      };
+      const unfoldNames = params.unfold.split(" ");
 
-    const matTab = this._uiTabs.pages[1];
-    const matNameMap = {};
-    for (let i = 0; i < materials.length; i++) {
-      matNameMap[materials[i].name] = i;
-    }
-    const opt = {
-      name: materials[0].name
-    }
-
-    this.matSelectorUI = matTab.addInput(opt, "name", {
-      options: matNameMap
-    }).on('change', (ev) => {
-      this.initMaterialParamUI(ev.value);
-    })
-
-    if (materials.length > 0) {
-      this.initMaterialParamUI(matNameMap[materials[0].name]);
+      const folderNames = Object.keys(this.paneMatFolders);
+      for(let fn in unfoldNames) {
+        if(folderNames.includes(unfoldNames[fn])) {
+          this.paneMatFolders[unfoldNames[fn]].expanded = true;
+        }
+      }
     }
   }
 
   private resolveUrlFromIndex(name: string) {
-    if(name == "") {
+    if (name == "") {
       return "None";
     }
 
