@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import {PathtracingRenderer} from 'dspbr-pt';
-import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls';
+import { PathtracingRenderer } from 'dspbr-pt';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import Stats from 'three/examples/jsm/libs/stats.module.js';
+
 
 export function init() {
   const viewport = document.getElementById("viewport");
@@ -14,7 +15,7 @@ export function init() {
   let aspect = window.innerWidth / window.innerHeight;
   const camera = new THREE.PerspectiveCamera(45, aspect, 0.01, 1000);
 
-  const renderer = new PathtracingRenderer({canvas : canvas});
+  const renderer = new PathtracingRenderer({ canvas: canvas });
   renderer.pixelRatio = 1.0 * window.devicePixelRatio;
 
   window.addEventListener('resize', () => {
@@ -41,13 +42,13 @@ export function init() {
     renderer.resetAccumulation();
   });
 
-  controls.addEventListener('start', () => { renderer.setLowResRenderMode(true); });
-  controls.addEventListener('end', () => { renderer.setLowResRenderMode(false); });
+  // controls.addEventListener('start', () => { renderer.setLowResRenderMode(true); });
+  // controls.addEventListener('end', () => { renderer.setLowResRenderMode(false); });
 
   controls.mouseButtons = {
-    LEFT : THREE.MOUSE.ROTATE,
-    MIDDLE : THREE.MOUSE.PAN,
-    RIGHT : THREE.MOUSE.DOLLY
+    LEFT: THREE.MOUSE.ROTATE,
+    MIDDLE: THREE.MOUSE.PAN,
+    RIGHT: THREE.MOUSE.DOLLY
   }
 
   const stats = new Stats();

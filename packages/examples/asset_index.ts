@@ -30,7 +30,6 @@ export const scenes = {
 };
 
 export const ibls = {
-  "None": {},
   "Artist Workshop": {
     "url": "https://raw.githubusercontent.com/DassaultSystemes-Technology/dspbr-pt/main/assets/ibl/artist_workshop_1k.hdr",
     "credit": "by Oliksiy Yakovlyev from <a href=\"hdrihaven.com\">hdrihaven.com</a> <a href=\"https://creativecommons.org/publicdomain/zero/1.0/\">(CC0)</a>",

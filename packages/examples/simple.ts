@@ -1,18 +1,17 @@
 import {GUI} from 'dat.gui';
-import {ThreeSceneTranslator} from 'dspbr-pt';
+import {ThreeSceneAdapter} from 'dspbr-pt';
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {RGBELoader} from 'three/examples/jsm/loaders/RGBELoader.js';
 
-import {init, setIBLInfo, setSceneInfo} from './utils'
+import {init} from './utils'
 
-const [canvas, camera, renderer, controls, stats] = init();
+const [_, camera, renderer, controls, stats] = init();
 
 const gui = new GUI();
 gui.add(renderer, 'exposure').name('Display Exposure').min(0).max(10).step(0.01);
 gui.add(renderer, 'tonemapping', renderer.tonemappingModes).name('Tonemapping');
 gui.add(renderer, 'pixelRatio').name('Pixel Ratio').min(0.1).max(1.0);
-gui.add(renderer, 'pixelRatioLowRes').name('Interaction Ratio').min(0.1).max(1.0).step(0.1);
 
 const iblInfo = {
   "name" : "Artist Workshop",
@@ -47,16 +46,14 @@ async function main() {
 
   const gltf = await new GLTFLoader().loadAsync(sceneInfo.url);
   gltf.scene.updateMatrixWorld();
-  const pathtracingSceneData = await ThreeSceneTranslator.translateThreeScene(gltf.scene, gltf);
-  await renderer.setScene(pathtracingSceneData);
+  const sceneAdapter = new ThreeSceneAdapter(gltf.scene, gltf);
+  await sceneAdapter.init();
+  await renderer.setScene(sceneAdapter.scene);
 
   document.getElementById("scene-info").innerHTML = `Scene: ${sceneInfo.name}`;
   document.getElementById("scene-info").innerHTML += ` - ${sceneInfo.credit}`;
 
-  renderer.render(camera, -1, () => {
-    controls.update();
-    stats.update();
-  })
+  renderer.render(camera, -1, () => { controls.update(); }, () => { stats.update(); })
 }
 
 main();

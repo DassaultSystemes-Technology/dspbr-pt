@@ -277,14 +277,15 @@ export class PathtracingRenderer {
   constructor(parameters: PathtracingRendererParameters = {}) {
     this.canvas = parameters.canvas ? parameters.canvas : document.createElementNS('http://www.w3.org/1999/xhtml', 'canvas');
 
-    this.gl = parameters.context ? parameters.context : this.canvas.getContext('webgl2', { alpha: true, powerPreference: "high-performance" });
-    this.gl.getExtension('EXT_color_buffer_float');
-    this.gl.getExtension('OES_texture_float_linear');
+    const gl = parameters.context ? parameters.context : this.canvas.getContext('webgl2', { alpha: true, powerPreference: "high-performance" });
+    this.gl = gl;
+    gl.getExtension('EXT_color_buffer_float');
+    gl.getExtension('OES_texture_float_linear');
 
-    this.pathtracingUniformBuffer = this.gl.createBuffer();
-    this.gl.bindBuffer(this.gl.UNIFORM_BUFFER, this.pathtracingUniformBuffer);
-    this.gl.bindBufferBase(this.gl.UNIFORM_BUFFER, 0, this.pathtracingUniformBuffer);
-    this.gl.bindBuffer(this.gl.UNIFORM_BUFFER, null);
+    this.pathtracingUniformBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.UNIFORM_BUFFER, this.pathtracingUniformBuffer);
+    gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, this.pathtracingUniformBuffer);
+    gl.bindBuffer(gl.UNIFORM_BUFFER, null);
 
     this.resize(Math.floor(this.canvas.width), Math.floor(this.canvas.height));
     this.initFullscreenQuad();
@@ -308,7 +309,7 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
-  private pathtracingUniformBuffer: WebGLBuffer;
+  private pathtracingUniformBuffer: WebGLBuffer | null;
   private pathTracingUniforms = {
     "u_u_view_mat": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
     "u_background_color": [0, 0, 0, 1],
@@ -356,11 +357,13 @@ export class PathtracingRenderer {
     this.gl.bufferData(this.gl.UNIFORM_BUFFER, uniformValues, this.gl.STATIC_DRAW);
     this.gl.bindBuffer(this.gl.UNIFORM_BUFFER, null);
 
-    for(let i=0; i<this.scene.materials.length; i++) {
-      if(this.scene.materials[i].dirty) {
-        this.gpu_scene.updateMaterial(i);
-        this.scene.materials[i].dirty = false;
-        this.resetAccumulation();
+    if (this.scene && this.gpu_scene) {
+      for (let i = 0; i < this.scene.materials.length; i++) {
+        if (this.scene.materials[i].dirty) {
+          this.gpu_scene.updateMaterial(i);
+          this.scene.materials[i].dirty = false;
+          this.resetAccumulation();
+        }
       }
     }
   }
@@ -368,67 +371,68 @@ export class PathtracingRenderer {
   private bindTextures(startSlot: number): number {
     let gl = this.gl;
 
+    const program = this.renderProgram!;
     let slot = startSlot;
-    gl.useProgram(this.renderProgram);
+    gl.useProgram(program);
 
     gl.activeTexture(gl.TEXTURE0 + slot)
     gl.bindTexture(gl.TEXTURE_2D, this.ibl);
-    gl.uniform1i(gl.getUniformLocation(this.renderProgram, "u_sampler_env_map"), slot++);
+    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_env_map"), slot++);
 
     gl.activeTexture(gl.TEXTURE0 + slot)
     gl.bindTexture(gl.TEXTURE_2D, this.iblImportanceSamplingData.pdf);
-    gl.uniform1i(gl.getUniformLocation(this.renderProgram, "u_sampler_env_map_pdf"), slot++);
+    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_env_map_pdf"), slot++);
 
     gl.activeTexture(gl.TEXTURE0 + slot)
     gl.bindTexture(gl.TEXTURE_2D, this.iblImportanceSamplingData.cdf);
-    gl.uniform1i(gl.getUniformLocation(this.renderProgram, "u_sampler_env_map_cdf"), slot++);
+    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_env_map_cdf"), slot++);
 
     gl.activeTexture(gl.TEXTURE0 + slot)
     gl.bindTexture(gl.TEXTURE_2D, this.iblImportanceSamplingData.yPdf);
-    gl.uniform1i(gl.getUniformLocation(this.renderProgram, "u_sampler_env_map_yPdf"), slot++);
+    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_env_map_yPdf"), slot++);
 
     gl.activeTexture(gl.TEXTURE0 + slot)
     gl.bindTexture(gl.TEXTURE_2D, this.iblImportanceSamplingData.yCdf);
-    gl.uniform1i(gl.getUniformLocation(this.renderProgram, "u_sampler_env_map_yCdf"), slot++);
+    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_env_map_yCdf"), slot++);
 
     for (let t in this.gpu_scene?.texArrayTextures) {
-      gl.uniform1i(gl.getUniformLocation(this.renderProgram, t), slot);
+      gl.uniform1i(gl.getUniformLocation(program, t), slot);
       gl.activeTexture(gl.TEXTURE0 + slot++);
-      gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.gpu_scene?.texArrayTextures[t]);
+      gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.gpu_scene?.texArrayTextures[t]!);
     }
 
     return slot;
   }
 
 
-  render(camera: any, num_samples: number, tileFinishedCB: () => void, frameFinishedCB: (frameCount: number) => void, renderingFinishedCB: () => void) {
+  render(camera: any, num_samples: number, tileFinishedCB: () => void, frameFinishedCB: (frameCount: number) => void, renderingFinishedCB?: () => void) {
     this._isRendering = true;
     this.resetAccumulation();
     this.renderFrame(camera, num_samples, 0, tileFinishedCB, frameFinishedCB, renderingFinishedCB);
   }
 
   renderFrame(camera: any, num_samples: number, tile: number,
-    tileFinishedCB: () => void, frameFinishedCB: (frameCount: number) => void, renderingFinishedCB: () => void) {
+    tileFinishedCB: () => void, frameFinishedCB: (frameCount: number) => void, renderingFinishedCB?: () => void) {
     let gl = this.gl;
     if (!this._isRendering) {
       console.log("Cancel");
       return;
     }
 
-    if(this.debugMode != "None") {
-      this.renderProgram = this.renderPrograms.get("debug_program")
+    if (this.debugMode != "None") {
+      this.renderProgram = this.renderPrograms.get("debug_program")!;
     } else {
       if (this.iblImportanceSampling) {
-        this.renderProgram = this.renderPrograms.get("misptdl_program");
+        this.renderProgram = this.renderPrograms.get("misptdl_program")!;
       } else {
-        this.renderProgram = this.renderPrograms.get("pt_program");
+        this.renderProgram = this.renderPrograms.get("pt_program")!;
       }
     }
 
-    const fbo = this.fbos.get("render");
-    const copyFbo = this.fbos.get("render_");
-    const renderBuffer = this.renderBuffers.get("render");
-    const copyBuffer = this.renderBuffers.get("render_");
+    const fbo = this.fbos.get("render")!;
+    const copyFbo = this.fbos.get("render_")!;
+    const renderBuffer = this.renderBuffers.get("render")!;
+    const copyBuffer = this.renderBuffers.get("render_")!;
     const renderRes = this.renderRes;
 
     if (this._resetAccumulation) {
@@ -465,8 +469,8 @@ export class PathtracingRenderer {
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
     gl.activeTexture(gl.TEXTURE0 + slot)
-    gl.bindTexture(gl.TEXTURE_2D, copyBuffer);
-    gl.uniform1i(gl.getUniformLocation(this.renderProgram, "u_sampler2D_PreviousTexture"), slot);
+    gl.bindTexture(gl.TEXTURE_2D, copyBuffer!);
+    gl.uniform1i(gl.getUniformLocation(this.renderProgram!, "u_sampler2D_PreviousTexture"), slot);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -477,37 +481,37 @@ export class PathtracingRenderer {
     gl.useProgram(this.copyProgram);
     gl.bindFramebuffer(gl.FRAMEBUFFER, copyFbo);
     gl.activeTexture(gl.TEXTURE0 + slot)
-    gl.bindTexture(gl.TEXTURE_2D, renderBuffer);
-    gl.uniform1i(gl.getUniformLocation(this.copyProgram, "tex"), slot);
+    gl.bindTexture(gl.TEXTURE_2D, renderBuffer!);
+    gl.uniform1i(gl.getUniformLocation(this.copyProgram!, "tex"), slot);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     // gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.disable(gl.SCISSOR_TEST);
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbos.get("postprocess"));
-    gl.useProgram(this.tonemapProgram);
-    gl.uniform1i(gl.getUniformLocation(this.tonemapProgram, "tex"), slot); // renderbuffer
-    gl.uniform1f(gl.getUniformLocation(this.tonemapProgram, "exposure"), this._exposure);
-    gl.uniform1i(gl.getUniformLocation(this.tonemapProgram, "gamma"), this._enableGamma ? 1.0 : 0.0);
-    gl.uniform1i(gl.getUniformLocation(this.tonemapProgram, "tonemappingMode"),
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbos.get("postprocess")!);
+    gl.useProgram(this.tonemapProgram!);
+    gl.uniform1i(gl.getUniformLocation(this.tonemapProgram!, "tex"), slot); // renderbuffer
+    gl.uniform1f(gl.getUniformLocation(this.tonemapProgram!, "exposure"), this._exposure);
+    gl.uniform1i(gl.getUniformLocation(this.tonemapProgram!, "gamma"), this._enableGamma ? 1.0 : 0.0);
+    gl.uniform1i(gl.getUniformLocation(this.tonemapProgram!, "tonemappingMode"),
       this.tonemappingModes.indexOf(this._tonemapping));
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
-    let displayBuffer = this.renderBuffers.get("postprocess");
+    let displayBuffer = this.renderBuffers.get("postprocess")!;
     if (this.enableFxaa) {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbos.get("postprocess_"));
-      gl.useProgram(this.fxaaProgram);
-      gl.bindTexture(gl.TEXTURE_2D, this.renderBuffers.get("postprocess"));
-      gl.uniform1i(gl.getUniformLocation(this.fxaaProgram, "tex"), slot);
-      gl.uniform2f(gl.getUniformLocation(this.fxaaProgram, "u_inv_res"), 1.0 / this.renderRes[0], 1.0 / this.renderRes[1]);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbos.get("postprocess_")!);
+      gl.useProgram(this.fxaaProgram!);
+      gl.bindTexture(gl.TEXTURE_2D, this.renderBuffers.get("postprocess")!);
+      gl.uniform1i(gl.getUniformLocation(this.fxaaProgram!, "tex"), slot);
+      gl.uniform2f(gl.getUniformLocation(this.fxaaProgram!, "u_inv_res"), 1.0 / this.renderRes[0], 1.0 / this.renderRes[1]);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-      displayBuffer = this.renderBuffers.get("postprocess_");
+      displayBuffer = this.renderBuffers.get("postprocess_")!;
     }
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.useProgram(this.displayProgram);
+    gl.useProgram(this.displayProgram!);
     gl.viewport(0, 0, this.displayRes[0], this.displayRes[1]);
     gl.bindTexture(gl.TEXTURE_2D, displayBuffer);
-    gl.uniform1i(gl.getUniformLocation(this.displayProgram, "tex"), slot);
+    gl.uniform1i(gl.getUniformLocation(this.displayProgram!, "tex"), slot);
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.bindTexture(gl.TEXTURE_2D, null);
@@ -523,7 +527,8 @@ export class PathtracingRenderer {
     }
 
     if (num_samples !== -1 && this._frameCount >= num_samples) {
-      renderingFinishedCB(); // finished rendering num_samples
+      if(renderingFinishedCB)
+        renderingFinishedCB(); // finished rendering num_samples
       this._isRendering = false;
     }
 
@@ -556,18 +561,18 @@ export class PathtracingRenderer {
         drawBuffers.push(gl.COLOR_ATTACHMENT0 + i);
       }
       gl.drawBuffers(drawBuffers);
-      return fbo;
+      return fbo!;
     }
 
-    this.renderBuffers.set("render", glu.createRenderBufferTexture(gl, null, this.renderRes[0], this.renderRes[1]));
-    this.renderBuffers.set("render_", glu.createRenderBufferTexture(gl, null, this.renderRes[0], this.renderRes[1]));
-    this.fbos.set("render", createFbo([this.renderBuffers.get("render")]));
-    this.fbos.set("render_", createFbo([this.renderBuffers.get("render_")]));
+    this.renderBuffers.set("render", glu.createRenderBufferTexture(gl, null, this.renderRes[0], this.renderRes[1])!);
+    this.renderBuffers.set("render_", glu.createRenderBufferTexture(gl, null, this.renderRes[0], this.renderRes[1])!);
+    this.fbos.set("render", createFbo([this.renderBuffers.get("render")!]));
+    this.fbos.set("render_", createFbo([this.renderBuffers.get("render_")!]));
 
-    this.renderBuffers.set("postprocess", glu.createRenderBufferTexture(gl, null, this.renderRes[0], this.renderRes[1]));
-    this.renderBuffers.set("postprocess_", glu.createRenderBufferTexture(gl, null, this.renderRes[0], this.renderRes[1]));
-    this.fbos.set("postprocess", createFbo([this.renderBuffers.get("postprocess")]));
-    this.fbos.set("postprocess_", createFbo([this.renderBuffers.get("postprocess_")]));
+    this.renderBuffers.set("postprocess", glu.createRenderBufferTexture(gl, null, this.renderRes[0], this.renderRes[1])!);
+    this.renderBuffers.set("postprocess_", glu.createRenderBufferTexture(gl, null, this.renderRes[0], this.renderRes[1])!);
+    this.fbos.set("postprocess", createFbo([this.renderBuffers.get("postprocess")!]));
+    this.fbos.set("postprocess_", createFbo([this.renderBuffers.get("postprocess_")!]));
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
@@ -683,19 +688,19 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
-  private _bvhDataTexture: WebGLTexture;
-  private _bvhIndexTexture: WebGLTexture;
+  private _bvhDataTexture?: WebGLTexture;
+  private _bvhIndexTexture?: WebGLTexture;
 
   private initBvh(sceneData: PathtracingSceneData) {
     const gl = this.gl;
     console.time("BvhGeneration");
     const bvh = new SimpleTriangleBVH(20);
-    bvh.build(sceneData.triangleBuffer);
+    bvh.build(sceneData.triangleBuffer!);
     console.timeEnd("BvhGeneration");
 
     if (this._bvhDataTexture) {
-      gl.deleteTexture(this._bvhDataTexture);
-      gl.deleteTexture(this._bvhIndexTexture);
+      gl.deleteTexture(this._bvhDataTexture!);
+      gl.deleteTexture(this._bvhIndexTexture!);
     }
 
     this._bvhDataTexture = glu.createDataTexture(gl, bvh.createAndCopyToFlattenedArray_StandardFormat());
@@ -705,12 +710,12 @@ export class PathtracingRenderer {
     const h = Math.ceil(numIndices / maxTextureSize);
     let w = Math.min(numIndices, maxTextureSize);
 
-    const paddedIndexBuffer = new Int32Array(w*h);
-    for(let i=0; i<bvh.m_pTriIndices.length; i++) {
+    const paddedIndexBuffer = new Int32Array(w * h);
+    for (let i = 0; i < bvh.m_pTriIndices.length; i++) {
       paddedIndexBuffer[i] = bvh.m_pTriIndices[i];
     }
 
-    this._bvhIndexTexture = gl.createTexture();
+    this._bvhIndexTexture = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, this._bvhIndexTexture);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
@@ -744,15 +749,15 @@ export class PathtracingRenderer {
 
     let slot = 0;
     gl.activeTexture(gl.TEXTURE0 + slot);
-    gl.bindTexture(gl.TEXTURE_2D, this._bvhDataTexture);
+    gl.bindTexture(gl.TEXTURE_2D, this._bvhDataTexture!);
     gl.uniform1i(gl.getUniformLocation(program, "u_sampler_bvh"), slot++);
 
     gl.activeTexture(gl.TEXTURE0 + slot);
-    gl.bindTexture(gl.TEXTURE_2D, this._bvhIndexTexture);
+    gl.bindTexture(gl.TEXTURE_2D, this._bvhIndexTexture!);
     gl.uniform1i(gl.getUniformLocation(program, "u_sampler_bvh_index"), slot++);
 
     gl.activeTexture(gl.TEXTURE0 + slot);
-    gl.bindTexture(gl.TEXTURE_2D, this.gpu_scene?.triangleDataTexture);
+    gl.bindTexture(gl.TEXTURE_2D, this.gpu_scene!.triangleDataTexture!);
     gl.uniform1i(gl.getUniformLocation(program, "u_sampler_triangle_data"), slot++);
 
     let pathtracingUniformBlockIdx = gl.getUniformBlockIndex(program, "PathTracingUniformBlock");

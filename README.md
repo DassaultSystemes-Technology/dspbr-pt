@@ -6,7 +6,7 @@ Features physical materials by implementing the [Enterprise PBR Shading Model (D
 
 [Demo Viewer (glTF drag&drop)](https://dassaultsystemes-technology.github.io/dspbr-pt/index.html)
 
-[Minimal Demo](https://dassaultsystemes-technology.github.io/dspbr-pt/simple.html) [[ Code ](packages/examples/simple.js)]
+[Minimal Demo](https://dassaultsystemes-technology.github.io/dspbr-pt/simple.html) [[ Code ](packages/examples/simple.ts)]
 
 
 ## Features

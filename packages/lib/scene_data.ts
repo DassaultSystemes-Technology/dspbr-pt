@@ -27,11 +27,16 @@ export class PathtracingSceneData {
   public get texArrays() { return this._texArrays; }
 
   private _triangleBuffer?: Float32Array;
-  public set triangleBuffer(buffer: Float32Array) { this._triangleBuffer = buffer; }
-  public get triangleBuffer() { return this._triangleBuffer; }
+  public set triangleBuffer(buffer: Float32Array | undefined ) { this._triangleBuffer = buffer; }
+  public get triangleBuffer(): Float32Array | undefined {
+    return this._triangleBuffer;
+  }
   public get num_triangles() { return this._triangleBuffer ? this._triangleBuffer.length / (VERTEX_STRIDE * 3) : 0 };
 
   public getPositionBuffer() {
+    if(!this.triangleBuffer)
+      return new Float32Array();
+
     const buffer = new Float32Array(this.triangleBuffer.length/VERTEX_STRIDE * 3);
 
     for(let i=0; i<this.triangleBuffer.length/VERTEX_STRIDE; i++) {

@@ -22,7 +22,7 @@ export class ThreeSceneAdapter {
 
   private calculateNumSceneVertices(scene: THREE.Scene | THREE.Group) {
     let numVertices = 0;
-    this.threeScene.traverse((child: any) => {
+    scene.traverse((child: any) => {
       if (child.isMesh) {
         if (child.geometry.groups.length > 0) {
           for (let i = 0; i < child.geometry.groups.length; i++) {

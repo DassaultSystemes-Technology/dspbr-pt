@@ -1,2 +1,2 @@
-export {PathtracingRenderer} from './renderer';
-export {ThreeSceneAdapter} from './three_scene_adapter';
+export { PathtracingRenderer } from './renderer';
+export { ThreeSceneAdapter } from './three_scene_adapter';

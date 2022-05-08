@@ -889,7 +889,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@parcel/transformer-typescript-types@npm:2.5.0":
+"@parcel/transformer-typescript-types@npm:2.5.0, @parcel/transformer-typescript-types@npm:^2.5.0":
   version: 2.5.0
   resolution: "@parcel/transformer-typescript-types@npm:2.5.0"
   dependencies:
@@ -1006,6 +1006,13 @@ __metadata:
   version: 0.2.0
   resolution: "@trysound/sax@npm:0.2.0"
   checksum: 11226c39b52b391719a2a92e10183e4260d9651f86edced166da1d95f39a0a1eaa470e44d14ac685ccd6d3df7e2002433782872c0feeb260d61e80f21250e65c
+  languageName: node
+  linkType: hard
+
+"@types/events@npm:^3.0.0":
+  version: 3.0.0
+  resolution: "@types/events@npm:3.0.0"
+  checksum: 9a424c2da210957d5636e0763e8c9fc3aaeee35bf411284ddec62a56a6abe31de9c7c2e713dabdd8a76ff98b47db2bd52f61310be6609641d6234cc842ecbbe3
   languageName: node
   linkType: hard
 
@@ -1865,10 +1872,12 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "dspbr-pt-demos@workspace:packages/examples"
   dependencies:
+    cross-env: ^7.0.3
     dat.gui: ^0.7.9
     dspbr-pt: 0.4.0
     parcel: ^2.5.0
     rimraf: ^3.0.2
+    shx: ^0.3.4
     three: ^0.139.2
   languageName: unknown
   linkType: soft
@@ -1893,15 +1902,14 @@ __metadata:
     "@gltf-transform/extensions": ^2.1.4
     "@gltf-transform/functions": ^2.1.4
     "@parcel/transformer-glsl": ^2.4.1
+    "@parcel/transformer-typescript-types": ^2.5.0
+    "@types/events": ^3.0.0
     "@types/three": ^0.139.0
-    cross-env: ^7.0.3
-    dat.gui: ^0.7.9
     dspbr-pt: 0.4.0
     meshoptimizer: ^0.17.0
     parcel: ^2.5.0
     patch-package: ^6.4.7
     rimraf: ^3.0.2
-    shx: ^0.3.4
     simple-dropzone: ^0.8.1
     three: ^0.139.2
     tweakpane: ^3.0.8
