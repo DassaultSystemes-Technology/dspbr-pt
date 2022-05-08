@@ -10,9 +10,6 @@ export class ThreeSceneAdapter {
   private threeScene: THREE.Scene | THREE.Group;
   private gltfInfo?: GLTF;
 
-  // private lightMap = new Map<string, number>();
-  // private materialMap = new Map<string, number>();
-
   public get scene() {
     return this._scene;
   }
@@ -67,7 +64,6 @@ export class ThreeSceneAdapter {
         l.type = (child.type === "PointLight") ? 0 : 1;
         l.emission = child.color.multiplyScalar(child.intensity).toArray();
         const lightIdx = this._scene.addLight(l);
-        // this.lightMap.set(child.uuid, lightIdx);
       }
     });
 
@@ -78,7 +74,6 @@ export class ThreeSceneAdapter {
     for (let m in materials) {
       const mat = await this.parseMaterial(materials[m], this._scene, this.gltfInfo);
       this._scene.addMaterial(mat);
-    // this.materialMap.set(threeMat.uuid, matIdx);
     }
   }
 
@@ -172,6 +167,7 @@ export class ThreeSceneAdapter {
     return new Promise<MaterialData>((resolve) => {
       let matInfo = new MaterialData();
 
+      matInfo.name = mat.name != "" ? mat.name : mat.uuid;
       matInfo.albedo = mat.color.toArray();
       if (mat.map) {
         matInfo.albedoTextureId = sceneData.addTexture(mat.map);
@@ -376,7 +372,7 @@ export class ThreeSceneAdapter {
         //   matInfo.scatterDistance = get_param("scatterDistance", ext, matInfo.scatterDistance);
         // });
       }
-
+      matInfo.dirty = false;
       resolve(matInfo);
     });
   }

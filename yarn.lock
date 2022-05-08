@@ -1904,6 +1904,7 @@ __metadata:
     shx: ^0.3.4
     simple-dropzone: ^0.8.1
     three: ^0.139.2
+    tweakpane: ^3.0.8
   languageName: unknown
   linkType: soft
 
@@ -4666,6 +4667,13 @@ __metadata:
   version: 0.0.6
   resolution: "tunnel@npm:0.0.6"
   checksum: c362948df9ad34b649b5585e54ce2838fa583aa3037091aaed66793c65b423a264e5229f0d7e9a95513a795ac2bd4cb72cda7e89a74313f182c1e9ae0b0994fa
+  languageName: node
+  linkType: hard
+
+"tweakpane@npm:^3.0.8":
+  version: 3.0.8
+  resolution: "tweakpane@npm:3.0.8"
+  checksum: 11c84c4c9eddfb0e2c55fa331fbf00934ec450a7bbacf6af1f1a1e34e67dcffbc75fd9cf0c68bb03a6b71662c695dab25d751ccebb1632d937954ce20123d51b
   languageName: node
   linkType: hard
 

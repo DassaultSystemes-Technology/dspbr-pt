@@ -14,11 +14,11 @@
     "@gltf-transform/extensions": "^2.1.4",
     "@gltf-transform/functions": "^2.1.4",
     "@types/three": "^0.139.0",
-    "dat.gui": "^0.7.9",
     "dspbr-pt": "0.4.0",
     "meshoptimizer": "^0.17.0",
     "simple-dropzone": "^0.8.1",
-    "three": "^0.139.2"
+    "three": "^0.139.2",
+    "tweakpane": "^3.0.8"
   },
   "browserslist": [
     "last 1 Chrome version"

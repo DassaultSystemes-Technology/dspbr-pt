@@ -1,103 +1,106 @@
 body {
-	margin: 0;
-	background-color: #000;
-	color: #fff;
-	font-family: Monospace;
-	font-size: 13px;
-	line-height: 24px;
-	overscroll-behavior: none;
+  margin: 0;
+  background-color: #000;
+  color: #fff;
+  font-family: Monospace;
+  font-size: 13px;
+  line-height: 24px;
+  overscroll-behavior: none;
 }
 
 a {
-	color: #ff0;
-	text-decoration: none;
+  color: #ff0;
+  text-decoration: none;
 }
 
 a:hover {
-	text-decoration: underline;
+  text-decoration: underline;
 }
 
 canvas {
-	display: block;
+  display: block;
 }
 
 #info {
-	position: absolute;
-	top: 0px;
-	width: 100%;
-	padding: 10px;
-	box-sizing: border-box;
-	text-align: center;
-	-moz-user-select: none;
-	-webkit-user-select: none;
-	-ms-user-select: none;
-	user-select: none;
-	pointer-events: none;
-	z-index: 1;
+  position: absolute;
+  top: 0px;
+  width: 100%;
+  padding: 10px;
+  box-sizing: border-box;
+  text-align: center;
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  pointer-events: none;
+  z-index: 1;
 }
 
 #bottom-info {
-	position: absolute;
-	bottom: 0;
-	width: 100%;
-	padding: 10px;
-	box-sizing: border-box;
-	text-align: left;
-	-moz-user-select: none;
-	-webkit-user-select: none;
-	-ms-user-select: none;
-	user-select: none;
-	pointer-events: none;
-	z-index: 1;
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  padding: 10px;
+  box-sizing: border-box;
+  text-align: left;
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  pointer-events: none;
+  z-index: 1;
 }
 
-a, button, input, select {
-	pointer-events: auto;
+a,
+button,
+input,
+select {
+  pointer-events: auto;
 }
 
 .dg.ac {
-	-moz-user-select: none;
-	-webkit-user-select: none;
-	-ms-user-select: none;
-	user-select: none;
-	z-index: 2 !important;
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  z-index: 2 !important;
 }
 
 .overlay {
-	position: absolute;
-	z-index: 2;
-	top: 0;
-	left: 0;
-	width: 100%;
-	height:100%;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	opacity: 1;
-	background-color: #000000;
-	color: #ffffff;
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  background-color: #000000;
+  color: #ffffff;
 }
 
-.overlay > div {
-	text-align: center;
+.overlay>div {
+  text-align: center;
 }
 
-.overlay > div > button {
-	height: 20px;
-	background: transparent;
-	color: #ffffff;
-	outline: 1px solid #ffffff;
-	border: 0px;
-	cursor: pointer;
+.overlay>div>button {
+  height: 20px;
+  background: transparent;
+  color: #ffffff;
+  outline: 1px solid #ffffff;
+  border: 0px;
+  cursor: pointer;
 }
 
-.overlay > div > p {
-	color: #777777;
-	font-size: 30px;
+.overlay>div>p {
+  color: #777777;
+  font-size: 30px;
 }
 
 
- /**
+/**
  * http://tobiasahlin.com/spinkit/
  */
 .spinner {
@@ -114,7 +117,10 @@ a, button, input, select {
 }
 
 @-webkit-keyframes sk-scaleout {
-  0% { -webkit-transform: scale(0) }
+  0% {
+    -webkit-transform: scale(0)
+  }
+
   100% {
     -webkit-transform: scale(1.0);
     opacity: 0;
@@ -125,9 +131,38 @@ a, button, input, select {
   0% {
     -webkit-transform: scale(0);
     transform: scale(0);
-  } 100% {
+  }
+
+  100% {
     -webkit-transform: scale(1.0);
     transform: scale(1.0);
     opacity: 0;
   }
+}
+
+/* .tp-lblv_v {
+  width: 200px;
+} */
+:root {
+  --tp-base-background-color: hsla(0, 0%, 10%, 0.8);
+  --tp-base-shadow-color: hsla(0, 0%, 0%, 0.2);
+  --tp-button-background-color: hsla(0, 0%, 80%, 1);
+  --tp-button-background-color-active: hsla(0, 0%, 100%, 1);
+  --tp-button-background-color-focus: hsla(0, 0%, 95%, 1);
+  --tp-button-background-color-hover: hsla(0, 0%, 85%, 1);
+  --tp-button-foreground-color: hsla(0, 0%, 0%, 0.8);
+  --tp-container-background-color: hsla(0, 0%, 0%, 0.3);
+  --tp-container-background-color-active: hsla(0, 0%, 0%, 0.6);
+  --tp-container-background-color-focus: hsla(0, 0%, 0%, 0.5);
+  --tp-container-background-color-hover: hsla(0, 0%, 0%, 0.4);
+  --tp-container-foreground-color: hsla(0, 0%, 100%, 0.5);
+  --tp-groove-foreground-color: hsla(0, 0%, 0%, 0.2);
+  --tp-input-background-color: hsla(0, 0%, 0%, 0.3);
+  --tp-input-background-color-active: hsla(0, 0%, 0%, 0.6);
+  --tp-input-background-color-focus: hsla(0, 0%, 0%, 0.5);
+  --tp-input-background-color-hover: hsla(0, 0%, 0%, 0.4);
+  --tp-input-foreground-color: hsla(0, 0%, 100%, 0.5);
+  --tp-label-foreground-color: hsla(0, 0%, 100%, 0.5);
+  --tp-monitor-background-color: hsla(0, 0%, 0%, 0.3);
+  --tp-monitor-foreground-color: hsla(0, 0%, 100%, 0.3);
 }

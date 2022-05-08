@@ -104,5 +104,4 @@ function flattenArray(arr: any, result: number[] = []) {
   return result;
 };
 
-
 export { TexInfo, MaterialData, Light }

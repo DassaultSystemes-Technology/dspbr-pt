@@ -6,10 +6,27 @@ export class MaterialData {
     return this._data;
   }
 
+  private _name = "";
+  public get name() {
+    return this._name;
+  }
+  public set name(val: string) {
+    this._name = val;
+  }
+
+  private _dirty = false;
+  public get dirty() {
+    return this._dirty;
+  }
+  public set dirty(flag: boolean) {
+    this._dirty = flag;
+  }
+
   public set albedo(val: number[]) {
     this._data[0] = val[0];
     this._data[1] = val[1];
     this._data[2] = val[2];
+    this.dirty = true;
   }
   public get albedo() {
     return [...this._data.slice(0, 3)];
@@ -17,20 +34,23 @@ export class MaterialData {
 
   public set metallic(val: number) {
     this._data[3] = val;
+    this.dirty = true;
   }
-  public get metallic() {
+  public get metallic() : number{
     return this.data[3];
   }
 
   public set roughness(val: number) {
     this._data[4] = val;
+    this.dirty = true;
   }
-  public get roughness() {
+  public get roughness() : number {
     return this.data[4];
   }
 
   public set anisotropy(val: number) {
     this._data[5] = val;
+    this.dirty = true;
   }
   public get anisotropy() {
     return this.data[5];
@@ -38,6 +58,7 @@ export class MaterialData {
 
   public set anisotropyRotation(val: number) {
     this._data[6] = val;
+    this.dirty = true;
   }
   public get anisotropyRotation() {
     return this.data[6];
@@ -45,6 +66,7 @@ export class MaterialData {
 
   public set transparency(val: number) {
     this._data[7] = val;
+    this.dirty = true;
   }
   public get transparency() {
     return this.data[7];
@@ -52,6 +74,7 @@ export class MaterialData {
 
   public set cutoutOpacity(val: number) {
     this._data[8] = val;
+    this.dirty = true;
   }
   public get cutoutOpacity() {
     return this.data[8];
@@ -59,6 +82,7 @@ export class MaterialData {
 
   public set doubleSided(val: number) {
     this._data[9] = val;
+    this.dirty = true;
   }
   public get doubleSided() {
     return this.data[9];
@@ -66,6 +90,7 @@ export class MaterialData {
 
   public set normalScale(val: number) {
     this._data[10] = val;
+    this.dirty = true;
   }
   public get normalScale() {
     return this.data[10];
@@ -73,6 +98,7 @@ export class MaterialData {
 
   public set ior(val: number) {
     this._data[11] = val;
+    this.dirty = true;
   }
   public get ior() {
     return this.data[11];
@@ -82,6 +108,7 @@ export class MaterialData {
     this._data[12] = val[0];
     this._data[13] = val[1];
     this._data[14] = val[2];
+    this.dirty = true;
   }
   public get specularTint() {
     return [...this._data.slice(12, 15)];
@@ -89,6 +116,7 @@ export class MaterialData {
 
   public set specular(val: number) {
     this._data[15] = val;
+    this.dirty = true;
   }
   public get specular() {
     return this.data[15];
@@ -98,6 +126,7 @@ export class MaterialData {
     this._data[16] = val[0];
     this._data[17] = val[1];
     this._data[18] = val[2];
+    this.dirty = true;
   }
   public get sheenColor() {
     return [...this._data.slice(16, 19)];
@@ -105,6 +134,7 @@ export class MaterialData {
 
   public set sheenRoughness(val: number) {
     this._data[19] = val;
+    this.dirty = true;
   }
   public get sheenRoughness() {
     return this.data[19];
@@ -114,6 +144,7 @@ export class MaterialData {
     this._data[20] = val[0];
     this._data[21] = val[1];
     this._data[22] = val[2];
+    this.dirty = true;
   }
   public get emission() {
     return [...this._data.slice(20, 23)];
@@ -121,6 +152,7 @@ export class MaterialData {
 
   public set normalScaleClearcoat(val: number) {
     this._data[23] = val;
+    this.dirty = true;
   }
   public get normalScaleClearcoat() {
     return this.data[23];
@@ -128,6 +160,7 @@ export class MaterialData {
 
   public set clearcoat(val: number) {
     this._data[24] = val;
+    this.dirty = true;
   }
   public get clearcoat() {
     return this.data[24];
@@ -135,6 +168,7 @@ export class MaterialData {
 
   public set clearcoatRoughness(val: number) {
     this._data[25] = val;
+    this.dirty = true;
   }
   public get clearcoatRoughness() {
     return this.data[25];
@@ -142,6 +176,7 @@ export class MaterialData {
 
   public set translucency(val: number) {
     this._data[26] = val;
+    this.dirty = true;
   }
   public get translucency() {
     return this.data[26];
@@ -158,6 +193,7 @@ export class MaterialData {
     this._data[28] = val[0];
     this._data[29] = val[1];
     this._data[30] = val[2];
+    this.dirty = true;
   }
   public get attenuationColor() {
     return [...this._data.slice(28, 31)];
@@ -165,6 +201,7 @@ export class MaterialData {
 
   public set attenuationDistance(val: number) {
     this._data[31] = val;
+    this.dirty = true;
   }
   public get attenuationDistance() {
     return this.data[31];
@@ -174,6 +211,7 @@ export class MaterialData {
     this._data[32] = val[0];
     this._data[33] = val[1];
     this._data[34] = val[2];
+    this.dirty = true;
   }
   public get subsurfaceColor() {
     return [...this._data.slice(32, 35)];
@@ -181,6 +219,7 @@ export class MaterialData {
 
   public set thinWalled(val: number) {
     this._data[35] = val;
+    this.dirty = true;
   }
   public get thinWalled() {
     return this.data[35];
@@ -190,6 +229,7 @@ export class MaterialData {
     this._data[36] = val[0];
     this._data[37] = val[1];
     this._data[38] = val[2];
+    this.dirty = true;
   }
   public get anisotropyDirection() {
     return [...this._data.slice(36, 39)];
@@ -204,6 +244,7 @@ export class MaterialData {
 
   public set iridescence(val: number) {
     this._data[40] = val;
+    this.dirty = true;
   }
   public get iridescence() {
     return this._data[40];
@@ -211,6 +252,7 @@ export class MaterialData {
 
   public set iridescenceIOR(val: number) {
     this._data[41] = val;
+    this.dirty = true;
   }
   public get iridescenceIOR() {
     return this._data[41];
@@ -218,6 +260,7 @@ export class MaterialData {
 
   public set iridescenceThicknessMinimum(val: number) {
     this._data[42] = val;
+    this.dirty = true;
   }
   public get iridescenceThicknessMinimum() {
     return this._data[42];
@@ -225,6 +268,7 @@ export class MaterialData {
 
   public set iridescenceThicknessMaximum(val: number) {
     this._data[43] = val;
+    this.dirty = true;
   }
   public get iridescenceThicknessMaximum() {
     return this._data[43];
@@ -281,6 +325,7 @@ export class MaterialData {
 
   public set clearcoatTextureId(val: number) {
     this._data[51] = val;
+    this.dirty = true;
   }
   public get clearcoatTextureId() {
     return this._data[51];
@@ -346,6 +391,7 @@ export class MaterialData {
     this._data[60] = val[0];
     this._data[61] = val[1];
     this._data[62] = val[2];
+    this.dirty = true;
   }
   public get translucencyColor() {
     return [...this._data.slice(60, 63)];
@@ -392,7 +438,7 @@ export class MaterialData {
     this.subsurfaceColor = [1, 1, 1];
     this.thinWalled = 1;
 
-    this.anisotropyDirection = [1,0,0];
+    this.anisotropyDirection = [1, 0, 0];
     this.translucencyTextureId = -1;
 
     this.iridescence = 0.0;

@@ -13,11 +13,10 @@
  * limitations under the License.
  */
 
-import Stats from 'three/examples/jsm/libs/stats.module.js';
-import { GUI } from 'dat.gui';
+import { Pane } from 'tweakpane';
 import { SimpleDropzone } from 'simple-dropzone';
 import { ThreeRenderer } from './three_renderer';
-import { PathtracingRenderer, ThreeSceneAdapter} from 'dspbr-pt';
+import { PathtracingRenderer, ThreeSceneAdapter } from 'dspbr-pt';
 
 
 import { PerspectiveCamera, Box3, Vector3, Scene, Mesh, FloatType, MOUSE, MeshStandardMaterial, PlaneBufferGeometry } from 'three';
@@ -42,11 +41,10 @@ if (process.env['NODE_ENV'] == 'dev') {
 
 class DemoViewer {
   _gui: any;
-  _stats: any | null;
   canvas: HTMLCanvasElement;
   canvas_three: HTMLCanvasElement;
   canvas_pt: HTMLCanvasElement;
-  spinner: Element;
+  spinner: HTMLElement;
   container: HTMLElement | null;
   startpage: HTMLElement | null;
   status: HTMLElement | null;
@@ -55,13 +53,14 @@ class DemoViewer {
   camera: PerspectiveCamera;
   controls: OrbitControls;
   sceneBoundingBox: Box3;
+  sceneAdapter: ThreeSceneAdapter;
 
   renderer: any;
   three_renderer: ThreeRenderer;
 
   default_ibl_name = "Artist Workshop";
-  current_ibl = null;
-  current_scene = null;
+  current_ibl = this.default_ibl_name;
+  current_scene = "";
   useControls = true;
   pathtracing = true;
   autoScaleScene = false;
@@ -73,6 +72,7 @@ class DemoViewer {
   interactionPixelRatio = 0.1;
   pixelRatio = 1.0;
   tileRes = 4;
+  fps = 0.0;
 
   constructor() {
     this.container = document.createElement('div');
@@ -163,7 +163,7 @@ class DemoViewer {
     });
 
     this.initUI();
-    this.initStats();
+    this.loadIbl(this.default_ibl_name);
 
     if (window.location.hash) {
       const uris = window.location.hash.split("#");
@@ -241,10 +241,10 @@ class DemoViewer {
       this.sceneBoundingBox = new Box3().setFromObject(gltf.scene);
     }
 
-    const sceneAdapter = new ThreeSceneAdapter(gltf.scene, gltf);
-    await sceneAdapter.init();
+    this.sceneAdapter = new ThreeSceneAdapter(gltf.scene, gltf);
+    await this.sceneAdapter.init();
 
-    await this.renderer.setScene(sceneAdapter.scene);
+    await this.renderer.setScene(this.sceneAdapter.scene);
     if (this.pathtracing)
       this.startPathtracing();
 
@@ -253,6 +253,7 @@ class DemoViewer {
       this.startRasterizer();
     }
 
+    this.initMaterialSelector();
     this.hideLoadscreen();
   }
 
@@ -310,17 +311,6 @@ class DemoViewer {
     scene.add(floorPlane);
   }
 
-  private initStats() {
-    this._stats = new (Stats as any)();
-    this._stats.domElement.style.position = 'absolute';
-    this._stats.domElement.style.top = '0px';
-    this._stats.domElement.style.cursor = "default";
-    this._stats.domElement.style.webkitUserSelect = "none";
-    this._stats.domElement.style.MozUserSelect = "none";
-    this._stats.domElement.style.zIndex = 1;
-    this.container.appendChild(this._stats.domElement);
-  }
-
   private startRasterizer() {
     this.stopPathtracing();
     this.three_renderer.render(this.camera, () => {
@@ -337,17 +327,23 @@ class DemoViewer {
     this.renderer.stopRendering();
   }
 
+  private lastTimeStamp = 0.0;
   private startPathtracing() {
     this.stopRasterizer();
 
-    this.renderer.render(this.camera, -1, () => {
-      this.controls.update();
-      this._stats.update();
-      if (this.pathtracing) {
-        var destCtx = this.canvas.getContext("2d");
-        destCtx.drawImage(this.canvas_pt, 0, 0);
-      }
-    })
+    this.renderer.render(this.camera, -1,
+      () => { // on tile finished
+        this.controls.update();
+        if (this.pathtracing) {
+          var destCtx = this.canvas.getContext("2d");
+          destCtx.drawImage(this.canvas_pt, 0, 0);
+        }
+      },
+      () => { // on frame finished
+        const now = performance.now();
+        this.fps = 1000.0 / (now - this.lastTimeStamp);
+        this.lastTimeStamp = now;
+      })
   }
 
   private resize() {
@@ -395,118 +391,373 @@ class DemoViewer {
     }
   }
 
-  initUI() {
-    if (this._gui)
+  private pane?: Pane;
+  private paneTab?: any;
+  private paneMatFolders = [];
+
+  private initMaterialParamUI(matIdx: number) {
+    const matTab = this.paneTab.pages[1];
+    const mat = this.sceneAdapter.scene.materials[matIdx];
+
+    this.paneMatFolders.forEach(p => {
+      p.dispose();
+    });
+    this.paneMatFolders = [];
+
+    const colors = {
+      albedo: { r: mat.albedo[0] * 255, g: mat.albedo[1] * 255, b: mat.albedo[2] * 255 },
+      specularTint: { r: mat.specularTint[0] * 255, g: mat.specularTint[1] * 255, b: mat.specularTint[2] * 255 },
+      translucencyColor: {
+        r: mat.translucencyColor[0] * 255,
+        g: mat.translucencyColor[1] * 255, b: mat.translucencyColor[2] * 255
+      },
+      sheenColor: { r: mat.sheenColor[0] * 255, g: mat.sheenColor[1] * 255, b: mat.sheenColor[2] * 255 },
+      attenuationColor: { r: mat.attenuationColor[0] * 255, g: mat.attenuationColor[1] * 255, b: mat.attenuationColor[2] * 255 }
+    };
+    const vectors = {
+      emission: { x: mat.emission[0], y: mat.emission[1], z: mat.emission[2] }
+    };
+
+    const basicFloatParamSettings = {
+      step: 0.01,
+      min: 0.0,
+      max: 1.0
+    };
+
+    const base = matTab.addFolder({
+      title: 'Base',
+    }); this.paneMatFolders.push(base);
+
+    base.addInput(colors, "albedo").on('change', ev => {
+      mat.albedo = [ev.value.r / 255.0, ev.value.g / 255.0, ev.value.b / 255.0];
+    });
+
+    base.addInput(mat, 'roughness', basicFloatParamSettings);
+    base.addInput(mat, 'metallic', basicFloatParamSettings);
+    base.addInput(mat, 'specular', basicFloatParamSettings);
+    base.addInput(vectors, "emission", {
+      x: { min: 0, max: 10e6, step: 0.1 },
+      y: { min: 0, max: 10e6, step: 0.1 },
+      z: { min: 0, max: 10e6, step: 0.1 }
+    }).on('change', ev => {
+      mat.emission = [ev.value.x, ev.value.y, ev.value.z];
+    });
+
+    const anisotropy = matTab.addFolder({
+      title: 'Anisotropy',
+    }); this.paneMatFolders.push(anisotropy);
+    anisotropy.addInput(mat, 'anisotropy', {
+      step: 0.01,
+      min: -1.0,
+      max: 1.0
+    });
+    anisotropy.direction = { x: mat.anisotropyDirection[0], y: mat.anisotropyDirection[1] };
+    anisotropy.addInput(anisotropy, "direction", {
+      picker: 'inline',
+      expanded: true,
+      x: { min: -1, max: 1, step: 0.01 },
+      y: { min: -1, max: 1, step: 0.01 }
+    }).on('change', ev => {
+      mat.anisotropyDirection = [ev.value.x, ev.value.y];
+    });
+
+    const transmission = matTab.addFolder({
+      title: 'Transmission',
+    }); this.paneMatFolders.push(transmission);
+    transmission.addInput(mat, 'transparency', basicFloatParamSettings);
+    transmission.addInput(mat, 'cutoutOpacity', basicFloatParamSettings);
+    transmission.addInput(mat, 'translucency', { ...basicFloatParamSettings, ...{ label: 'diffuse transmission' } });
+    transmission.addInput(colors, "translucencyColor", {
+      ...basicFloatParamSettings,
+      ...{ label: 'diffuse transmission color' }
+    }).on('change', ev => {
+      mat.translucencyColor = [ev.value.r / 255.0, ev.value.g / 255.0, ev.value.b / 255.0];
+    });
+
+    const sheen = matTab.addFolder({
+      title: 'Sheen',
+    }); this.paneMatFolders.push(sheen);
+    sheen.addInput(mat, 'sheenRoughness', basicFloatParamSettings);
+    sheen.addInput(colors, "sheenColor").on('change', ev => {
+      mat.sheenColor = [ev.value.r / 255.0, ev.value.g / 255.0, ev.value.b / 255.0];
+    });
+
+    const clearcoat = matTab.addFolder({
+      title: 'Clearcoat',
+    }); this.paneMatFolders.push(clearcoat);
+    clearcoat.addInput(mat, 'clearcoat', basicFloatParamSettings);
+    clearcoat.addInput(mat, 'clearcoatRoughness', basicFloatParamSettings);
+
+    const volume = matTab.addFolder({
+      title: 'Volume',
+    }); this.paneMatFolders.push(volume);
+    volume.thinWalled = mat.thinWalled > 0 ? true : false;
+    volume.addInput(volume, 'thinWalled').on('change', ev => {
+      mat.thinWalled = ev.value ? 1 : 0;
+    });
+    volume.addInput(mat, 'ior', {
+      min: 0,
+      max: 3,
+      step: 0.01
+    });
+    volume.addInput(mat, 'attenuationDistance', {
+      step: 0.00001,
+      min: 0.0,
+      max: 10e5
+    });
+    volume.addInput(colors, "attenuationColor").on('change', ev => {
+      mat.attenuationColor = [ev.value.r / 255.0, ev.value.g / 255.0, ev.value.b / 255.0];
+    });
+
+    const iridescence = matTab.addFolder({
+      title: 'Iridescence',
+    }); this.paneMatFolders.push(iridescence);
+    iridescence.addInput(mat, 'iridescence', basicFloatParamSettings);
+    iridescence.addInput(mat, 'iridescenceIOR', {
+      min: 0,
+      max: 3,
+      step: 0.01
+    });
+    iridescence.addInput(mat, 'iridescenceThicknessMinimum', {
+      min: 10,
+      max: 1200,
+      step: 1
+    });
+    iridescence.addInput(mat, 'iridescenceThicknessMaximum', {
+      min: 10,
+      max: 1200,
+      step: 1
+    });
+  }
+
+  private initMaterialSelector() {
+    const matTab = this.paneTab.pages[1];
+
+    const materials = this.sceneAdapter.scene.materials;
+
+    const matNameMap = {};
+    for (let i = 0; i < materials.length; i++) {
+      matNameMap[materials[i].name] = i;
+    }
+    const opt = {
+      name: materials[0].name
+    }
+
+    matTab.addInput(opt, "name", {
+      options: matNameMap
+    }).on('change', (ev) => {
+      this.initMaterialParamUI(ev.value);
+    })
+
+    if(materials.length > 0)
+      this.initMaterialParamUI(matNameMap[materials[0].name]);
+
+  }
+
+
+  private initUI() {
+    if (this.pane)
       return;
 
-    this._gui = new GUI();
-    // GUI.toggleHide();
-    this._gui.domElement.classList.add("hidden");
-    this._gui.width = 300;
+    const pane = new Pane({
+      title: "dspbr-pt"
+    });
+    pane.element.style.width = '350px';
+    pane.element.style.top = '5px';
+    pane.element.style.right = '5px';
+    pane.element.style.position = 'absolute';
+    pane.element.style.zIndex = "2";
 
-    // let reload_obj = {
-    //   reload: () => {
-    //     console.log("Reload");
-    //     this.loadScenario(this.scene, this.ibl);
-    //   }
-    // };
-    // this._gui.add(reload_obj, 'reload').name('Reload');
+    // this.pane = pane;
+    this.paneTab = pane.addTab({
+      pages: [
+        { title: 'Parameters' },
+        { title: 'Materials' },
+      ],
+    });
+    const params = this.paneTab.pages[0];
 
-    const center_obj = {
-      centerView: this.centerView.bind(this)
-    };
-    this._gui.add(center_obj, 'centerView').name('Center View');
+    params.addButton({
+      title: 'Center View'
+    }).on('click', () => {
+      this.centerView();
+    })
 
-    const save_img = {
-      save_img: () => {
-        console.log("Save Image");
-        var dataURL = this.canvas.toDataURL('image/png');
-        const link = document.createElement("a");
-        link.download = 'capture.png';
-        link.href = dataURL;
-        link.click();
+    params.addButton({
+      title: 'Save Image'
+    }).on('click', () => {
+      console.log("Save Image");
+      var dataURL = this.canvas.toDataURL('image/png');
+      const link = document.createElement("a");
+      link.download = 'capture.png';
+      link.href = dataURL;
+      link.click();
+    });
+
+    const scene = params.addFolder({
+      title: 'Scene',
+    });
+
+    const optionsFromList = (l) => {
+      const obj = {
+        "": ""
+      };
+      for (let e in l) {
+        obj[l[e]] = l[e];
       }
+      return obj;
     };
-    this._gui.add(save_img, 'save_img').name('Save PNG');
 
-    const scene_names = Object.keys(Assets.scenes);
-    let scene = this._gui.addFolder('Scene');
-    scene.add(this, "current_scene", scene_names).name('Scene').onChange((value) => {
-      this.loadSceneFromUrl(value);
-      this.hideStartpage();
+    scene.addInput(this, 'current_scene', {
+      label: "Scene",
+      options: optionsFromList(Object.keys(Assets.scenes)),
+    }).on('change', (ev) => {
+      if(ev.value != "") {
+        this.loadSceneFromUrl(ev.value);
+        this.hideStartpage();
+      }
     });
 
-    // this._gui.add(this, 'autoScaleScene').name('Autoscale Scene');
-
-    scene.add(this, 'autoRotate').name('Auto Rotate').onChange((value) => {
-      this.controls.autoRotate = value;
-      this.renderer.resetAccumulation();
+    scene.addInput(this, 'autoRotate', {
+      label: "Auto Rotate"
+    }).on('change', (ev) => {
+      this.controls.autoRotate = ev.value;
+      this.toggleInteractionMode(ev.value);
     });
-    scene.open();
 
-    const ibl_names = Object.keys(Assets.ibls);
-    let lighting = this._gui.addFolder('Lighting');
-    lighting.add(this, "current_ibl", ibl_names).name('IBL').onChange((value) => {
-      this.loadIbl(value);
-    }).setValue(this.default_ibl_name);
+    const lighting = params.addFolder({
+      title: 'Lighting',
+    });
 
-    lighting.add(this.renderer, 'iblRotation').name('IBL Rotation').min(-180.0).max(180.0).step(0.1)
-      .onChange(val => {
-        this.toggleInteractionMode(true, 10.0);
-      }).listen();
+    lighting.addInput(this, 'current_ibl', {
+      label: "IBL",
+      options: optionsFromList(Object.keys(Assets.ibls)),
+    }).on('change', (ev) => {
+      this.loadIbl(ev.value);
+    });
 
-    lighting.add(this.renderer, 'iblImportanceSampling').name('Importance Sampling').listen();
-    lighting.open();
+    lighting.addInput(this.renderer, 'iblRotation', {
+      label: 'IBL Rotation',
+      step: 0.1,
+      min: -180,
+      max: 180
+    }).on('change', () => {
+      this.toggleInteractionMode(true, 10.0);
+    });
 
-    let interator = this._gui.addFolder('Integrator');
-    interator.add(this, 'pathtracing').name('Use Pathtracing').onChange((value) => {
-      if (value == false) {
+    lighting.addInput(this.renderer, 'iblImportanceSampling', {
+      label: 'Importance Sampling'
+    })
+
+    const interator = params.addFolder({
+      title: 'Integrator',
+    });
+
+    interator.addInput(this, 'pathtracing', {
+      label: 'Pathtracing'
+    }).on('change', (ev) => {
+      if (ev.value == false) {
         this.startRasterizer();
       } else {
         this.startPathtracing();
       }
     });
 
-    interator.add(this.renderer, 'debugMode', this.renderer.debugModes).name('Debug Mode');
-    // interator.add(this.renderer, 'renderMode', this.renderer.renderModes).name('Integrator');
-    interator.add(this.renderer, 'maxBounces').name('Bounce Depth').min(0).max(32).step(1);
-    interator.add(this.renderer, 'rayEps').name('Ray Offset');
-    interator.add(this.renderer, 'tileRes').name('Tile Res').min(1).max(8).step(1).onChange(val => {
-      this.renderer.tileRes = val;
+    interator.addInput(this.renderer, 'debugMode', {
+      label: 'Debug Mode',
+      options: optionsFromList(this.renderer.debugModes)
     });
-    interator.add(this.renderer, 'clampThreshold').name('Clamp Threshold').min(0.0).max(100).step(0.1);
-    interator.open();
-
-    let display = this._gui.addFolder('Display');
-    display.add(this.renderer, 'exposure').name('Display Exposure').min(0).max(10).step(0.01).onChange((value) => {
-      this.three_renderer.exposure = value;
-    }).listen();
-
-    display.add(this.renderer, 'tonemapping', this.renderer.tonemappingModes).name('Tonemapping').onChange(val => {
-      this.three_renderer.tonemapping = val;
+    interator.addInput(this.renderer, 'maxBounces', {
+      label: 'Max Bounces',
+      step: 1,
+      min: 0,
+      max: 32
     });
-    display.add(this.renderer, 'enableGamma').name('Gamma');
-
-    display.add(this, 'pixelRatio').name('Pixel Ratio').min(0.1).max(1.0).onChange(val => {
-      this.renderer.pixelRatio = val;
-    }
-
-    );
-    display.add(this, 'pathtracedInteraction').name('Pathtraced Navigation');
-    display.add(this, 'interactionPixelRatio').name('Interaction Ratio').min(0.1).max(1.0).step(0.1);
-    display.add(this.renderer, 'enableFxaa').name('Fxaa');
-    display.open();
-
-    let background = this._gui.addFolder('Background');
-    background.add(this.renderer, 'showBackground').name('Background from IBL').onChange((value) => {
-      this.three_renderer.showBackground = value;
+    interator.addInput(this.renderer, 'rayEps', {
+      label: 'Ray Offset',
+      step: 0.00001,
+      min: 0,
+      max: 10.0
+    });
+    interator.addInput(this, 'tileRes', {
+      label: 'Tile Res',
+      step: 1,
+      min: 1,
+      max: 8
+    }).on('change', (ev) => {
+      this.renderer.tileRes = ev.value;
+    });
+    interator.addInput(this.renderer, 'clampThreshold', {
+      label: 'Clamp Threshold',
+      step: 0.1,
+      min: 0,
+      max: 100
     });
 
-    background.color = [0, 0, 0];
-    background.addColor(background, 'color').name('Background Color').onChange((value) => {
-      this.renderer.backgroundColor = [value[0] / 255.0, value[1] / 255.0, value[2] / 255.0, 1.0];
-      this.three_renderer.backgroundColor = [value[0] / 255.0, value[1] / 255.0, value[2] / 255.0];
+    const display = params.addFolder({
+      title: 'Display',
     });
+    display.addInput(this.renderer, 'exposure', {
+      label: 'Display Exposure',
+      step: 0.01,
+      min: 0,
+      max: 10
+    });
+    display.addInput(this.renderer, 'tonemapping', {
+      label: 'Tonemapping',
+      options: optionsFromList(this.renderer.tonemappingModes)
+    }).on('change', (ev) => {
+      this.three_renderer.tonemapping = ev.val;
+    });
+    display.addInput(this.renderer, 'enableGamma', {
+      label: 'Gamma'
+    });
+    display.addInput(this.renderer, 'exposure', {
+      label: 'Display Exposure',
+      step: 0.1,
+      min: 0.1,
+      max: 10
+    });
+    display.addInput(this, 'pathtracedInteraction', {
+      label: 'Pathtraced Navigation'
+    });
+    display.addInput(this, 'interactionPixelRatio', {
+      label: 'Interaction Ratio',
+      step: 0.1,
+      min: 0.1,
+      max: 1
+    });
+    display.addInput(this.renderer, 'enableFxaa', {
+      label: 'Fxaa'
+    });
+
+    const background = params.addFolder({
+      title: 'Background',
+    });
+    display.addInput(this.renderer, 'showBackground', {
+      label: 'Background from IBL'
+    }).on('change', (ev) => {
+      this.three_renderer.showBackground = ev.val;
+    });
+
+    background.color = { r: 0, g: 0, b: 0 };
+    background.addInput(background, 'color', {
+      label: 'Background Color',
+      picker: 'inline',
+      expanded: true,
+    }).on('change', (ev) => {
+      console.log(ev.value);
+      this.renderer.backgroundColor = [ev.value.r / 255.0, ev.value.g / 255.0, ev.value.g / 255.0, 1.0];
+    });
+
+    params.addMonitor(this, 'fps', {
+      label: 'Fps',
+      view: 'graph',
+      step: 0.1,
+      min: 0,
+      max: 10
+    });
+
   }
 
   showStartpage() {
