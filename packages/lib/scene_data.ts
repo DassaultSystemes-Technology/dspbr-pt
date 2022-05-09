@@ -9,6 +9,8 @@ class Light {
   pad = 0;
 }
 
+export const VERTEX_STRIDE = 20;
+
 export class PathtracingSceneData {
   private _lights: Light[] = [];
   public get lights() { return this._lights; }
@@ -19,18 +21,30 @@ export class PathtracingSceneData {
 
   private _texInfos: TexInfo[] = [];
   public getTexInfo(idx: number) { return this._texInfos[idx]; }
-  public get num_textures() { return this._texInfos.length; }
+  public get num_textures() { return this._texInfos.length; } // TODO numTexInfos != actual number of textures, since tex infos reference textures in tex array
 
   private _texArrays = new Map<string, Texture[]>();
   public get texArrays() { return this._texArrays; }
 
   private _triangleBuffer?: Float32Array;
-  public set triangleBuffer(buffer: Float32Array) { this._triangleBuffer = buffer; }
-  public get num_triangles() { return this._triangleBuffer ? this._triangleBuffer.length / 3 : 0 };
+  public set triangleBuffer(buffer: Float32Array | undefined ) { this._triangleBuffer = buffer; }
+  public get triangleBuffer(): Float32Array | undefined {
+    return this._triangleBuffer;
+  }
+  public get num_triangles() { return this._triangleBuffer ? this._triangleBuffer.length / (VERTEX_STRIDE * 3) : 0 };
 
-  private _bvhBuffer?: Float32Array;
-  public set bvhBuffer(buffer: Float32Array) {
-    this._bvhBuffer = buffer;
+  public getPositionBuffer() {
+    if(!this.triangleBuffer)
+      return new Float32Array();
+
+    const buffer = new Float32Array(this.triangleBuffer.length/VERTEX_STRIDE * 3);
+
+    for(let i=0; i<this.triangleBuffer.length/VERTEX_STRIDE; i++) {
+      buffer[i*3+0] = this.triangleBuffer[i*VERTEX_STRIDE+0];
+      buffer[i*3+1] = this.triangleBuffer[i*VERTEX_STRIDE+1];
+      buffer[i*3+2] = this.triangleBuffer[i*VERTEX_STRIDE+2];
+    }
+    return buffer;
   }
 
   public addTexture(tex: Texture): number {
@@ -45,18 +59,18 @@ export class PathtracingSceneData {
         texIdx = texArray.length - 1;
       }
 
-      let i=0;
+      let i = 0;
       // find index of element in map (js map stores entries in insertion order)
       // TODO find better alternative
-      for(let key of this._texArrays.keys()) {
-        if(key == res) break;
+      for (let key of this._texArrays.keys()) {
+        if (key == res) break;
         i++
       }
       texInfo.texArrayIdx = i;
       texInfo.texIdx = texIdx;
     } else {
       this._texArrays.set(res, [tex]);
-      texInfo.texArrayIdx = this._texArrays.size-1;
+      texInfo.texArrayIdx = this._texArrays.size - 1;
       texInfo.texIdx = 0;
     }
 
@@ -69,20 +83,14 @@ export class PathtracingSceneData {
     return this._texInfos.length - 1;
   }
 
-  public addMaterial(mat: MaterialData) {
+  public addMaterial(mat: MaterialData): number {
     this._materials.push(mat);
+    return this._materials.length - 1;
   }
 
-  public addLight(light: Light) {
+  public addLight(light: Light): number {
     this._lights.push(light);
-  }
-
-  public getFlatBvhBuffer(): Float32Array | undefined {
-    return this._bvhBuffer;
-  }
-
-  public getFlatTriangleDataBuffer(): Float32Array | undefined {
-    return this._triangleBuffer;
+    return this._lights.length - 1;
   }
 
   public getFlatMaterialBuffer(): Float32Array {
@@ -111,6 +119,5 @@ function flattenArray(arr: any, result: number[] = []) {
   }
   return result;
 };
-
 
 export { TexInfo, MaterialData, Light }

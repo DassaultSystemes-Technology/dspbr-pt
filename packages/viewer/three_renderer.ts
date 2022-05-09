@@ -5,9 +5,9 @@ export class ThreeRenderer {
   private gl: any;
   private canvas: any | undefined;
 
-  private ibl: THREE.Texture;
+  private ibl?: THREE.Texture;
   private pmremGenerator: THREE.PMREMGenerator;
-  private scene: THREE.Scene | null;
+  private scene?: THREE.Scene;
   private renderer: THREE.WebGLRenderer;
 
   private isRendering = false;
@@ -22,16 +22,18 @@ export class ThreeRenderer {
     return this.renderer.toneMappingExposure;
   }
 
-  private tonemappingModes = {
-    "None": THREE.LinearToneMapping,
-    "Reinhard": THREE.ReinhardToneMapping,
-    "Cineon": THREE.CineonToneMapping,
-    "AcesFilm": THREE.ACESFilmicToneMapping
-  };
+  private tonemappingModes = new Map<string, THREE.ToneMapping>([
+    ["None", THREE.LinearToneMapping],
+    ["Reinhard", THREE.ReinhardToneMapping],
+    ["Cineon", THREE.CineonToneMapping],
+    ["AcesFilm", THREE.ACESFilmicToneMapping]
+  ]);
 
   set tonemapping(val: string) {
-    this.renderer.toneMapping = this.tonemappingModes[val];
-    this.dirty = true;
+    if(this.tonemappingModes.has(val)) {
+      this.renderer.toneMapping = this.tonemappingModes.get(val)!;
+      this.dirty = true;
+    }
   }
 
   private _backgroundColor = [0.0, 0.0, 0.0];
@@ -57,7 +59,7 @@ export class ThreeRenderer {
       return;
     }
     if(this._showBackground) {
-      this.scene.background = this.ibl;
+      this.scene.background = this.ibl!;
     }
     else {
       this.scene.background = new THREE.Color(
@@ -67,12 +69,12 @@ export class ThreeRenderer {
     }
   }
 
-  useIBL(val) {
+  useIBL(flag: boolean) {
     if (!this.scene) {
       return;
     }
-    if (val) {
-      this.scene.environment = this.ibl;
+    if (flag) {
+      this.scene!.environment = this.ibl!;
       this.showBackground = true ;
     } else {
       this.scene.environment = null;
@@ -99,7 +101,7 @@ export class ThreeRenderer {
     this.isRendering = false;
   }
 
-  render(camera: THREE.PerspectiveCamera, frameFinishedCB?) {
+  render(camera: THREE.PerspectiveCamera, frameFinishedCB?: Function) {
     if (camera instanceof THREE.Camera === false) {
       console.error('PathtracingRenderer.render: camera is not an instance of THREE.Camera.');
       return;
@@ -112,13 +114,14 @@ export class ThreeRenderer {
       }
 
       if(this.dirty) {
-        this.renderer.compile(this.scene, camera);
+        this.renderer.compile(this.scene!, camera);
         this.dirty = false;
       }
 
-      this.renderer.render(this.scene, camera);
-      if (frameFinishedCB !== undefined)
+      this.renderer.render(this.scene!, camera);
+      if (frameFinishedCB) {
         frameFinishedCB();
+      }
       requestAnimationFrame(renderFrame);
     };
 
@@ -130,7 +133,7 @@ export class ThreeRenderer {
   }
 
   private updateSceneIbl() {
-    if(!this.scene) return;
+    if(!this.scene || !this.ibl) return;
     this.scene.background = this.ibl;
     this.scene.environment  = this.ibl;
   }
@@ -145,7 +148,7 @@ export class ThreeRenderer {
     this.updateSceneIbl();
   }
 
-  setScene(scene) {
+  setScene(scene: THREE.Scene) {
     this.scene = scene;
     this.updateSceneIbl();
   }

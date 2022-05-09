@@ -7,11 +7,14 @@
     "three": "^0.139.2"
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
     "parcel": "^2.5.0",
-    "rimraf": "^3.0.2"
+    "rimraf": "^3.0.2",
+    "shx": "^0.3.4"
   },
   "scripts": {
+    "copy-assets": "shx cp -R ../../assets dist",
     "build": "parcel build *.html --dist-dir ../../dist --public-url ./",
-    "dev": "rimraf dist && parcel *.html --public-url / --port 3000 --open"
+    "dev": "rimraf dist && yarn run copy-assets && cross-env NODE_ENV=dev parcel index.html --open"
   }
 }

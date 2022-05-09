@@ -15,7 +15,7 @@
 
 import 'regenerator-runtime/runtime'
 
-import {PathtracingRenderer, ThreeSceneTranslator} from 'dspbr-pt';
+import {PathtracingRenderer, ThreeSceneAdapter} from 'dspbr-pt';
 import {FloatType, PerspectiveCamera} from 'three'
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {RGBELoader} from 'three/examples/jsm/loaders/RGBELoader.js';
@@ -38,8 +38,11 @@ async function startRenderer() {
   try {
     const gltf = await new GLTFLoader().loadAsync(args.gltf_path);
     gltf.scene.updateMatrixWorld();
-    const pathtracingSceneData = await ThreeSceneTranslator.translateThreeScene(gltf.scene, gltf);
-    renderer.setScene(pathtracingSceneData).then(() => {
+
+    this.sceneAdapter = new ThreeSceneAdapter(gltf.scene, gltf);
+    await this.sceneAdapter.init();
+
+    renderer.setScene(this.sceneAdapter.scene).then(() => {
       if (args.ibl !== "None") {
         new RGBELoader().setDataType(FloatType).loadAsync(args.ibl).then((ibl) => {
           console.log("loaded ibl" + args.ibl);

@@ -14,14 +14,17 @@
  */
 
 // @ts-ignore
+import { SimpleTriangleBVH } from './bvh';
 import { PathtracingSceneData } from './scene_data'
-import { PathtracingSceneDataAdapterWebGL2 } from './scene_data_adapter_webgl2'
+import { PathtracingSceneDataWebGL2 } from './scene_data_webgl2'
 
 import * as glu from './gl_utils';
 
 import shader_constants from './shader/constants.glsl';
 import copy_shader from './shader/copy.glsl';
 import display_shader from './shader/display.frag';
+import tonemap_shader from './shader/tonemap.frag';
+import fxaa_shader from './shader/fxaa.frag';
 
 import structs_shader from './shader/structs.glsl';
 import rng_shader from './shader/rng.glsl';
@@ -51,9 +54,6 @@ void main()
   gl_Position = position;
 }`;
 
-const TILE_RES = 4;
-const INTERACTION_TILE_RES = 1;
-
 enum BufferType {
   Front = 0,
   Back = 1
@@ -79,34 +79,34 @@ export enum RenderResMode {
   Low = 1
 }
 export class PathtracingRenderer {
-  private gl: any;
+  private gl: WebGL2RenderingContext;
   private canvas: any | undefined;
 
-  private scene?: PathtracingSceneDataAdapterWebGL2;
+  private scene?: PathtracingSceneData;
+  private gpu_scene?: PathtracingSceneDataWebGL2;
 
   private ibl: WebGLTexture | null = null;
   private iblImportanceSamplingData: IBLImportanceSamplingData = new IBLImportanceSamplingData();
 
-  private fbos = new Map<string, WebGLFramebuffer[][]>();
-  private renderBuffers = new Map<string, WebGLFramebuffer[][]>();
+  private fbos = new Map<string, WebGLFramebuffer>();
+  private renderBuffers = new Map<string, WebGLFramebuffer>();
 
   private quadVao: WebGLVertexArrayObject | null = null;
   private renderPrograms = new Map<string, WebGLProgram>();
   private renderProgram: WebGLProgram | null = null;
-  private debugProgram: WebGLProgram | null = null;
   private copyProgram: WebGLProgram | null = null;
+  private fxaaProgram: WebGLProgram | null = null;
+  private tonemapProgram: WebGLProgram | null = null;
   private displayProgram: WebGLProgram | null = null;
   private quadVertexBuffer: WebGLBuffer | null = null;
 
-  private renderRes = [[0, 0], [0, 0]]; // [highres, lowres]
+  private renderRes = [0, 0]; // [highres, lowres]
   private displayRes = [0, 0];
 
   private _frameCount = 1;
   private _isRendering = false;
   private _currentAnimationFrameId = -1;
   private _resetAccumulation = false;
-
-  private _tileRes = TILE_RES;
 
   private _exposure = 1.0;
   public get exposure() {
@@ -124,11 +124,7 @@ export class PathtracingRenderer {
   }
   public set debugMode(val) {
     this._debugMode = val;
-    if (val != "None") {
-      this.renderProgram = this.renderPrograms.get("debug_program")!;
-    } else {
-      this.iblImportanceSampling = this.iblImportanceSampling;
-    }
+    console.log(val);
     this.resetAccumulation();
   }
 
@@ -222,11 +218,6 @@ export class PathtracingRenderer {
   }
   public set iblImportanceSampling(val) {
     this._iblImportanceSampling = val;
-    if (val) {
-      this.renderProgram = this.renderPrograms.get("misptdl_program")!;
-    } else {
-      this.renderProgram = this.renderPrograms.get("pt_program")!;
-    }
     this.resetAccumulation();
   }
 
@@ -237,28 +228,6 @@ export class PathtracingRenderer {
   public set pixelRatio(val) {
     this._pixelRatio = val;
     this.resize(this.canvas.width, this.canvas.height);
-  }
-
-  private _pixelRatioLowRes = 0.1;
-  public get pixelRatioLowRes() {
-    return this._pixelRatioLowRes;
-  }
-  public set pixelRatioLowRes(val) {
-    this._pixelRatioLowRes = val;
-    this.resize(this.canvas.width, this.canvas.height);
-  }
-
-  private _renderResMode = RenderResMode.High;
-  private setLowResRenderMode(flag: boolean) {
-    if (flag) {
-      this._renderResMode = RenderResMode.Low;
-      this._tileRes = INTERACTION_TILE_RES;
-    } else {
-      this._renderResMode = RenderResMode.High;
-      this._tileRes = TILE_RES;
-    }
-
-    this.resetAccumulation();
   }
 
   private _backgroundColor = [0.0, 0.0, 0.0, 1.0];
@@ -279,17 +248,44 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
+  private _enableFxaa = false;
+  public get enableFxaa() {
+    return this._enableFxaa;
+  }
+  public set enableFxaa(val) {
+    this._enableFxaa = val;
+  }
+
+  private _tileRes = 4;
+  public set tileRes(val: number) {
+    this._tileRes = val;
+  }
+  public get tileRes() {
+    return this._tileRes;
+  }
+
+  private _clampThreshold = 3.0;
+  public set clampThreshold(val: number) {
+    this._clampThreshold = val;
+    this.resetAccumulation();
+  }
+  public get clampThreshold() {
+    return this._clampThreshold;
+  }
+
+
   constructor(parameters: PathtracingRendererParameters = {}) {
     this.canvas = parameters.canvas ? parameters.canvas : document.createElementNS('http://www.w3.org/1999/xhtml', 'canvas');
 
-    this.gl = parameters.context ? parameters.context : this.canvas.getContext('webgl2', { alpha: true, powerPreference: "high-performance" });
-    this.gl.getExtension('EXT_color_buffer_float');
-    this.gl.getExtension('OES_texture_float_linear');
+    const gl = parameters.context ? parameters.context : this.canvas.getContext('webgl2', { alpha: true, powerPreference: "high-performance" });
+    this.gl = gl;
+    gl.getExtension('EXT_color_buffer_float');
+    gl.getExtension('OES_texture_float_linear');
 
-    this.pathtracingUniformBuffer = this.gl.createBuffer();
-    this.gl.bindBuffer(this.gl.UNIFORM_BUFFER, this.pathtracingUniformBuffer);
-    this.gl.bindBufferBase(this.gl.UNIFORM_BUFFER, 0, this.pathtracingUniformBuffer);
-    this.gl.bindBuffer(this.gl.UNIFORM_BUFFER, null);
+    this.pathtracingUniformBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.UNIFORM_BUFFER, this.pathtracingUniformBuffer);
+    gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, this.pathtracingUniformBuffer);
+    gl.bindBuffer(gl.UNIFORM_BUFFER, null);
 
     this.resize(Math.floor(this.canvas.width), Math.floor(this.canvas.height));
     this.initFullscreenQuad();
@@ -306,20 +302,14 @@ export class PathtracingRenderer {
 
   resize(width: number, height: number) {
     this.displayRes = [width, height];
-    this.renderRes[0] = [
-      Math.ceil(this.displayRes[0] * this._pixelRatio),
-      Math.ceil(this.displayRes[1] * this._pixelRatio)
-    ];
-    this.renderRes[1] = [
-      Math.ceil(this.displayRes[0] * this._pixelRatioLowRes),
-      Math.ceil(this.displayRes[1] * this._pixelRatioLowRes)
-    ];
+    this.renderRes[0] = Math.ceil(this.displayRes[0] * this._pixelRatio);
+    this.renderRes[1] = Math.ceil(this.displayRes[1] * this._pixelRatio);
 
     this.initFramebuffers();
     this.resetAccumulation();
   }
 
-  private pathtracingUniformBuffer: WebGLBuffer;
+  private pathtracingUniformBuffer: WebGLBuffer | null;
   private pathTracingUniforms = {
     "u_u_view_mat": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
     "u_background_color": [0, 0, 0, 1],
@@ -337,11 +327,11 @@ export class PathtracingRenderer {
     "u_ibl_pdf_total_sum": 0,
     "u_ray_eps": 0,
     "u_render_mode": 0,
-    "pad": 0
+    "u_clamp_threshold": 0
   };
 
   private updatePathracingUniforms(camera: any) {
-    const renderRes = this.renderRes[this._renderResMode];
+    const renderRes = this.renderRes;
     let filmHeight = Math.tan(camera.fov * 0.5 * Math.PI / 180.0) * camera.near;
 
     this.pathTracingUniforms["u_u_view_mat"] = camera.matrixWorld.elements;
@@ -360,60 +350,90 @@ export class PathtracingRenderer {
     this.pathTracingUniforms["u_ray_eps"] = this.rayEps;
     this.pathTracingUniforms["u_render_mode"] = this.integratorTypes.indexOf(this._integrator);
     this.pathTracingUniforms["u_ibl_pdf_total_sum"] = this.iblImportanceSamplingData.totalSum;
+    this.pathTracingUniforms["u_clamp_threshold"] = this.clampThreshold;
 
     const uniformValues = new Float32Array(Object.values(this.pathTracingUniforms).flat());
     this.gl.bindBuffer(this.gl.UNIFORM_BUFFER, this.pathtracingUniformBuffer);
     this.gl.bufferData(this.gl.UNIFORM_BUFFER, uniformValues, this.gl.STATIC_DRAW);
     this.gl.bindBuffer(this.gl.UNIFORM_BUFFER, null);
+
+    if (this.scene && this.gpu_scene) {
+      for (let i = 0; i < this.scene.materials.length; i++) {
+        if (this.scene.materials[i].dirty) {
+          this.gpu_scene.updateMaterial(i);
+          this.scene.materials[i].dirty = false;
+          this.resetAccumulation();
+        }
+      }
+    }
   }
 
   private bindTextures(startSlot: number): number {
     let gl = this.gl;
 
+    const program = this.renderProgram!;
     let slot = startSlot;
-    gl.useProgram(this.renderProgram);
+    gl.useProgram(program);
 
     gl.activeTexture(gl.TEXTURE0 + slot)
     gl.bindTexture(gl.TEXTURE_2D, this.ibl);
-    gl.uniform1i(gl.getUniformLocation(this.renderProgram, "u_sampler_env_map"), slot++);
+    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_env_map"), slot++);
 
     gl.activeTexture(gl.TEXTURE0 + slot)
     gl.bindTexture(gl.TEXTURE_2D, this.iblImportanceSamplingData.pdf);
-    gl.uniform1i(gl.getUniformLocation(this.renderProgram, "u_sampler_env_map_pdf"), slot++);
+    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_env_map_pdf"), slot++);
 
     gl.activeTexture(gl.TEXTURE0 + slot)
     gl.bindTexture(gl.TEXTURE_2D, this.iblImportanceSamplingData.cdf);
-    gl.uniform1i(gl.getUniformLocation(this.renderProgram, "u_sampler_env_map_cdf"), slot++);
+    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_env_map_cdf"), slot++);
 
     gl.activeTexture(gl.TEXTURE0 + slot)
     gl.bindTexture(gl.TEXTURE_2D, this.iblImportanceSamplingData.yPdf);
-    gl.uniform1i(gl.getUniformLocation(this.renderProgram, "u_sampler_env_map_yPdf"), slot++);
+    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_env_map_yPdf"), slot++);
 
     gl.activeTexture(gl.TEXTURE0 + slot)
     gl.bindTexture(gl.TEXTURE_2D, this.iblImportanceSamplingData.yCdf);
-    gl.uniform1i(gl.getUniformLocation(this.renderProgram, "u_sampler_env_map_yCdf"), slot++);
+    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_env_map_yCdf"), slot++);
 
-    for (let t in this.scene?.texArrayTextures) {
-      gl.uniform1i(gl.getUniformLocation(this.renderProgram, t), slot);
+    for (let t in this.gpu_scene?.texArrayTextures) {
+      gl.uniform1i(gl.getUniformLocation(program, t), slot);
       gl.activeTexture(gl.TEXTURE0 + slot++);
-      gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.scene?.texArrayTextures[t]);
+      gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.gpu_scene?.texArrayTextures[t]!);
     }
 
     return slot;
   }
 
-  renderFrame(camera: any, num_samples: number, tile: number, frameFinishedCB: (frameCount: number) => void, renderingFinishedCB: () => void) {
+
+  render(camera: any, num_samples: number, tileFinishedCB: () => void, frameFinishedCB: (frameCount: number) => void, renderingFinishedCB?: () => void) {
+    this._isRendering = true;
+    this.resetAccumulation();
+    this.renderFrame(camera, num_samples, 0, tileFinishedCB, frameFinishedCB, renderingFinishedCB);
+  }
+
+  renderFrame(camera: any, num_samples: number, tile: number,
+    tileFinishedCB: () => void, frameFinishedCB: (frameCount: number) => void, renderingFinishedCB?: () => void) {
     let gl = this.gl;
     if (!this._isRendering) {
       console.log("Cancel");
       return;
     }
 
-    const fbo = this.fbos.get("pt_fbo")![BufferType.Front][this._renderResMode];
-    const copyFbo = this.fbos.get("pt_fbo")![BufferType.Back][this._renderResMode];
-    const renderBuffer = this.renderBuffers.get("pt_buffer")![BufferType.Front][this._renderResMode];
-    const copyBuffer = this.renderBuffers.get("pt_buffer")![BufferType.Back][this._renderResMode];
-    const renderRes = this.renderRes[this._renderResMode];
+    if (this.debugMode != "None") {
+      this.renderProgram = this.renderPrograms.get("debug_program")!;
+    } else {
+      if (this.iblImportanceSampling) {
+        this.renderProgram = this.renderPrograms.get("misptdl_program")!;
+      } else {
+        this.renderProgram = this.renderPrograms.get("pt_program")!;
+      }
+    }
+
+    const fbo = this.fbos.get("render")!;
+    const copyFbo = this.fbos.get("render_")!;
+    const renderBuffer = this.renderBuffers.get("render")!;
+    const copyBuffer = this.renderBuffers.get("render_")!;
+    const renderRes = this.renderRes;
 
     if (this._resetAccumulation) {
       this._frameCount = 1;
@@ -426,7 +446,7 @@ export class PathtracingRenderer {
       gl.clear(gl.COLOR_BUFFER_BIT);
     }
 
-    let slot = 2; // first 2 slots used are blocked by bvh and mesh textures
+    let slot = 3; // first 3 slots used are blocked by bvh and mesh textures
     slot = this.bindTextures(slot);
     this.updatePathracingUniforms(camera);
 
@@ -449,8 +469,8 @@ export class PathtracingRenderer {
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
     gl.activeTexture(gl.TEXTURE0 + slot)
-    gl.bindTexture(gl.TEXTURE_2D, copyBuffer);
-    gl.uniform1i(gl.getUniformLocation(this.renderProgram, "u_sampler2D_PreviousTexture"), slot);
+    gl.bindTexture(gl.TEXTURE_2D, copyBuffer!);
+    gl.uniform1i(gl.getUniformLocation(this.renderProgram!, "u_sampler2D_PreviousTexture"), slot);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -461,64 +481,73 @@ export class PathtracingRenderer {
     gl.useProgram(this.copyProgram);
     gl.bindFramebuffer(gl.FRAMEBUFFER, copyFbo);
     gl.activeTexture(gl.TEXTURE0 + slot)
-    gl.bindTexture(gl.TEXTURE_2D, renderBuffer);
-    gl.uniform1i(gl.getUniformLocation(this.copyProgram, "tex"), slot);
+    gl.bindTexture(gl.TEXTURE_2D, renderBuffer!);
+    gl.uniform1i(gl.getUniformLocation(this.copyProgram!, "tex"), slot);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    // gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.disable(gl.SCISSOR_TEST);
 
-    // display render pass
-    gl.useProgram(this.displayProgram);
-    gl.viewport(0, 0, this.displayRes[0], this.displayRes[1]);
-    gl.uniform1i(gl.getUniformLocation(this.displayProgram, "tex"), slot);
-    gl.uniform1f(gl.getUniformLocation(this.displayProgram, "exposure"), this._exposure);
-    gl.uniform1i(gl.getUniformLocation(this.displayProgram, "gamma"), this._enableGamma);
-    gl.uniform1i(gl.getUniformLocation(this.displayProgram, "tonemappingMode"),
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbos.get("postprocess")!);
+    gl.useProgram(this.tonemapProgram!);
+    gl.uniform1i(gl.getUniformLocation(this.tonemapProgram!, "tex"), slot); // renderbuffer
+    gl.uniform1f(gl.getUniformLocation(this.tonemapProgram!, "exposure"), this._exposure);
+    gl.uniform1i(gl.getUniformLocation(this.tonemapProgram!, "gamma"), this._enableGamma ? 1.0 : 0.0);
+    gl.uniform1i(gl.getUniformLocation(this.tonemapProgram!, "tonemappingMode"),
       this.tonemappingModes.indexOf(this._tonemapping));
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+    let displayBuffer = this.renderBuffers.get("postprocess")!;
+    if (this.enableFxaa) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbos.get("postprocess_")!);
+      gl.useProgram(this.fxaaProgram!);
+      gl.bindTexture(gl.TEXTURE_2D, this.renderBuffers.get("postprocess")!);
+      gl.uniform1i(gl.getUniformLocation(this.fxaaProgram!, "tex"), slot);
+      gl.uniform2f(gl.getUniformLocation(this.fxaaProgram!, "u_inv_res"), 1.0 / this.renderRes[0], 1.0 / this.renderRes[1]);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      displayBuffer = this.renderBuffers.get("postprocess_")!;
+    }
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.useProgram(this.displayProgram!);
+    gl.viewport(0, 0, this.displayRes[0], this.displayRes[1]);
+    gl.bindTexture(gl.TEXTURE_2D, displayBuffer);
+    gl.uniform1i(gl.getUniformLocation(this.displayProgram!, "tex"), slot);
+
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.bindTexture(gl.TEXTURE_2D, null);
 
     gl.useProgram(null);
     gl.bindVertexArray(null);
 
+    tileFinishedCB();
+
     if (tile == (this._tileRes * this._tileRes) - 1) {
       this._frameCount++;
+      frameFinishedCB(this._frameCount);
     }
 
     if (num_samples !== -1 && this._frameCount >= num_samples) {
-      renderingFinishedCB(); // finished rendering num_samples
+      if(renderingFinishedCB)
+        renderingFinishedCB(); // finished rendering num_samples
       this._isRendering = false;
     }
 
-    frameFinishedCB(this._frameCount);
     this._currentAnimationFrameId = requestAnimationFrame(() => {
-      this.renderFrame(camera, num_samples, ++tile % (this._tileRes * this._tileRes), frameFinishedCB, renderingFinishedCB)
+      this.renderFrame(camera, num_samples, ++tile % (this._tileRes * this._tileRes), tileFinishedCB, frameFinishedCB, renderingFinishedCB)
     });
   };
-
-  render(camera: any, num_samples: number, frameFinishedCB: (frameCount: number) => void, renderingFinishedCB: () => void) {
-    this._isRendering = true;
-    this.resetAccumulation();
-    this.renderFrame(camera, num_samples, 0, frameFinishedCB, renderingFinishedCB);
-  }
 
   private initFramebuffers() {
     const gl = this.gl;
 
     // cleanup renderbuffers and fbos
     for (const rb of this.renderBuffers.values()) {
-      if (rb[0][0]) gl.deleteTexture(rb[0][0]);
-      if (rb[1][0]) gl.deleteTexture(rb[1][0]);
-      if (rb[0][1]) gl.deleteTexture(rb[0][1]);
-      if (rb[1][1]) gl.deleteTexture(rb[1][1]);
+      if (rb) gl.deleteTexture(rb);
     }
     this.renderBuffers.clear();
 
     for (const fbo of this.fbos.values()) {
-      if (fbo[0][0]) gl.deleteFramebuffer(fbo[0][0]);
-      if (fbo[1][0]) gl.deleteFramebuffer(fbo[1][0]);
-      if (fbo[1][1]) gl.deleteFramebuffer(fbo[1][1]);
-      if (fbo[0][1]) gl.deleteFramebuffer(fbo[0][1]);
+      if (fbo) gl.deleteFramebuffer(fbo);
     }
     this.fbos.clear();
 
@@ -532,24 +561,18 @@ export class PathtracingRenderer {
         drawBuffers.push(gl.COLOR_ATTACHMENT0 + i);
       }
       gl.drawBuffers(drawBuffers);
-      return fbo;
+      return fbo!;
     }
 
-    this.renderBuffers.set("pt_buffer", [
-      [glu.createRenderBufferTexture(gl, null, this.renderRes[RenderResMode.High][0], this.renderRes[RenderResMode.High][1])!,
-      glu.createRenderBufferTexture(gl, null, this.renderRes[RenderResMode.Low][0], this.renderRes[RenderResMode.Low][1])!],
-      [glu.createRenderBufferTexture(gl, null, this.renderRes[RenderResMode.High][0], this.renderRes[RenderResMode.High][1])!,
-      glu.createRenderBufferTexture(gl, null, this.renderRes[RenderResMode.Low][0], this.renderRes[RenderResMode.Low][1])!]
-    ]);
+    this.renderBuffers.set("render", glu.createRenderBufferTexture(gl, null, this.renderRes[0], this.renderRes[1])!);
+    this.renderBuffers.set("render_", glu.createRenderBufferTexture(gl, null, this.renderRes[0], this.renderRes[1])!);
+    this.fbos.set("render", createFbo([this.renderBuffers.get("render")!]));
+    this.fbos.set("render_", createFbo([this.renderBuffers.get("render_")!]));
 
-    this.fbos.set("pt_fbo", [[
-      createFbo([this.renderBuffers.get("pt_buffer")![BufferType.Front][RenderResMode.High]]),
-      createFbo([this.renderBuffers.get("pt_buffer")![BufferType.Front][RenderResMode.Low]])
-    ],
-    [
-      createFbo([this.renderBuffers.get("pt_buffer")![BufferType.Back][RenderResMode.High]]),
-      createFbo([this.renderBuffers.get("pt_buffer")![BufferType.Back][RenderResMode.Low]])
-    ]]);
+    this.renderBuffers.set("postprocess", glu.createRenderBufferTexture(gl, null, this.renderRes[0], this.renderRes[1])!);
+    this.renderBuffers.set("postprocess_", glu.createRenderBufferTexture(gl, null, this.renderRes[0], this.renderRes[1])!);
+    this.fbos.set("postprocess", createFbo([this.renderBuffers.get("postprocess")!]));
+    this.fbos.set("postprocess_", createFbo([this.renderBuffers.get("postprocess_")!]));
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
@@ -665,14 +688,51 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
-  public async setScene(sceneData: PathtracingSceneData) {
+  private _bvhDataTexture?: WebGLTexture;
+  private _bvhIndexTexture?: WebGLTexture;
+
+  private initBvh(sceneData: PathtracingSceneData) {
+    const gl = this.gl;
+    console.time("BvhGeneration");
+    const bvh = new SimpleTriangleBVH(20);
+    bvh.build(sceneData.triangleBuffer!);
+    console.timeEnd("BvhGeneration");
+
+    if (this._bvhDataTexture) {
+      gl.deleteTexture(this._bvhDataTexture!);
+      gl.deleteTexture(this._bvhIndexTexture!);
+    }
+
+    this._bvhDataTexture = glu.createDataTexture(gl, bvh.createAndCopyToFlattenedArray_StandardFormat());
+
+    const maxTextureSize = glu.getMaxTextureSize(gl);
+    const numIndices = bvh.m_pTriIndices.length;
+    const h = Math.ceil(numIndices / maxTextureSize);
+    let w = Math.min(numIndices, maxTextureSize);
+
+    const paddedIndexBuffer = new Int32Array(w * h);
+    for (let i = 0; i < bvh.m_pTriIndices.length; i++) {
+      paddedIndexBuffer[i] = bvh.m_pTriIndices[i];
+    }
+
+    this._bvhIndexTexture = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, this._bvhIndexTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32I, w, h, 0, gl.RED_INTEGER, gl.INT, paddedIndexBuffer);
+  }
+
+  public async setScene(scene: PathtracingSceneData) {
     const gl = this.gl
     this.stopRendering();
 
-    this.scene = new PathtracingSceneDataAdapterWebGL2(this.gl, sceneData);
+    this.scene = scene;
+    this.gpu_scene = new PathtracingSceneDataWebGL2(this.gl, scene);
+    this.gpu_scene.init();
 
-    this.scene.generateGPUBuffers();
-
+    this.initBvh(scene);
     await this.initializeShaders();
 
     this.renderPrograms.forEach(program => {
@@ -689,53 +749,36 @@ export class PathtracingRenderer {
 
     let slot = 0;
     gl.activeTexture(gl.TEXTURE0 + slot);
-    gl.bindTexture(gl.TEXTURE_2D, this.scene?.bvhDataTexture);
+    gl.bindTexture(gl.TEXTURE_2D, this._bvhDataTexture!);
     gl.uniform1i(gl.getUniformLocation(program, "u_sampler_bvh"), slot++);
 
     gl.activeTexture(gl.TEXTURE0 + slot);
+    gl.bindTexture(gl.TEXTURE_2D, this._bvhIndexTexture!);
+    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_bvh_index"), slot++);
+
+    gl.activeTexture(gl.TEXTURE0 + slot);
+    gl.bindTexture(gl.TEXTURE_2D, this.gpu_scene!.triangleDataTexture!);
     gl.uniform1i(gl.getUniformLocation(program, "u_sampler_triangle_data"), slot++);
-    gl.bindTexture(gl.TEXTURE_2D, this.scene?.triangleDataTexture);
 
     let pathtracingUniformBlockIdx = gl.getUniformBlockIndex(program, "PathTracingUniformBlock");
     gl.uniformBlockBinding(program, pathtracingUniformBlockIdx, 0);
 
-    // const pathtracingUniformBlockSize = gl.getActiveUniformBlockParameter(
-    //   program,
-    //   pathtracingUniformBlockIdx,
-    //   gl.UNIFORM_BLOCK_DATA_SIZE
-    // );
-    //console.log(`Uniform Block Size: ${pathtracingUniformBlockSize}`);
-    // const expectedMaterialBlockSize = 240*this.scene!.sceneData.num_materials;
-
-    if (this.scene!.sceneData.num_textures > 0) {
+    if (this.gpu_scene!.sceneData.num_textures > 0) {
       let texInfoBlockIdx = gl.getUniformBlockIndex(program, "TextureInfoBlock");
       gl.uniformBlockBinding(program, texInfoBlockIdx, 1);
-      // const textureInfoBlockSize = gl.getActiveUniformBlockParameter(
-      //   program,
-      //   texInfoBlockIdx,
-      //   gl.UNIFORM_BLOCK_DATA_SIZE
-      // );
-      // console.log(`TexInfo Block Size: ${textureInfoBlockSize}`);
-      // const expectedTextureInfoBlockSize = 32*this.scene!.sceneData.num_textures;
     }
 
-    const materialUniformBuffers = this.scene?.materialUniformBuffers!;
+    const materialUniformBuffers = this.gpu_scene?.materialUniformBuffers!;
     for (let i = 0; i < materialUniformBuffers.length; i++) {
       let matBlockIdx = gl.getUniformBlockIndex(program, `MaterialBlock${i}`);
       gl.uniformBlockBinding(program, matBlockIdx, i + 2);
-      // const materialBlockSize = gl.getActiveUniformBlockParameter(
-      //   program,
-      //   matBlockIdx,
-      //   gl.UNIFORM_BLOCK_DATA_SIZE
-      // );
-      //console.log(`Material_${i} Block Size: ${materialBlockSize}`);
     }
 
     gl.useProgram(null);
   }
 
   private async initializeShaders() {
-    if (!this.scene) throw new Error("Scene not initialized");
+    if (!this.gpu_scene) throw new Error("Scene not initialized");
     console.time("Pathtracing shader generation");
 
     const bufferAccessSnippet = `
@@ -754,7 +797,7 @@ export class PathtracingRenderer {
     const uint UV_OFFSET = 2u;
     const uint TANGENT_OFFSET = 3u;
     const uint COLOR_OFFSET = 4u;
-    const uint NUM_TRIANGLES = ${this.scene.sceneData.num_triangles}u;
+    const uint NUM_TRIANGLES = ${this.gpu_scene.sceneData.num_triangles}u;
     `;
 
     const pt_trace = `
@@ -772,12 +815,12 @@ export class PathtracingRenderer {
       ['structs', structs_shader],
       ['rng', rng_shader],
       ['constants', shader_constants],
-      ['lights', this.scene.lightShaderChunk],
+      ['lights', this.gpu_scene.lightShaderChunk],
       ['utils', utils_shader],
       ['material', material_shader],
       ['buffer_accessor', bufferAccessSnippet],
-      ['texture_accessor', this.scene.texAccessorShaderChunk],
-      ['material_block', this.scene.materialBufferShaderChunk],
+      ['texture_accessor', this.gpu_scene.texAccessorShaderChunk],
+      ['material_block', this.gpu_scene.materialBufferShaderChunk],
       ['dspbr', dspbr_shader],
       ['bvh', bvh_shader],
       ['lighting', lighting_shader],
@@ -798,11 +841,14 @@ export class PathtracingRenderer {
 
     this.copyProgram = await glu.createProgramFromSource(this.gl, vertexShader, copy_shader);
     this.displayProgram = await glu.createProgramFromSource(this.gl, vertexShader, display_shader);
+    this.tonemapProgram = await glu.createProgramFromSource(this.gl, vertexShader, tonemap_shader);
+    this.fxaaProgram = await glu.createProgramFromSource(this.gl, vertexShader, fxaa_shader);
     this.renderPrograms.set("pt_program", await glu.createProgramFromSource(this.gl, vertexShader, render_shader, ptShaderMap));
     this.renderPrograms.set("debug_program", await glu.createProgramFromSource(this.gl, vertexShader, render_shader, debugShaderMap));
     this.renderPrograms.set("misptdl_program", await glu.createProgramFromSource(this.gl, vertexShader, render_shader, misptdlShaderMap));
 
     this.renderProgram = this.renderPrograms.get("misptdl_program")!;
+    // this.renderProgram = this.renderPrograms.get("pt_program")!;
 
     console.timeEnd("Pathtracing shader generation");
   }

@@ -1,6 +1,7 @@
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader';
 import { WebIO, VertexLayout, Document } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { weld, dequantize, reorder } from '@gltf-transform/functions';
@@ -93,6 +94,11 @@ export async function loadSceneFromUrl(url: string, autoscale?: boolean) {
 function loadScene(glb: ArrayBuffer, autoscale?: boolean) {
   var loader = new GLTFLoader();
   loader.setMeshoptDecoder(MeshoptDecoder);
+
+  var ktx2Loader = new KTX2Loader();
+  ktx2Loader.setTranscoderPath( 'three/examples/js/libs/basis/' );
+  loader.setKTX2Loader(ktx2Loader);
+
   return new Promise((resolve, reject) => {
 
     loader.parse(glb, "", (gltf) => {

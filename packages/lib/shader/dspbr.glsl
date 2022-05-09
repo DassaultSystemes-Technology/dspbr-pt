@@ -19,7 +19,7 @@
 // }
 
 vec3 coating_layer(out float base_weight, float clearcoat, float clearcoat_alpha, vec3 wi, vec3 wo, vec3 wh, Geometry g) {
-  vec3 coating = eval_brdf_microfacet_ggx_smith(vec3(0.04), vec3(1.0), vec2(clearcoat_alpha), wi, wo, wh, g);
+  vec3 coating = eval_brdf_microfacet_ggx(vec3(0.04), vec3(1.0), vec2(clearcoat_alpha), wi, wo, wh, g);
   vec3 Fcv = clearcoat * fresnel_schlick(vec3(0.04), vec3(1.0), abs(dot(wi, g.n)));
   vec3 Fcl = clearcoat * fresnel_schlick(vec3(0.04), vec3(1.0), abs(dot(wo, g.n)));
 
@@ -34,11 +34,11 @@ vec3 eval_dspbr(const in MaterialClosure c, vec3 wi, vec3 wo) {
   Geometry g = calculateBasis(c.n, c.t);
 
   vec3 base = vec3(0);
-  base = diffuse_bsdf_eval(c, wi, wo, g, false);
+  base = diffuse_bsdf_eval(c, wi, wo, g);
   base += eval_brdf_microfacet_ggx(c.specular_f0, c.specular_f90, c.alpha, c.iridescence, c.iridescence_ior, c.iridescence_thickness, wi, wo, wh, g);
   base += eval_brdf_microfacet_ggx_ms(c.specular_f0, c.specular_f90, c.alpha, wi, wo, g);
 
-  base += eval_btdf_microfacet_ggx(c.specular_f0, c.specular_f90, c.alpha, c.iridescence, c.iridescence_ior, c.iridescence_thickness, wi, wo, g);
+  base += eval_btdf_microfacet_ggx(c.specular_f0, c.specular_f90, c.alpha, wi, wo, g);
 
   float sheen_base_weight;
   vec3 sheen = sheen_layer(sheen_base_weight, c.sheen_color, c.sheen_roughness, wi, wo, wh, g);
@@ -56,16 +56,16 @@ float dspbr_pdf(const in MaterialClosure c, vec3 wi, vec3 wo) {
   Geometry g = calculateBasis(c.n, c.t);
 
   if(bool(c.event_type & E_COATING)) {
-    pdf = brdf_microfacet_ggx_smith_pdf(c, g, wi, wo);
+    pdf = pdf_brdf_microfacet_ggx(c, g, wi, wo);
   }
   else if (bool(c.event_type & E_DIFFUSE)) {
     pdf = diffuse_bsdf_pdf(wi, wo, g);
   }
   else if(bool(c.event_type & E_OPAQUE_DIELECTRIC)) {
-    pdf = brdf_microfacet_ggx_smith_pdf(c, g, wi, wo);
+    pdf = pdf_brdf_microfacet_ggx(c, g, wi, wo);
   }
     else if(bool(c.event_type & E_METAL)) {
-    pdf = brdf_microfacet_ggx_smith_pdf(c, g, wi, wo);
+    pdf = pdf_brdf_microfacet_ggx(c, g, wi, wo);
   }
   else if(bool(c.event_type & E_TRANSPARENT_DIELECTRIC)) {
     pdf = bsdf_microfacet_ggx_smith_pdf(c, g, wi, wo);
@@ -87,7 +87,7 @@ vec3 dspbr_microfacet_brdf_ggx_smith_rho(const in MaterialClosure c, Geometry g,
   return fresnel_schlick(c.specular_f0, c.specular_f90, saturate(dot(wi, g.n)));
 }
 
-vec3 dspbr_microfacet_bsdf_ggx_smith_rho(const in MaterialClosure c, Geometry g, vec3 wi) {
+vec3 dspbr_microfacet_btdf_ggx_smith_rho(const in MaterialClosure c, Geometry g, vec3 wi) {
   return (vec3(1.0) - fresnel_schlick(c.specular_f0, c.specular_f90, saturate(dot(wi, g.n))));
 }
 
@@ -96,13 +96,13 @@ void select_bsdf(inout MaterialClosure c, float rr, vec3 wi, out float pdf) {
 
   float diffuse_importance = luminance(dspbr_diffuse_rho(c));
   float brdf_importance =  luminance(dspbr_microfacet_brdf_ggx_smith_rho(c, g, wi));
-  float bsdf_importance =  luminance(dspbr_microfacet_bsdf_ggx_smith_rho(c, g, wi));
+  float btdf_importance =  luminance(dspbr_microfacet_btdf_ggx_smith_rho(c, g, wi));
   float clearcoat_importance = dspbr_clearcoat_rho(c, g, wi);
 
   float bsdf_pdf[5];
-  bsdf_pdf[0] = diffuse_importance * (1.0 - c.metallic) * (1.0 - c.transparency) * 0.1; // diffuse
+  bsdf_pdf[0] = diffuse_importance * (1.0 - c.metallic) * (1.0 - c.transparency) * btdf_importance; // diffuse
   bsdf_pdf[1] = brdf_importance * (1.0 - c.metallic) * (1.0 - c.transparency); // opaque dielectric
-  bsdf_pdf[2] = bsdf_importance * (1.0 - c.metallic) * c.transparency; // transparent dielectric
+  bsdf_pdf[2] = btdf_importance * (1.0 - c.metallic) * c.transparency; // transparent dielectric
   bsdf_pdf[3] = brdf_importance * c.metallic * (1.0 - c.transparency); // metal
   bsdf_pdf[4] = clearcoat_importance; // clearcoat
 
@@ -124,7 +124,7 @@ void select_bsdf(inout MaterialClosure c, float rr, vec3 wi, out float pdf) {
   }
 
   // bsdf_cdf[0] = 1.0;
-  // bsdf_cdf[1] = 1.0;
+  // bsdf_cdf[1] = 0.0;
   // bsdf_cdf[2] = 0.0;
   // bsdf_cdf[3] = 0.0;
   // bsdf_cdf[4] = 0.0;
@@ -183,7 +183,7 @@ vec3 sample_dspbr(inout MaterialClosure c, vec3 wi, in vec3 uvw, inout vec3 bsdf
     }
   }
   else if (bool(c.event_type & E_OPAQUE_DIELECTRIC)) {
-    wo = sample_brdf_microfacet_ggx_smith(c.alpha, wi, g, uvw.xy, pdf);
+    wo = sample_brdf_microfacet_ggx(c.alpha, wi, g, uvw.xy, pdf);
     vec3 wh = normalize(wi + wo);
 
     bsdf_over_pdf *= eval_brdf_microfacet_ggx(c.specular_f0, c.specular_f90, c.alpha, c.iridescence, c.iridescence_ior, c.iridescence_thickness, wi, wo, wh, g) / pdf;
@@ -221,16 +221,17 @@ vec3 sample_dspbr(inout MaterialClosure c, vec3 wi, in vec3 uvw, inout vec3 bsdf
     c.event_type = event;
   }
   else if (bool(c.event_type & E_METAL)) {
-    wo = sample_brdf_microfacet_ggx_smith(c.alpha, wi, g, uvw.xy, pdf);
+    wo = sample_brdf_microfacet_ggx(c.alpha, wi, g, uvw.xy, pdf);
     vec3 wh = normalize(wi + wo);
 
-    bsdf_over_pdf *= eval_brdf_microfacet_ggx(c.specular_f0, c.specular_f90, c.alpha, c.iridescence, c.iridescence_ior, c.iridescence_thickness, wi, wo, wh, g) / pdf;
+    bsdf_over_pdf *= eval_brdf_microfacet_ggx(c.specular_f0, c.specular_f90, c.alpha,
+      c.iridescence, c.iridescence_ior, c.iridescence_thickness, wi, wo, wh, g) / pdf;
     bsdf_over_pdf += eval_brdf_microfacet_ggx_ms(c.specular_f0, c.specular_f90, c.alpha, wi, wo, g);
 
-    bsdf_over_pdf *= abs(dot(wo, g.n));
+    bsdf_over_pdf *= saturate(dot(wo, g.n));
   }
   else if (bool(c.event_type & E_COATING)) {
-    wo = sample_brdf_microfacet_ggx_smith(vec2(c.clearcoat_alpha), wi, g, uvw.xy, pdf);
+    wo = sample_brdf_microfacet_ggx(vec2(c.clearcoat_alpha), wi, g, uvw.xy, pdf);
     vec3 wh = normalize(wi + wo);
 
     float clearcoat_base_weight;
