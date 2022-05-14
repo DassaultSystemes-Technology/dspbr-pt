@@ -46,7 +46,6 @@ export class DemoViewer extends EventEmitter {
 
   private autoScaleScene = false;
   private interactionTimeoutId = null;
-  private tileRes = 4;
 
   private three_renderer: ThreeRenderer;
 
@@ -109,6 +108,15 @@ export class DemoViewer extends EventEmitter {
   private _showGroundPlane = false;
   public set showGroundPlane(val: boolean) {
     this._showGroundPlane = val;
+  }
+
+  private _tileRes = 4;
+  public set tileRes(val: number) {
+    this._tileRes = val;
+    this._renderer.tileRes = val;
+  }
+  public get tileRes() {
+    return this._tileRes;
   }
 
   constructor(params: { container: HTMLElement }) {
@@ -174,8 +182,9 @@ export class DemoViewer extends EventEmitter {
 
     this._renderer = new PathtracingRenderer({ canvas: this.canvas_pt });
     this.three_renderer = new ThreeRenderer({ canvas: this.canvas_three, powerPreference: "high-performance", alpha: true });
-    this._renderer.pixelRatio = 1.0;
     this._renderer.maxBounces = 5;
+    this._renderer.pixelRatio = this.pixelRatio;
+    this._renderer.tileRes = this.tileRes;
 
     window.addEventListener('resize', () => {
       this.resize();
@@ -212,7 +221,7 @@ export class DemoViewer extends EventEmitter {
       }
     } else {
       this._renderer.pixelRatio = this.pixelRatio;
-      this._renderer.tileRes = this.tileRes;
+      this._renderer.tileRes = this._tileRes;
     }
   }
 

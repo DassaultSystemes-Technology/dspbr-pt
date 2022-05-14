@@ -12,6 +12,7 @@
   "source": "index.ts",
   "types": "dist/index.d.ts",
   "main": "dist/index.js",
+  "module": "dist/module.js",
   "scripts": {
     "build": "parcel build index.ts --dist-dir dist/ --public-url ./ --no-source-maps"
   },

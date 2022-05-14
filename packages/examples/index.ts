@@ -65,11 +65,12 @@ class Demo {
     })
 
     if(this._params.ground) {
+      console.log(`Param: showGroundPlane => true`);
       this._viewer.showGroundPlane = true;
     }
 
-    if (this._params.scene) {
-      this._viewer.loadSceneFromUrl(this.resolveUrlFromIndex(this._params.scene));
+    if (this._params.src) {
+      this._viewer.loadSceneFromUrl(this.resolveUrlFromIndex(this._params.src));
     }
     if (this._params.ibl) {
       console.log(this.resolveUrlFromIndex(this._params.ibl));
@@ -79,10 +80,15 @@ class Demo {
       this._viewer.loadIbl(this.resolveUrlFromIndex(this._defaultIblKey));
     }
 
-    if(this._params.rotate) {
-      this._renderer.iblRotation = this._params.rotate;
+    if(this._params.iblRotation) {
+      console.log(`Param: iblRotation => ${this._params.iblRotation}`);
+      this._renderer.iblRotation = parseFloat(this._params.iblRotation);
     }
 
+    if(this._params.tileRes) {
+      console.log(`Param: tileRes => ${this._params.tileRes}`);
+      this._viewer.tileRes = parseInt(this._params.tileRes);
+    }
 
     this.initUI();
   }
@@ -191,7 +197,7 @@ class Demo {
       min: 0,
       max: 10.0
     });
-    interator.addInput(this._renderer, 'tileRes', {
+    interator.addInput(this._viewer, 'tileRes', {
       label: 'Tile Res',
       step: 1,
       min: 1,

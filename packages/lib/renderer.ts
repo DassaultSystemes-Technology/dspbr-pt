@@ -256,7 +256,7 @@ export class PathtracingRenderer {
     this._enableFxaa = val;
   }
 
-  private _tileRes = 4;
+  private _tileRes = 1;
   public set tileRes(val: number) {
     this._tileRes = val;
   }
