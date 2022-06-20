@@ -216,7 +216,7 @@ vec3 sample_bsdf_microfacet_ggx_smith(const in MaterialClosure c, vec3 wi, Geome
   float ior_i = 1.0;
   float ior_o = c.ior;
 
-  if (c.backside) {
+  if (c.backside && !c.thin_walled) {
     ior_i = c.ior;
     ior_o = 1.0;
   }
