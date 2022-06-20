@@ -54,7 +54,7 @@ export class ThreeSceneAdapter {
           materials.push(child.material as THREE.MeshPhysicalMaterial);
         }
 
-        const matIdx = materials.length -1;
+        const matIdx = materials.length - 1;
         vertexOffset += this.processMesh(child, matIdx, combinedMeshBuffer, vertexOffset);
       }
       else if (child.isLight) {
@@ -162,219 +162,218 @@ export class ThreeSceneAdapter {
     geo.morphTargetsRelative = false;;
   }
 
-  private async parseMaterial(mat: THREE.MeshPhysicalMaterial, sceneData: PathtracingSceneData, gltf?: GLTF): Promise<MaterialData> {
+  private async parseMaterial(mat: THREE.MeshPhysicalMaterial, sceneData: PathtracingSceneData, gltf?: GLTF) {
     // console.log(mat);
-    return new Promise<MaterialData>((resolve) => {
-      let matInfo = new MaterialData();
+    let matInfo = new MaterialData();
 
-      matInfo.name = mat.name != "" ? mat.name : mat.uuid;
-      matInfo.albedo = mat.color.toArray();
-      if (mat.map) {
-        matInfo.albedoTextureId = sceneData.addTexture(mat.map);
+    matInfo.name = mat.name != "" ? mat.name : mat.uuid;
+    matInfo.albedo = mat.color.toArray();
+    if (mat.map) {
+      matInfo.albedoTextureId = sceneData.addTexture(mat.map);
+    }
+
+    matInfo.metallic = mat.metalness || 0;
+    matInfo.roughness = mat.roughness || 0;
+    matInfo.doubleSided = mat.side == THREE.DoubleSide ? 1 : 0;
+
+    matInfo.cutoutOpacity = mat.opacity;
+    matInfo.alphaCutoff = mat.alphaTest;
+    if (mat.alphaTest == 0.0 && !mat.transparent)
+      matInfo.alphaCutoff = 1.0;
+
+    if (mat.metalnessMap) {
+      matInfo.metallicRoughnessTextureId = sceneData.addTexture(mat.metalnessMap);
+    }
+
+    if (mat.normalMap) {
+      matInfo.normalTextureId = sceneData.addTexture(mat.normalMap);
+      matInfo.normalScale = mat.normalScale.x;
+    }
+
+    if (mat.emissive) {
+      matInfo.emission = mat.emissive.toArray();
+      if (mat.emissiveMap) {
+        matInfo.emissionTextureId = sceneData.addTexture(mat.emissiveMap);
       }
+    }
 
-      matInfo.metallic = mat.metalness || 0;
-      matInfo.roughness = mat.roughness || 0;
-      matInfo.doubleSided = mat.side == THREE.DoubleSide ? 1 : 0;
+    matInfo.clearcoat = mat.clearcoat || 0;
+    if (mat.clearcoatMap) {
+      matInfo.clearcoatTextureId = sceneData.addTexture(mat.clearcoatMap);
+    }
 
-      matInfo.cutoutOpacity = mat.opacity;
-      matInfo.alphaCutoff = mat.alphaTest;
-      if (mat.alphaTest == 0.0 && !mat.transparent)
-        matInfo.alphaCutoff = 1.0;
+    matInfo.clearcoatRoughness = mat.clearcoatRoughness || 0;
+    if (mat.clearcoatRoughnessMap) {
+      matInfo.clearcoatRoughnessTextureId = sceneData.addTexture(mat.clearcoatRoughnessMap);
+    }
 
-      if (mat.metalnessMap) {
-        matInfo.metallicRoughnessTextureId = sceneData.addTexture(mat.metalnessMap);
-      }
+    matInfo.transparency = mat.transmission || 0;
+    if (mat.transmissionMap) {
+      matInfo.transmissionTextureId = sceneData.addTexture(mat.transmissionMap);
+    }
 
-      if (mat.normalMap) {
-        matInfo.normalTextureId = sceneData.addTexture(mat.normalMap);
-        matInfo.normalScale = mat.normalScale.x;
-      }
+    matInfo.specular = (mat.specularIntensity === undefined) ? 1.0 : mat.specularIntensity;
+    if (mat.specularColor)
+      matInfo.specularTint = mat.specularColor.toArray();
+    if (mat.specularIntensityMap) {
+      matInfo.specularTextureId = sceneData.addTexture(mat.specularIntensityMap);
+    }
+    if (mat.specularColorMap) {
+      matInfo.specularColorTextureId = sceneData.addTexture(mat.specularColorMap);
+    }
 
-      if (mat.emissive) {
-        matInfo.emission = mat.emissive.toArray();
-        if (mat.emissiveMap) {
-          matInfo.emissionTextureId = sceneData.addTexture(mat.emissiveMap);
+    if (mat.sheenColor)
+      matInfo.sheenColor = mat.sheenColor.toArray();
+    if (mat.sheenColorMap) {
+      matInfo.sheenColorTextureId = sceneData.addTexture(mat.sheenColorMap);
+    }
+    matInfo.sheenRoughness = (mat.sheenRoughness === undefined) ? 0.0 : mat.sheenRoughness;
+    if (mat.sheenRoughnessMap) {
+      matInfo.sheenRoughnessTextureId = sceneData.addTexture(mat.sheenRoughnessMap);
+    }
+
+    // KHR_materials_volume
+    if (mat.thickness)
+      matInfo.thinWalled = mat.thickness == 0.01 ? 1 : 0; //hack: three.js defaults thickness to 0.01 when volume extensions doesn't exist.
+    if (mat.attenuationColor)
+      matInfo.attenuationColor = mat.attenuationColor.toArray();
+
+    matInfo.attenuationDistance = mat.attenuationDistance || matInfo.attenuationDistance;
+
+    if (matInfo.attenuationDistance == 0.0)
+      matInfo.attenuationDistance = Number.MAX_VALUE;
+
+    // KHR_materials_ior
+    matInfo.ior = mat.ior || matInfo.ior;
+
+    if (gltf) {
+      // console.log(`Parsing Extensions`);
+      const setTextureTransformFromExt = (texInfo: TexInfo, ext: any) => {
+        if ("extensions" in ext && "KHR_texture_transform" in ext.extensions) {
+          let transform = ext.extensions["KHR_texture_transform"];
+          if ("offset" in transform)
+            texInfo.texOffset = transform["offset"];
+          if ("scale" in transform)
+            texInfo.texScale = transform["scale"];
         }
-      }
+      };
 
-      matInfo.clearcoat = mat.clearcoat || 0;
-      if (mat.clearcoatMap) {
-        matInfo.clearcoatTextureId = sceneData.addTexture(mat.clearcoatMap);
-      }
-
-      matInfo.clearcoatRoughness = mat.clearcoatRoughness || 0;
-      if (mat.clearcoatRoughnessMap) {
-        matInfo.clearcoatRoughnessTextureId = sceneData.addTexture(mat.clearcoatRoughnessMap);
-      }
-
-      matInfo.transparency = mat.transmission || 0;
-      if (mat.transmissionMap) {
-        matInfo.transmissionTextureId = sceneData.addTexture(mat.transmissionMap);
-      }
-
-      matInfo.specular = (mat.specularIntensity === undefined) ? 1.0 : mat.specularIntensity;
-      if (mat.specularColor)
-        matInfo.specularTint = mat.specularColor.toArray();
-      if (mat.specularIntensityMap) {
-        matInfo.specularTextureId = sceneData.addTexture(mat.specularIntensityMap);
-      }
-      if (mat.specularColorMap) {
-        matInfo.specularColorTextureId = sceneData.addTexture(mat.specularColorMap);
-      }
-
-      if (mat.sheenColor)
-        matInfo.sheenColor = mat.sheenColor.toArray();
-      if (mat.sheenColorMap) {
-        matInfo.sheenColorTextureId = sceneData.addTexture(mat.sheenColorMap);
-      }
-      matInfo.sheenRoughness = (mat.sheenRoughness === undefined) ? 0.0 : mat.sheenRoughness;
-      if (mat.sheenRoughnessMap) {
-        matInfo.sheenRoughnessTextureId = sceneData.addTexture(mat.sheenRoughnessMap);
-      }
-
-      // KHR_materials_volume
-      if (mat.thickness)
-        matInfo.thinWalled = mat.thickness == 0.01 ? 1 : 0; //hack: three.js defaults thickness to 0.01 when volume extensions doesn't exist.
-      if (mat.attenuationColor)
-        matInfo.attenuationColor = mat.attenuationColor.toArray();
-
-      matInfo.attenuationDistance = mat.attenuationDistance || matInfo.attenuationDistance;
-
-      if (matInfo.attenuationDistance == 0.0)
-        matInfo.attenuationDistance = Number.MAX_VALUE;
-
-      // KHR_materials_ior
-      matInfo.ior = mat.ior || matInfo.ior;
-
-      if (gltf) {
-        // console.log(`Parsing Extensions`);
-        const setTextureTransformFromExt = (texInfo: TexInfo, ext: any) => {
-          if ("extensions" in ext && "KHR_texture_transform" in ext.extensions) {
-            let transform = ext.extensions["KHR_texture_transform"];
-            if ("offset" in transform)
-              texInfo.texOffset = transform["offset"];
-            if ("scale" in transform)
-              texInfo.texScale = transform["scale"];
-          }
-        };
-
-        const findExtension = (name: string, mat: THREE.MeshPhysicalMaterial) => {
-          // check for unofficial extension in extras
-          if (name in mat.userData) {
-            return mat.userData[name];
-          }
-
-          // Check for offical extensions
-          if ('gltfExtensions' in mat.userData) {
-            if (name in mat.userData.gltfExtensions) {
-              return mat.userData.gltfExtensions[name];
-            }
-          }
-
-          return null;
+      const findExtension = (name: string, mat: THREE.MeshPhysicalMaterial) => {
+        // check for unofficial extension in extras
+        if (name in mat.userData) {
+          return mat.userData[name];
         }
 
-        const get_param = function (name: string, obj: any, default_value: any) {
-          return (name in obj) ? obj[name] : default_value;
-        };
-
-        const parseExtensions = (name: string, parseFunc: Function) => {
-          const ext = findExtension(name, mat);
-          if (ext) {
-            // console.log(`  ${name}`);
-            parseFunc(ext);
+        // Check for offical extensions
+        if ('gltfExtensions' in mat.userData) {
+          if (name in mat.userData.gltfExtensions) {
+            return mat.userData.gltfExtensions[name];
           }
-        };
+        }
 
-        parseExtensions('KHR_materials_emissive_strength', (ext: any) => {
-          const emissiveStrength = get_param("emissiveStrength", ext, 1.0);
-          matInfo.emission = matInfo.emission.map(x => x * emissiveStrength);
-        });
-
-        parseExtensions('KHR_materials_anisotropy', async (ext: any) => {
-          matInfo.anisotropy = get_param("anisotropy", ext, matInfo.anisotropy);
-          matInfo.anisotropyDirection = get_param("anisotropyDirection", ext, matInfo.anisotropyDirection);
-          if ("anisotropyTexture" in ext) {
-            await gltf.parser.getDependency('texture', ext.anisotropyTexture.index)
-              .then((tex: THREE.Texture) => {
-                matInfo.anisotropyTextureId = sceneData.addTexture(tex);
-                setTextureTransformFromExt(sceneData.getTexInfo(matInfo.anisotropyTextureId), ext.anisotropyTexture);
-              });
-          }
-          if ("anisotropyDirectionTexture" in ext) {
-            await gltf.parser.getDependency('texture', ext.anisotropyDirectionTexture.index)
-              .then((tex: THREE.Texture) => {
-                matInfo.anisotropyDirectionTextureId = sceneData.addTexture(tex);
-                setTextureTransformFromExt(sceneData.getTexInfo(matInfo.anisotropyDirectionTextureId), ext.anisotropyDirectionTexture);
-              });
-          }
-        });
-
-        parseExtensions('3DS_materials_anisotropy', (ext: any) => {
-          matInfo.anisotropy = get_param("anisotropyFactor", ext, matInfo.anisotropy);
-          let anisotropyRotation = get_param("anisotropyRotationFactor", ext, matInfo.anisotropyRotation) * 2.0 * Math.PI;
-          matInfo.anisotropyDirection = [Math.cos(anisotropyRotation), Math.sin(anisotropyRotation), 0];
-        });
-
-        parseExtensions('KHR_materials_iridescence', async (ext: any) => {
-          matInfo.iridescence = get_param("iridescenceFactor", ext, 1.0);
-          matInfo.iridescenceIOR = get_param("iridescenceIor", ext, matInfo.iridescenceIOR);
-          matInfo.iridescenceThicknessMinimum = get_param("iridescenceThicknessMinimum", ext, matInfo.iridescenceThicknessMinimum);
-          matInfo.iridescenceThicknessMaximum = get_param("iridescenceThicknessMaximum", ext, matInfo.iridescenceThicknessMaximum);
-          if ("iridescenceTexture" in ext) {
-            await gltf.parser.getDependency('texture', ext.iridescenceTexture.index)
-              .then((tex: THREE.Texture) => {
-                matInfo.iridescenceTextureId = sceneData.addTexture(tex);
-                setTextureTransformFromExt(sceneData.getTexInfo(matInfo.iridescenceTextureId), ext.iridescenceTexture);
-              });
-          }
-          if ("iridescenceThicknessTexture" in ext) {
-            await gltf.parser.getDependency('texture', ext.iridescenceThicknessTexture.index)
-              .then((tex: THREE.Texture) => {
-                matInfo.iridescenceThicknessTextureId = sceneData.addTexture(tex);
-                setTextureTransformFromExt(sceneData.getTexInfo(matInfo.iridescenceThicknessTextureId), ext.iridescenceThicknessTexture);
-              });
-          }
-        });
-
-        const translucencyParser = async (ext: any) => {
-          matInfo.translucency = get_param("translucencyFactor", ext, matInfo.transparency);
-          matInfo.translucencyColor = get_param("translucencyColorFactor", ext, matInfo.translucencyColor);
-          if ("translucencyTexture" in ext) {
-            await gltf.parser.getDependency('texture', ext.translucencyTexture.index)
-              .then((tex) => {
-                matInfo.translucencyTextureId = sceneData.addTexture(tex);
-                setTextureTransformFromExt(sceneData.getTexInfo(matInfo.translucencyTextureId), ext.translucencyTexture);
-              });
-          }
-          if ("translucencyColorTexture" in ext) {
-            await gltf.parser.getDependency('texture', ext.translucencyColorTexture.index)
-              .then((tex) => {
-                matInfo.translucencyColorTextureId = sceneData.addTexture(tex);
-                setTextureTransformFromExt(sceneData.getTexInfo(matInfo.translucencyColorTextureId), ext.translucencyColorTexture);
-              });
-          }
-        };
-
-        parseExtensions('KHR_materials_translucency', translucencyParser);
-        parseExtensions('3DS_materials_translucency', translucencyParser);
-
-        parseExtensions('3DS_materials_volume', async (ext: any) => {
-          matInfo.thinWalled = get_param("thinWalled", ext, matInfo.thinWalled);
-          matInfo.attenuationColor = get_param("attenuationColor", ext, matInfo.attenuationColor);
-          matInfo.attenuationDistance = get_param("attenuationDistance", ext, matInfo.attenuationDistance);
-          matInfo.subsurfaceColor = get_param("subsurfaceColor", ext, matInfo.subsurfaceColor);
-        });
-
-        // parseExtensions('KHR_materials_sss', (ext: any) => {
-        //   matInfo.scatterColor = get_param("scatterColor", ext, matInfo.scatterColor);
-        //   matInfo.scatterDistance = get_param("scatterDistance", ext, matInfo.scatterDistance);
-        // });
+        return null;
       }
-      matInfo.dirty = false;
-      resolve(matInfo);
-    });
+
+      function get_param(name: string, obj: any, default_value: any) {
+        return (name in obj) ? obj[name] : default_value;
+      };
+
+      async function parseExtensions(name: string, parseFunc: Function) {
+        const ext = findExtension(name, mat);
+        if (ext) {
+          // console.log(`  ${name}`);
+          await parseFunc(ext);
+        }
+      };
+
+      parseExtensions('KHR_materials_emissive_strength', (ext: any) => {
+        const emissiveStrength = get_param("emissiveStrength", ext, 1.0);
+        matInfo.emission = matInfo.emission.map(x => x * emissiveStrength);
+      });
+
+      await parseExtensions('KHR_materials_anisotropy', async (ext: any) => {
+        matInfo.anisotropy = get_param("anisotropy", ext, matInfo.anisotropy);
+        matInfo.anisotropyDirection = get_param("anisotropyDirection", ext, matInfo.anisotropyDirection);
+        if ("anisotropyTexture" in ext) {
+          await gltf.parser.getDependency('texture', ext.anisotropyTexture.index)
+            .then((tex: THREE.Texture) => {
+              matInfo.anisotropyTextureId = sceneData.addTexture(tex);
+              setTextureTransformFromExt(sceneData.getTexInfo(matInfo.anisotropyTextureId), ext.anisotropyTexture);
+            });
+        }
+        if ("anisotropyDirectionTexture" in ext) {
+          await gltf.parser.getDependency('texture', ext.anisotropyDirectionTexture.index)
+            .then((tex: THREE.Texture) => {
+              matInfo.anisotropyDirectionTextureId = sceneData.addTexture(tex);
+              setTextureTransformFromExt(sceneData.getTexInfo(matInfo.anisotropyDirectionTextureId), ext.anisotropyDirectionTexture);
+            });
+        }
+      });
+
+      parseExtensions('3DS_materials_anisotropy', (ext: any) => {
+        matInfo.anisotropy = get_param("anisotropyFactor", ext, matInfo.anisotropy);
+        let anisotropyRotation = get_param("anisotropyRotationFactor", ext, matInfo.anisotropyRotation) * 2.0 * Math.PI;
+        matInfo.anisotropyDirection = [Math.cos(anisotropyRotation), Math.sin(anisotropyRotation), 0];
+      });
+
+      await parseExtensions('KHR_materials_iridescence', async (ext: any) => {
+        matInfo.iridescence = get_param("iridescenceFactor", ext, 1.0);
+        matInfo.iridescenceIOR = get_param("iridescenceIor", ext, matInfo.iridescenceIOR);
+        matInfo.iridescenceThicknessMinimum = get_param("iridescenceThicknessMinimum", ext, matInfo.iridescenceThicknessMinimum);
+        matInfo.iridescenceThicknessMaximum = get_param("iridescenceThicknessMaximum", ext, matInfo.iridescenceThicknessMaximum);
+        if ("iridescenceTexture" in ext) {
+          await gltf.parser.getDependency('texture', ext.iridescenceTexture.index)
+            .then((tex: THREE.Texture) => {
+              matInfo.iridescenceTextureId = sceneData.addTexture(tex);
+              setTextureTransformFromExt(sceneData.getTexInfo(matInfo.iridescenceTextureId), ext.iridescenceTexture);
+            });
+        }
+        if ("iridescenceThicknessTexture" in ext) {
+          await gltf.parser.getDependency('texture', ext.iridescenceThicknessTexture.index)
+            .then((tex: THREE.Texture) => {
+              matInfo.iridescenceThicknessTextureId = sceneData.addTexture(tex);
+              setTextureTransformFromExt(sceneData.getTexInfo(matInfo.iridescenceThicknessTextureId), ext.iridescenceThicknessTexture);
+            });
+        }
+      });
+
+      const translucencyParser = async (ext: any) => {
+        matInfo.translucency = get_param("translucencyFactor", ext, matInfo.transparency);
+        matInfo.translucencyColor = get_param("translucencyColorFactor", ext, matInfo.translucencyColor);
+        if ("translucencyTexture" in ext) {
+          await gltf.parser.getDependency('texture', ext.translucencyTexture.index)
+            .then((tex) => {
+              matInfo.translucencyTextureId = sceneData.addTexture(tex);
+              setTextureTransformFromExt(sceneData.getTexInfo(matInfo.translucencyTextureId), ext.translucencyTexture);
+            });
+        }
+        if ("translucencyColorTexture" in ext) {
+          await gltf.parser.getDependency('texture', ext.translucencyColorTexture.index)
+            .then((tex) => {
+              matInfo.translucencyColorTextureId = sceneData.addTexture(tex);
+              setTextureTransformFromExt(sceneData.getTexInfo(matInfo.translucencyColorTextureId), ext.translucencyColorTexture);
+            });
+        }
+      };
+
+      await parseExtensions('KHR_materials_translucency', translucencyParser);
+      await parseExtensions('3DS_materials_translucency', translucencyParser);
+
+      parseExtensions('3DS_materials_volume', (ext: any) => {
+        c.thinWalled = get_param("thinWalled", ext, matInfo.thinWalled);
+        matInfo.attenuationColor = get_param("attenuationColor", ext, matInfo.attenuationColor);
+        matInfo.attenuationDistance = get_param("attenuationDistance", ext, matInfo.attenuationDistance);
+        matInfo.subsurfaceColor = get_param("subsurfaceColor", ext, matInfo.subsurfaceColor);
+      });
+
+      // parseExtensions('KHR_materials_sss', (ext: any) => {
+      //   matInfo.scatterColor = get_param("scatterColor", ext, matInfo.scatterColor);
+      //   matInfo.scatterDistance = get_param("scatterDistance", ext, matInfo.scatterDistance);
+      // });
+    }
+    matInfo.dirty = false;
+
+    return matInfo;
   }
 
 }

@@ -730,7 +730,7 @@ export class PathtracingRenderer {
 
     this.scene = scene;
     this.gpu_scene = new PathtracingSceneDataWebGL2(this.gl, scene);
-    this.gpu_scene.init();
+    await this.gpu_scene.init();
 
     this.initBvh(scene);
     await this.initializeShaders();
