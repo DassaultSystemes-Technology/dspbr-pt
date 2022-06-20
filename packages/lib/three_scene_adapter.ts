@@ -360,7 +360,7 @@ export class ThreeSceneAdapter {
       await parseExtensions('3DS_materials_translucency', translucencyParser);
 
       parseExtensions('3DS_materials_volume', (ext: any) => {
-        c.thinWalled = get_param("thinWalled", ext, matInfo.thinWalled);
+        matInfo.thinWalled = get_param("thinWalled", ext, matInfo.thinWalled);
         matInfo.attenuationColor = get_param("attenuationColor", ext, matInfo.attenuationColor);
         matInfo.attenuationDistance = get_param("attenuationDistance", ext, matInfo.attenuationDistance);
         matInfo.subsurfaceColor = get_param("subsurfaceColor", ext, matInfo.subsurfaceColor);
