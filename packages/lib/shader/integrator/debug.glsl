@@ -66,10 +66,7 @@ vec4 trace(const bvh_ray ray) {
       contrib = fresnel_schlick(c.specular_f0, c.specular_f90, dot(c.n, rs.wi));
     }
     if (int(u_debug_mode) == D_FRESNEL_IRIDESCENCE) {
-      float ior_i = c.backside ? c.ior : 1.0;
-      float ior_o = c.backside ? 1.0 : c.ior;
-      vec3 f0 = sqr((ior_i - ior_o) / (ior_i + ior_o)) * c.specular * c.specular_tint;
-      contrib = evalIridescence(ior_i, c.iridescence_ior, cos_theta, c.iridescence_thickness, f0);
+      contrib = evalIridescence(1.0, c.iridescence_ior, cos_theta, c.iridescence_thickness, c.specular_f0);
     }
     color = vec4(contrib, 1.0);
   } else { // direct background hit

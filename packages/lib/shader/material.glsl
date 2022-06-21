@@ -111,13 +111,13 @@ void configure_material(const in uint matIdx, in RenderState rs, out MaterialClo
   float anisotropyRotation = atan(ansiotropyDirection.y, ansiotropyDirection.x) + PI;
   c.t = rotation_to_tangent(anisotropyRotation, c.n, c.t);
 
-  if (c.backside) {
+  if (c.backside && !c.thin_walled) {
     c.f0 = ((1.0 - c.ior) / (1.0 + c.ior)) * ((1.0 - c.ior) / (1.0 + c.ior));
   } else {
     c.f0 = ((c.ior - 1.0) / (c.ior + 1.0)) * ((c.ior - 1.0) / (c.ior + 1.0));
   }
-  c.specular_f0 = (1.0 - c.metallic) * c.specular * c.f0 * c.specular_tint + c.metallic * c.albedo;
-  c.specular_f90 = vec3((1.0 - c.metallic) * c.specular + c.metallic);
+  c.specular_f0 = mix(c.specular * c.f0 * c.specular_tint, c.albedo, c.metallic);
+  c.specular_f90 = vec3(mix(c.specular, 1.0, c.metallic));
 
   vec3 emission = get_texture_value(matData.emissionTextureId, uv).xyz;
   c.emission = matData.emission.xyz * to_linear_rgb(emission);

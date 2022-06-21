@@ -39,10 +39,10 @@ async function startRenderer() {
     const gltf = await new GLTFLoader().loadAsync(args.gltf_path);
     gltf.scene.updateMatrixWorld();
 
-    this.sceneAdapter = new ThreeSceneAdapter(gltf.scene, gltf);
-    await this.sceneAdapter.init();
+    const sceneAdapter = new ThreeSceneAdapter(gltf.scene, gltf);
+    await sceneAdapter.init();
 
-    renderer.setScene(this.sceneAdapter.scene).then(() => {
+    renderer.setScene(sceneAdapter.scene).then(() => {
       if (args.ibl !== "None") {
         new RGBELoader().setDataType(FloatType).loadAsync(args.ibl).then((ibl) => {
           console.log("loaded ibl" + args.ibl);
@@ -67,7 +67,7 @@ async function startRenderer() {
         camera.updateMatrixWorld();
       }
 
-      renderer.render(camera, args.samples, () => {}, (result) => {
+      renderer.render(camera, args.samples, () => {}, () => {}, (result) => {
         console.log("icpRenderer Ready");
         ipcRenderer.send('rendererReady');
       });

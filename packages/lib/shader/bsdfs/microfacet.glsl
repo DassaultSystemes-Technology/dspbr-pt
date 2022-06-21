@@ -141,8 +141,6 @@ vec3 eval_brdf_microfacet_ggx(vec3 f0, vec3 f90, vec2 alpha, float iridescence, 
     return vec3(0.0);
   }
 
-  // iridescence_base_weight = 1.0 - vec3(max(max(iridescence_fresnel.r, iridescence_fresnel.g),
-  // iridescence_fresnel.b));
   vec3 iridescence_fresnel = evalIridescence(1.0, iridescence_ior, dot(wi, wh), iridescence_thickness, f0);
 
   vec3 f = mix(fresnel_schlick(f0, f90, dot(wi, wh)), iridescence_fresnel, iridescence);
@@ -187,19 +185,14 @@ vec3 sample_brdf_microfacet_ggx(vec2 alpha, vec3 wi, Geometry g, vec2 uv, out fl
 }
 
 vec3 fresnel_reflection(MaterialClosure c, float cos_theta, float ni, float nt) {
-  vec3 f0 = sqr((ni - nt) / (ni + nt)) * c.specular * c.specular_tint;
-  vec3 f90 = vec3(c.specular);
-
-  vec3 _iridescence = evalIridescence(ni, c.iridescence_ior, cos_theta, c.iridescence_thickness, f0);
-  vec3 _plastic = fresnel_schlick(f0, f90, cos_theta);
-  vec3 _glass = fresnel_schlick_dielectric(cos_theta, f0, f90, ni, nt, c.thin_walled);
+  vec3 _iridescence = evalIridescence(1.0, c.iridescence_ior, cos_theta, c.iridescence_thickness, c.specular_f0);
+  vec3 _plastic = fresnel_schlick(c.specular_f0, c.specular_f90, cos_theta);
+  vec3 _glass = fresnel_schlick_dielectric(cos_theta, c.specular_f0, c.specular_f90, ni, nt, c.thin_walled);
   return mix(mix(_plastic, _glass, c.transparency), _iridescence, c.iridescence);
 }
 
 vec3 fresnel_transmission(MaterialClosure c, float cos_theta, float ni, float nt) {
-  vec3 f0 = sqr((ni - nt) / (ni + nt)) * c.specular * c.specular_tint;
-  vec3 f90 = vec3(c.specular);
-  vec3 fr = fresnel_schlick_dielectric(cos_theta, f0, f90, ni, nt, c.thin_walled);
+  vec3 fr = fresnel_schlick_dielectric(cos_theta, c.specular_f0, c.specular_f90, ni, nt, c.thin_walled);
   return vec3(1.0) - fr;
 }
 
@@ -264,10 +257,6 @@ vec3 sample_bsdf_microfacet_ggx_smith(const in MaterialClosure c, vec3 wi, Geome
   if (bool(event & E_REFLECTION)) {
     float g2 = ggx_smith_g2(c.alpha, wi, wo, wh, geo, false);
 
-    // vec3 f0 = sqr((ior_i - ior_o) / (ior_i + ior_o)) * c.specular * c.specular_tint;
-    // vec3 _iridescence = evalIridescence(ior_i, c.iridescence_ior, cos_theta_i, c.iridescence_thickness, f0);
-    // float iridescence_base_weight = 1.0 - max_(_iridescence);
-
     bsdf_weight *= fr / prob_fr;
     bsdf_weight *= g2 / g1; // * iridescence_base_weight;
     pdf *= prob_fr / (4.0 * abs(dot(wo, wh)));
@@ -300,7 +289,7 @@ float bsdf_microfacet_ggx_smith_pdf(in MaterialClosure c, Geometry g, vec3 wi, v
 
   float ior_i = 1.0;
   float ior_o = c.ior;
-  if (c.backside) {
+  if (c.backside && !c.thin_walled) {
     ior_i = c.ior;
     ior_o = 1.0;
   }
