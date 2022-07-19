@@ -259,7 +259,7 @@ class Demo {
       expanded: true,
     }).on('change', (ev) => {
       console.log(ev.value);
-      this._renderer.backgroundColor = [ev.value.r / 255.0, ev.value.g / 255.0, ev.value.g / 255.0, 1.0];
+      this._renderer.backgroundColor = [ev.value.r / 255.0, ev.value.g / 255.0, ev.value.b / 255.0, 1.0];
     });
 
     params.addMonitor(this._viewer, 'fps', {
