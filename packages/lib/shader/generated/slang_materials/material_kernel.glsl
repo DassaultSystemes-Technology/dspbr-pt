@@ -486,7 +486,7 @@ vec3 evaluateDielectricSpecularGGX_0(SurfaceClosure_0 closure_5, vec3 normal_3, 
     }
     vec3 microfacetResponse_0 = evaluateMicrofacetResponseAnisotropic_0(closure_5.roughness_1, closure_5.anisotropy_1, normal_3, closure_5.anisotropyTangent_1, viewDir_1, lightDir_2);
 
-    float _S22 = max(closure_5.roughness_1, 0.00009999999747379);
+    float _S22 = max(closure_5.roughness_1 * closure_5.roughness_1, 0.00009999999747379);
 
 
 
@@ -933,7 +933,7 @@ vec3 evaluateThinSharedSpecularGGX_0(SurfaceClosure_0 closure_18, vec3 normal_8,
         return vec3(0.0);
     }
 
-    float _S39 = max(closure_18.roughness_1, 0.00009999999747379);
+    float _S39 = max(closure_18.roughness_1 * closure_18.roughness_1, 0.00009999999747379);
 
 
 
@@ -956,7 +956,7 @@ vec3 evaluateBaseSpecularGGX_0(SurfaceClosure_0 closure_19, vec3 normal_9, vec3 
     vec3 microfacetResponse_1 = evaluateMicrofacetResponseAnisotropic_0(closure_19.roughness_1, closure_19.anisotropy_1, normal_9, closure_19.anisotropyTangent_1, viewDir_8, lightDir_8);
 
     float _S41 = max(dot(viewDir_8, normalize(viewDir_8 + lightDir_8)), 0.0);
-    float _S42 = max(closure_19.roughness_1, 0.00009999999747379);
+    float _S42 = max(closure_19.roughness_1 * closure_19.roughness_1, 0.00009999999747379);
 
     float eAvg_2 = averageAlbedoGGX_0(_S42);
     float _S43 = 1.0 - eAvg_2;

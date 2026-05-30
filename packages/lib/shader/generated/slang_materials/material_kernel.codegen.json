@@ -1,7 +1,7 @@
 {
   "version": 1,
   "sourceRoot": "../gltf-pt/packages/lib/wavefront/shaders/slang/materials",
-  "sourceHash": "e366a52f7757dcecbba5fb9e5fd5480f468d91053fce9dcc9fc87361131eb4cc",
+  "sourceHash": "412c27209e2ef8cff60e0aec8c38e44499b129708df9f62d0cbf6afb0ed931e1",
   "sourceFiles": [
     "packages/lib/wavefront/shaders/slang/materials/api.slang",
     "packages/lib/wavefront/shaders/slang/materials/bsdf/eval.slang",
