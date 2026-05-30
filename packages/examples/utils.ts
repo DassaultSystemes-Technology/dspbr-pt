@@ -1,57 +1,30 @@
-import * as THREE from 'three';
 import { PathtracingRenderer } from 'dspbr-pt';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import Stats from 'three/examples/jsm/libs/stats.module.js';
+import { PerspectiveCamera, WasdCameraController, Vec3 } from 'dspbr-pt-viewer';
 
-
-export function init() {
-  const viewport = document.getElementById("viewport");
+export function init(): [HTMLCanvasElement, PerspectiveCamera, PathtracingRenderer, WasdCameraController] {
+  const viewport = document.getElementById('viewport')!;
   const canvas = document.createElement('canvas');
   viewport.appendChild(canvas);
 
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
 
-  let aspect = window.innerWidth / window.innerHeight;
-  const camera = new THREE.PerspectiveCamera(45, aspect, 0.01, 1000);
+  const camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 1000);
+  camera.position.set(0, 0, 6);
+  camera.lookAt(new Vec3(0, 0, 0));
 
-  const renderer = new PathtracingRenderer({ canvas: canvas });
-  renderer.pixelRatio = 1.0 * window.devicePixelRatio;
+  const renderer = new PathtracingRenderer({ canvas });
+  renderer.pixelRatio = window.devicePixelRatio;
+
+  const controls = new WasdCameraController(camera, canvas);
+  controls.addEventListener('change', () => renderer.resetAccumulation());
 
   window.addEventListener('resize', () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     renderer.resize(window.innerWidth, window.innerHeight);
     camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
   }, false);
 
-  const controls = new OrbitControls(camera, canvas);
-  controls.screenSpacePanning = true;
-  controls.enableDamping = false;
-  controls.rotateSpeed = 2.0;
-  controls.panSpeed = 2.0;
-
-  camera.position.set(0.0, 0.0, 6.0);
-  camera.lookAt(new THREE.Vector3());
-  camera.updateMatrixWorld();
-  controls.update();
-
-  controls.addEventListener('change', () => {
-    camera.updateMatrixWorld();
-    renderer.resetAccumulation();
-  });
-
-  // controls.addEventListener('start', () => { renderer.setLowResRenderMode(true); });
-  // controls.addEventListener('end', () => { renderer.setLowResRenderMode(false); });
-
-  controls.mouseButtons = {
-    LEFT: THREE.MOUSE.ROTATE,
-    MIDDLE: THREE.MOUSE.PAN,
-    RIGHT: THREE.MOUSE.DOLLY
-  }
-
-  const stats = new Stats();
-  viewport.appendChild(stats.domElement);
-  return [canvas, camera, renderer, controls, stats];
+  return [canvas, camera, renderer, controls];
 }

@@ -15,24 +15,21 @@
 
 import { Pane } from 'tweakpane';
 import { DemoViewer } from 'dspbr-pt-viewer';
-import { PathtracingRenderer, PathtracingSceneData } from 'dspbr-pt';
+import type { PathtracingRenderer, PathtracingSceneData } from 'dspbr-pt';
 import * as Assets from './asset_index';
 
 if (!window.File || !window.FileReader || !window.FileList || !window.Blob) {
   alert('The File APIs are not fully supported in this browser.');
 }
 
-if (process.env['NODE_ENV'] == 'dev') {
-  console.log("Local development: Replacing Asset URLs...");
-  for (let [_, ibl] of Object.entries(Assets.ibls)) {
-    if (ibl["url"]) {
-      ibl["url"] = ibl["url"].replace("https://raw.githubusercontent.com/DassaultSystemes-Technology/dspbr-pt/main/assets", '');
-    }
+if (import.meta.env.DEV) {
+  console.log('Local development: replacing asset URLs with local paths...');
+  const base = 'https://raw.githubusercontent.com/DassaultSystemes-Technology/dspbr-pt/main/assets';
+  for (const ibl of Object.values(Assets.ibls)) {
+    if (ibl['url']) ibl['url'] = ibl['url'].replace(base, '');
   }
-  for (let [_, scene] of Object.entries(Assets.scenes)) {
-    if (scene["url"]) {
-      scene["url"] = scene["url"].replace("https://raw.githubusercontent.com/DassaultSystemes-Technology/dspbr-pt/main/assets", '');
-    }
+  for (const scene of Object.values(Assets.scenes)) {
+    if (scene['url']) scene['url'] = scene['url'].replace(base, '');
   }
 }
 
@@ -41,448 +38,264 @@ class Demo {
   private _renderer: PathtracingRenderer;
   private _scene?: PathtracingSceneData;
   private _ui: Pane;
-  private _uiTabs: any;
+  private _uiTabs: ReturnType<Pane['addTab']>;
   private _container: HTMLElement;
 
-  private _defaultIblKey = "Artist Workshop";
-  private _currentIbl = this._defaultIblKey;
-  private _currentScene = "";
-  private _params: any;
+  private _defaultIblKey = 'Artist Workshop';
+  private _currentIbl    = this._defaultIblKey;
+  private _currentScene  = '';
+  private _params: Record<string, string | null>;
+
+  private _paneMatFolders: Record<string, ReturnType<Pane['addFolder']>> = {};
 
   constructor() {
     this._container = document.createElement('div');
-    this._viewer = new DemoViewer({ container: this._container });
-    this._renderer = this._viewer.renderer;
-    this._ui = new Pane({ title: "dspbr-pt" });
+    this._viewer    = new DemoViewer({ container: this._container });
+    this._renderer  = this._viewer.renderer;
+    this._ui        = new Pane({ title: 'dspbr-pt' });
 
     this._params = new Proxy(new URLSearchParams(window.location.search), {
-      get: (searchParams, prop) => searchParams.get(prop),
+      get: (sp, prop: string) => sp.get(prop),
+    }) as unknown as Record<string, string | null>;
+
+    this._viewer.addEventListener('sceneLoaded', (ev: Event) => {
+      const { scene } = (ev as CustomEvent<{ scene: PathtracingSceneData }>).detail;
+      this._scene = scene;
+      this.initMaterialSelector();
     });
 
-    this._viewer.on("sceneLoaded", (ev: any) => {
-      this._scene = ev.scene;
-      this.initMaterialSelector(this._params);
-    })
-
-    if(this._params.ground) {
-      console.log(`Param: showGroundPlane => true`);
-      this._viewer.showGroundPlane = true;
+    if (this._params['src']) {
+      this._viewer.loadSceneFromUrl(this.resolveUrlFromIndex(this._params['src']!));
     }
-
-    if (this._params.src) {
-      this._viewer.loadSceneFromUrl(this.resolveUrlFromIndex(this._params.src));
-    }
-    if (this._params.ibl) {
-      console.log(this.resolveUrlFromIndex(this._params.ibl));
-      this._viewer.loadIbl(this.resolveUrlFromIndex(this._params.ibl));
-    }
-    else {
+    if (this._params['ibl']) {
+      this._viewer.loadIbl(this.resolveUrlFromIndex(this._params['ibl']!));
+    } else {
       this._viewer.loadIbl(this.resolveUrlFromIndex(this._defaultIblKey));
     }
-
-    if(this._params.iblRotation) {
-      console.log(`Param: iblRotation => ${this._params.iblRotation}`);
-      this._renderer.iblRotation = parseFloat(this._params.iblRotation);
+    if (this._params['iblRotation']) {
+      this._renderer.iblRotation = parseFloat(this._params['iblRotation']!);
     }
-
-    if(this._params.tileRes) {
-      console.log(`Param: tileRes => ${this._params.tileRes}`);
-      this._viewer.tileRes = parseInt(this._params.tileRes);
+    if (this._params['tileRes']) {
+      this._viewer.tileRes = parseInt(this._params['tileRes']!);
     }
 
     this.initUI();
   }
 
   private initUI() {
-    this._ui.element.style.width = '350px';
-    this._ui.element.style.top = '5px';
-    this._ui.element.style.right = '5px';
-    this._ui.element.style.position = 'absolute';
-    this._ui.element.style.zIndex = "2";
+    Object.assign(this._ui.element.style, {
+      width: '350px', top: '5px', right: '5px', position: 'absolute', zIndex: '2',
+    });
 
-    // this.pane = pane;
     this._uiTabs = this._ui.addTab({
-      pages: [
-        { title: 'Parameters' },
-        { title: 'Materials' },
-      ],
+      pages: [{ title: 'Parameters' }, { title: 'Materials' }],
     });
-    const params = this._uiTabs.pages[0];
+    const params = this._uiTabs.pages[0]!;
 
-    params.addButton({
-      title: 'Center View'
-    }).on('click', () => {
-      this._viewer.centerView();
-    })
+    params.addButton({ title: 'Center View' }).on('click', () => this._viewer.centerView());
+    params.addButton({ title: 'Save Image'  }).on('click', () => this._viewer.saveImage());
 
-    params.addButton({
-      title: 'Save Image'
-    }).on('click', () => {
-      this._viewer.saveImage();
+    // Scene
+    const scene = params.addFolder({ title: 'Scene' });
+    scene.addBinding(this, '_currentScene', {
+      label: 'Scene',
+      options: buildOptions(Object.keys(Assets.scenes)),
+    }).on('change', ev => {
+      if (ev.value) this._viewer.loadSceneFromUrl(this.resolveUrlFromIndex(ev.value));
     });
+    scene.addBinding(this._viewer, 'autoRotate', { label: 'Auto Rotate' });
 
-    const scene = params.addFolder({
-      title: 'Scene',
-    });
+    // Lighting
+    const lighting = params.addFolder({ title: 'Lighting' });
+    lighting.addBinding(this, '_currentIbl', {
+      label: 'IBL',
+      options: buildOptions(Object.keys(Assets.ibls)),
+    }).on('change', ev => this._viewer.loadIbl(this.resolveUrlFromIndex(ev.value)));
 
-    const optionsFromList = (l) => {
-      const obj = {
-        "": ""
-      };
-      for (let e in l) {
-        obj[l[e]] = l[e];
-      }
-      return obj;
-    };
+    lighting.addBinding(this._renderer, 'iblRotation', {
+      label: 'IBL Rotation', step: 0.1, min: -180, max: 180,
+    }).on('change', () => this._viewer.toggleInteractionMode(true, 100));
 
-    scene.addInput(this, '_currentScene', {
-      label: "Scene",
-      options: optionsFromList(Object.keys(Assets.scenes)),
-    }).on('change', (ev) => {
-      if (ev.value != "") {
-        const url = this.resolveUrlFromIndex(ev.value);
-        this._viewer.loadSceneFromUrl(url);
-      }
-    });
+    lighting.addBinding(this._renderer, 'iblImportanceSampling', { label: 'Importance Sampling' });
 
-    scene.addInput(this._viewer, 'autoRotate', {
-      label: "Auto Rotate"
-    });
-
-    const lighting = params.addFolder({
-      title: 'Lighting',
-    });
-
-    lighting.addInput(this, '_currentIbl', {
-      label: "IBL",
-      options: optionsFromList(Object.keys(Assets.ibls)),
-    }).on('change', (ev) => {
-      const url = this.resolveUrlFromIndex(ev.value);
-      console.log(url);
-      this._viewer.loadIbl(url);
-    });
-
-    lighting.addInput(this._renderer, 'iblRotation', {
-      label: 'IBL Rotation',
-      step: 0.1,
-      min: -180,
-      max: 180
-    }).on('change', () => {
-      this._viewer.toggleInteractionMode(true, 100.0);
-    });
-
-    lighting.addInput(this._renderer, 'iblImportanceSampling', {
-      label: 'Importance Sampling'
-    })
-
-    const interator = params.addFolder({
-      title: 'Integrator',
-    });
-    interator.addInput(this._viewer, 'togglePathtracing', {
-      label: 'Pathtracing'
-    });
-    interator.addInput(this._renderer, 'debugMode', {
+    // Integrator
+    const integrator = params.addFolder({ title: 'Integrator' });
+    integrator.addBinding(this._renderer, 'debugMode', {
       label: 'Debug Mode',
-      options: optionsFromList(this._renderer.debugModes)
+      options: buildOptions(this._renderer.debugModes),
     });
-    interator.addInput(this._renderer, 'maxBounces', {
-      label: 'Max Bounces',
-      step: 1,
-      min: 0,
-      max: 32
-    });
-    interator.addInput(this._renderer, 'rayEps', {
-      label: 'Ray Offset',
-      step: 0.00001,
-      min: 0,
-      max: 10.0
-    });
-    interator.addInput(this._viewer, 'tileRes', {
-      label: 'Tile Res',
-      step: 1,
-      min: 1,
-      max: 8
-    });
-    interator.addInput(this._renderer, 'clampThreshold', {
-      label: 'Clamp Threshold',
-      step: 0.1,
-      min: 0,
-      max: 100
-    });
+    integrator.addBinding(this._renderer, 'maxBounces',     { label: 'Max Bounces',     step: 1,       min: 0,   max: 32    });
+    integrator.addBinding(this._renderer, 'rayEps',         { label: 'Ray Offset',      step: 0.00001, min: 0,   max: 10    });
+    integrator.addBinding(this._viewer,   'tileRes',        { label: 'Tile Res',        step: 1,       min: 1,   max: 8     });
+    integrator.addBinding(this._renderer, 'clampThreshold', { label: 'Clamp Threshold', step: 0.1,     min: 0,   max: 100   });
 
-    const display = params.addFolder({
-      title: 'Display',
-    });
-    display.addInput(this._renderer, 'exposure', {
-      label: 'Display Exposure',
-      step: 0.01,
-      min: 0,
-      max: 10
-    });
-    display.addInput(this._renderer, 'tonemapping', {
+    // Display
+    const display = params.addFolder({ title: 'Display' });
+    display.addBinding(this._renderer, 'exposure',    { label: 'Display Exposure', step: 0.01, min: 0, max: 10 });
+    display.addBinding(this._renderer, 'tonemapping', {
       label: 'Tonemapping',
-      options: optionsFromList(this._renderer.tonemappingModes)
+      options: buildOptions(this._renderer.tonemappingModes),
     });
-    display.addInput(this._renderer, 'enableGamma', {
-      label: 'Gamma'
-    });
-    display.addInput(this._viewer, 'pathtracedInteraction', {
-      label: 'Pathtraced Navigation'
-    });
-    display.addInput(this._viewer, 'pixelRatio', {
-      label: 'Pixel Ratio',
-      step: 0.1,
-      min: 0.1,
-      max: 1
-    });
-    display.addInput(this._viewer, 'interactionPixelRatio', {
-      label: 'Interaction Ratio',
-      step: 0.1,
-      min: 0.1,
-      max: 1
-    });
-    display.addInput(this._renderer, 'enableFxaa', {
-      label: 'Fxaa'
+    display.addBinding(this._renderer, 'enableGamma',         { label: 'Gamma' });
+    display.addBinding(this._viewer,   'pathtracedInteraction',{ label: 'Pathtraced Navigation' });
+    display.addBinding(this._renderer, 'showBackground',      { label: 'Background from IBL' });
+    display.addBinding(this._viewer,   'pixelRatio',          { label: 'Pixel Ratio',    step: 0.1, min: 0.1, max: 1 });
+    display.addBinding(this._viewer,   'interactionPixelRatio',{ label: 'Interaction Ratio', step: 0.1, min: 0.1, max: 1 });
+    display.addBinding(this._renderer, 'enableFxaa',          { label: 'FXAA' });
+
+    // Background color
+    const bgState = { color: { r: 0, g: 0, b: 0 } };
+    const background = params.addFolder({ title: 'Background' });
+    background.addBinding(bgState, 'color', {
+      label: 'Color',
+      color: { type: 'int' },
+    }).on('change', ev => {
+      this._renderer.backgroundColor = [ev.value.r / 255, ev.value.g / 255, ev.value.b / 255, 1];
     });
 
-    const background = params.addFolder({
-      title: 'Background',
-    });
-    display.addInput(this._renderer, 'showBackground', {
-      label: 'Background from IBL'
-    });
-
-    background.color = { r: 0, g: 0, b: 0 };
-    background.addInput(background, 'color', {
-      label: 'Background Color',
-      picker: 'inline',
-      expanded: true,
-    }).on('change', (ev) => {
-      console.log(ev.value);
-      this._renderer.backgroundColor = [ev.value.r / 255.0, ev.value.g / 255.0, ev.value.b / 255.0, 1.0];
-    });
-
-    params.addMonitor(this._viewer, 'fps', {
-      label: 'Fps',
+    // FPS monitor
+    params.addBinding(this._viewer, 'fps', {
+      readonly: true,
       view: 'graph',
-      step: 0.1,
+      label: 'FPS',
       min: 0,
-      max: 10
+      max: 60,
     });
   }
 
-
-  private initMaterialSelector(params: any) {
+  private initMaterialSelector() {
+    if (!this._scene) return;
     const materials = this._scene.materials;
+    const matTab = this._uiTabs.pages[1]!;
 
-    const matTab = this._uiTabs.pages[1];
-    for (let child of matTab.children) {
-      console.log("dispose", child);
-      child.dispose();
+    // Clear old children
+    for (const child of [...(matTab as any).children]) {
+      (child as any).dispose?.();
     }
 
-    const matNames = [];
-    for (let i = 0; i < materials.length; i++) {
-      matNames.push({ text: materials[i].name, value: i });
-    }
-    const opt = { name: materials[0].name };
-    matTab.addInput(opt, "name", {
-      options: matNames
-    }).on('change', (ev) => {
+    const matNames = materials.map((m, i) => ({ text: m.name || `material_${i}`, value: i }));
+    const sel = { index: 0 };
+    matTab.addBinding(sel, 'index', { options: matNames }).on('change', ev => {
       this.initMaterialParamUI(ev.value);
-    })
+    });
 
-    if (materials.length > 0) {
-      this.initMaterialParamUI(matNames[0].value, params);
-    }
+    if (materials.length > 0) this.initMaterialParamUI(0);
   }
 
-  private paneMatFolders = {};
-  private initMaterialParamUI(matIdx: number, params?: any) {
-    const matTab = this._uiTabs.pages[1];
-    const mat = this._scene.materials[matIdx];
+  private initMaterialParamUI(matIdx: number) {
+    if (!this._scene) return;
+    const matTab = this._uiTabs.pages[1]!;
+    const mat = this._scene.materials[matIdx]!;
 
-    for(let fn in this.paneMatFolders) {
-      this.paneMatFolders[fn].dispose();
-    };
-    this.paneMatFolders = {};
+    for (const folder of Object.values(this._paneMatFolders)) {
+      folder.dispose();
+    }
+    this._paneMatFolders = {};
 
+    const f01: Parameters<Pane['addBinding']>[2] = { step: 0.01, min: 0, max: 1 };
     const colors = {
-      albedo: { r: mat.albedo[0] * 255, g: mat.albedo[1] * 255, b: mat.albedo[2] * 255 },
-      specularTint: { r: mat.specularTint[0] * 255, g: mat.specularTint[1] * 255, b: mat.specularTint[2] * 255 },
-      translucencyColor: {
-        r: mat.translucencyColor[0] * 255,
-        g: mat.translucencyColor[1] * 255, b: mat.translucencyColor[2] * 255
-      },
-      sheenColor: { r: mat.sheenColor[0] * 255, g: mat.sheenColor[1] * 255, b: mat.sheenColor[2] * 255 },
-      attenuationColor: { r: mat.attenuationColor[0] * 255, g: mat.attenuationColor[1] * 255, b: mat.attenuationColor[2] * 255 }
+      albedo:           { r: mat.albedo[0]! * 255,           g: mat.albedo[1]! * 255,           b: mat.albedo[2]! * 255 },
+      specularTint:     { r: mat.specularTint[0]! * 255,     g: mat.specularTint[1]! * 255,     b: mat.specularTint[2]! * 255 },
+      translucencyColor:{ r: mat.translucencyColor[0]! * 255,g: mat.translucencyColor[1]! * 255,b: mat.translucencyColor[2]! * 255 },
+      sheenColor:       { r: mat.sheenColor[0]! * 255,       g: mat.sheenColor[1]! * 255,       b: mat.sheenColor[2]! * 255 },
+      attenuationColor: { r: mat.attenuationColor[0]! * 255, g: mat.attenuationColor[1]! * 255, b: mat.attenuationColor[2]! * 255 },
     };
-    const vectors = {
-      emission: { x: mat.emission[0], y: mat.emission[1], z: mat.emission[2] }
-    };
+    const colorOpts = { color: { type: 'int' as const } };
+    const emission = { x: mat.emission[0]!, y: mat.emission[1]!, z: mat.emission[2]! };
 
-    const basicFloatParamSettings = {
-      step: 0.01,
-      min: 0.0,
-      max: 1.0
+    const add = (title: string) => {
+      const folder = matTab.addFolder({ title });
+      this._paneMatFolders[title] = folder;
+      return folder;
     };
 
-    const base = matTab.addFolder({
-      title: 'Base',
-    }); this.paneMatFolders['base'] = base;
-
-    base.addInput(colors, "albedo").on('change', ev => {
-      mat.albedo = [ev.value.r / 255.0, ev.value.g / 255.0, ev.value.b / 255.0];
+    const base = add('Base');
+    base.addBinding(colors, 'albedo', { ...colorOpts }).on('change', ev => {
+      mat.albedo = [ev.value.r / 255, ev.value.g / 255, ev.value.b / 255];
     });
+    base.addBinding(mat, 'roughness', f01);
+    base.addBinding(mat, 'metallic',  f01);
+    base.addBinding(mat, 'specular',  f01);
+    base.addBinding(emission, 'x', { label: 'emission R', min: 0, max: 1e6, step: 0.1 }).on('change', ev => { mat.emission = [ev.value, emission.y, emission.z]; });
+    base.addBinding(emission, 'y', { label: 'emission G', min: 0, max: 1e6, step: 0.1 }).on('change', ev => { mat.emission = [emission.x, ev.value, emission.z]; });
+    base.addBinding(emission, 'z', { label: 'emission B', min: 0, max: 1e6, step: 0.1 }).on('change', ev => { mat.emission = [emission.x, emission.y, ev.value]; });
 
-    base.addInput(mat, 'roughness', basicFloatParamSettings);
-    base.addInput(mat, 'metallic', basicFloatParamSettings);
-    base.addInput(mat, 'specular', basicFloatParamSettings);
-    base.addInput(vectors, "emission", {
-      x: { min: 0, max: 10e6, step: 0.1 },
-      y: { min: 0, max: 10e6, step: 0.1 },
-      z: { min: 0, max: 10e6, step: 0.1 }
-    }).on('change', ev => {
-      mat.emission = [ev.value.x, ev.value.y, ev.value.z];
-    });
+    const anisotropy = add('Anisotropy');
+    const anisoDir = { x: mat.anisotropyDirection[0]!, y: mat.anisotropyDirection[1]! };
+    anisotropy.addBinding(mat, 'anisotropy', { step: 0.01, min: -1, max: 1 });
+    anisotropy.addBinding(anisoDir, 'x', { label: 'direction X', step: 0.01, min: -1, max: 1 }).on('change', ev => { mat.anisotropyDirection = [ev.value, anisoDir.y, 0]; });
+    anisotropy.addBinding(anisoDir, 'y', { label: 'direction Y', step: 0.01, min: -1, max: 1 }).on('change', ev => { mat.anisotropyDirection = [anisoDir.x, ev.value, 0]; });
 
-    const anisotropy = matTab.addFolder({
-      title: 'Anisotropy',
-    }); this.paneMatFolders['anisotropy'] = anisotropy;
-    anisotropy.addInput(mat, 'anisotropy', {
-      step: 0.01,
-      min: -1.0,
-      max: 1.0
-    });
-    anisotropy.direction = { x: mat.anisotropyDirection[0], y: mat.anisotropyDirection[1] };
-    anisotropy.addInput(anisotropy, "direction", {
-      picker: 'inline',
-      expanded: true,
-      x: { min: -1, max: 1, step: 0.01 },
-      y: { min: -1, max: 1, step: 0.01 }
-    }).on('change', ev => {
-      mat.anisotropyDirection = [ev.value.x, ev.value.y];
+    const transmission = add('Transmission');
+    transmission.addBinding(mat, 'transparency',  f01);
+    transmission.addBinding(mat, 'cutoutOpacity', f01);
+    transmission.addBinding(mat, 'translucency',  { ...f01, label: 'diffuse transmission' });
+    transmission.addBinding(colors, 'translucencyColor', { ...colorOpts, label: 'diffuse transmission color' }).on('change', ev => {
+      mat.translucencyColor = [ev.value.r / 255, ev.value.g / 255, ev.value.b / 255];
     });
 
-    const transmission = matTab.addFolder({
-      title: 'Transmission',
-    }); this.paneMatFolders['transmission'] = transmission;
-    transmission.addInput(mat, 'transparency', basicFloatParamSettings);
-    transmission.addInput(mat, 'cutoutOpacity', basicFloatParamSettings);
-    transmission.addInput(mat, 'translucency', { ...basicFloatParamSettings, ...{ label: 'diffuse transmission' } });
-    transmission.addInput(colors, "translucencyColor", {
-      ...basicFloatParamSettings,
-      ...{ label: 'diffuse transmission color' }
-    }).on('change', ev => {
-      mat.translucencyColor = [ev.value.r / 255.0, ev.value.g / 255.0, ev.value.b / 255.0];
+    const sheen = add('Sheen');
+    sheen.addBinding(mat,    'sheenRoughness', f01);
+    sheen.addBinding(colors, 'sheenColor', colorOpts).on('change', ev => {
+      mat.sheenColor = [ev.value.r / 255, ev.value.g / 255, ev.value.b / 255];
     });
 
-    const sheen = matTab.addFolder({
-      title: 'Sheen',
-    }); this.paneMatFolders['sheen'] = sheen;
-    sheen.addInput(mat, 'sheenRoughness', basicFloatParamSettings);
-    sheen.addInput(colors, "sheenColor").on('change', ev => {
-      mat.sheenColor = [ev.value.r / 255.0, ev.value.g / 255.0, ev.value.b / 255.0];
+    const clearcoat = add('Clearcoat');
+    clearcoat.addBinding(mat, 'clearcoat',          f01);
+    clearcoat.addBinding(mat, 'clearcoatRoughness', f01);
+
+    const thinWalledState = { thinWalled: mat.thinWalled > 0 };
+    const volume = add('Volume');
+    volume.addBinding(thinWalledState, 'thinWalled').on('change', ev => { mat.thinWalled = ev.value ? 1 : 0; });
+    volume.addBinding(mat, 'ior',               { min: 0, max: 3, step: 0.01 });
+    volume.addBinding(mat, 'attenuationDistance',{ step: 0.00001, min: 0, max: 1e5 });
+    volume.addBinding(colors, 'attenuationColor', colorOpts).on('change', ev => {
+      mat.attenuationColor = [ev.value.r / 255, ev.value.g / 255, ev.value.b / 255];
     });
 
-    const clearcoat = matTab.addFolder({
-      title: 'Clearcoat',
-    }); this.paneMatFolders['clearcoat'] = clearcoat;
-    clearcoat.addInput(mat, 'clearcoat', basicFloatParamSettings);
-    clearcoat.addInput(mat, 'clearcoatRoughness', basicFloatParamSettings);
+    const iridescence = add('Iridescence');
+    iridescence.addBinding(mat, 'iridescence',                f01);
+    iridescence.addBinding(mat, 'iridescenceIOR',             { min: 0, max: 3, step: 0.01 });
+    iridescence.addBinding(mat, 'iridescenceThicknessMinimum',{ min: 10, max: 1200, step: 1 });
+    iridescence.addBinding(mat, 'iridescenceThicknessMaximum',{ min: 10, max: 1200, step: 1 });
 
-    const volume = matTab.addFolder({
-      title: 'Volume',
-    }); this.paneMatFolders['volume'] = volume;
-    volume.thinWalled = mat.thinWalled > 0 ? true : false;
-    volume.addInput(volume, 'thinWalled').on('change', ev => {
-      mat.thinWalled = ev.value ? 1 : 0;
-    });
-    volume.addInput(mat, 'ior', {
-      min: 0,
-      max: 3,
-      step: 0.01
-    });
-    volume.addInput(mat, 'attenuationDistance', {
-      step: 0.00001,
-      min: 0.0,
-      max: 10e5
-    });
-    volume.addInput(colors, "attenuationColor").on('change', ev => {
-      mat.attenuationColor = [ev.value.r / 255.0, ev.value.g / 255.0, ev.value.b / 255.0];
-    });
-
-    const iridescence = matTab.addFolder({
-      title: 'Iridescence',
-    }); this.paneMatFolders['iridescence'] = iridescence;
-    iridescence.addInput(mat, 'iridescence', basicFloatParamSettings);
-    iridescence.addInput(mat, 'iridescenceIOR', {
-      min: 0,
-      max: 3,
-      step: 0.01
-    });
-    iridescence.addInput(mat, 'iridescenceThicknessMinimum', {
-      min: 10,
-      max: 1200,
-      step: 1
-    });
-    iridescence.addInput(mat, 'iridescenceThicknessMaximum', {
-      min: 10,
-      max: 1200,
-      step: 1
-    });
-
-    if (params && params.unfold) {
-      this._uiTabs.pages[1].selected = true;
-
-      for(let fn in this.paneMatFolders) {
-        this.paneMatFolders[fn].expanded = false;
-      };
-      const unfoldNames = params.unfold.split(" ");
-
-      const folderNames = Object.keys(this.paneMatFolders);
-      for(let fn in unfoldNames) {
-        if(folderNames.includes(unfoldNames[fn])) {
-          this.paneMatFolders[unfoldNames[fn]].expanded = true;
-        }
+    const unfold = this._params['unfold'];
+    if (unfold) {
+      for (const folder of Object.values(this._paneMatFolders)) folder.expanded = false;
+      for (const name of unfold.split(' ')) {
+        if (this._paneMatFolders[name]) this._paneMatFolders[name]!.expanded = true;
       }
     }
   }
 
-  private resolveUrlFromIndex(name: string) {
-    if (name == "") {
-      return "None";
-    }
-
-    let sceneUrl = "";
+  private resolveUrlFromIndex(name: string): string {
+    if (!name) return 'None';
     const key = name.replaceAll('%20', ' ');
     if (key in Assets.scenes) {
-      const scene = Assets.scenes[key];
-      this.setSceneInfo(key, scene.credit);
-      sceneUrl = scene.url;
+      const s = Assets.scenes[key]!;
+      this.setInfo('scene-info', key, s.credit);
+      return s.url;
     }
     if (key in Assets.ibls) {
-      const ibl = Assets.ibls[key];
-      this.setIBLInfo(key, ibl.credit);
-      sceneUrl = ibl.url;
-      this._renderer.exposure = ibl.intensity ?? 1.0;
+      const ibl = Assets.ibls[key]!;
+      this.setInfo('ibl-info', key, ibl.credit);
+      this._renderer.exposure   = ibl.intensity ?? 1.0;
       this._renderer.iblRotation = ibl.rotation ?? 180.0;
+      return ibl.url;
     }
-
-    return sceneUrl != "" ? sceneUrl : name;
+    return name;
   }
 
-
-  private setIBLInfo(name: string, credit?: any) {
-    document.getElementById("ibl-info").innerHTML = `IBL: ${name}`;
-    if (credit) document.getElementById("ibl-info").innerHTML += ` - ${credit}`;
+  private setInfo(id: string, name: string, credit?: string) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = `${id === 'ibl-info' ? 'IBL' : 'Scene'}: ${name}`;
+    if (credit) el.innerHTML += ` - ${credit}`;
   }
-
-  private setSceneInfo(name: string, credit?: any) {
-    document.getElementById("scene-info").innerHTML = `Scene: ${name}`;
-    if (credit) document.getElementById("scene-info").innerHTML += ` - ${credit}`;
-  }
-
 }
 
-let demo = new Demo();
+function buildOptions(labels: string[]): Record<string, string> {
+  return Object.fromEntries([['', ''], ...labels.map(l => [l, l])]);
+}
+
+new Demo();
