@@ -7,10 +7,6 @@ export const scenes = {
     "url": "https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Assets@main/Models/DiffuseTransmissionTeacup/glTF-Binary/DiffuseTransmissionTeacup.glb",
     "credit": "Official <a href=\"https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/DiffuseTransmissionTeacup\">glTF Sample Asset</a>"
   },
-  "Potted Plant": {
-    "url": "https://raw.githubusercontent.com/DassaultSystemes-Technology/dspbr-pt/main/assets/scenes/potted_plant/potted_plant_1k.glb",
-    "credit": "by <a href=\"https://www.artstation.com/ricocilliers\">Rico Cilliers</a> on <a href=\"https://polyhaven.com/a/potted_plant_02\">polyhaven.com</a>"
-  },
   "Dragon Attenuation": {
     "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/DragonAttenuation/glTF-Binary/DragonAttenuation.glb",
     "credit": "Official <a href=\"https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0/DragonAttenuation\">glTF Sample Model</a>"
