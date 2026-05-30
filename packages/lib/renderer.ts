@@ -69,6 +69,13 @@ class IBLImportanceSamplingData {
   totalSum: number = 0;
 }
 
+export interface PathtracingCamera {
+  fov: number;
+  near: number;
+  matrixWorld: { elements: ArrayLike<number> };
+  position: { x: number; y: number; z: number };
+}
+
 export interface PathtracingRendererParameters {
   canvas?: HTMLCanvasElement;
   context?: WebGL2RenderingContext;
@@ -330,11 +337,11 @@ export class PathtracingRenderer {
     "u_clamp_threshold": 0
   };
 
-  private updatePathracingUniforms(camera: any) {
+  private updatePathracingUniforms(camera: PathtracingCamera) {
     const renderRes = this.renderRes;
     let filmHeight = Math.tan(camera.fov * 0.5 * Math.PI / 180.0) * camera.near;
 
-    this.pathTracingUniforms["u_u_view_mat"] = camera.matrixWorld.elements;
+    this.pathTracingUniforms["u_u_view_mat"] = Array.from(camera.matrixWorld.elements);
     this.pathTracingUniforms["u_camera_pos"] = [camera.position.x, camera.position.y, camera.position.z, filmHeight];
     this.pathTracingUniforms["u_frame_count"] = this._frameCount;
     this.pathTracingUniforms["u_debug_mode"] = this.debugModes.indexOf(this._debugMode);
@@ -352,7 +359,10 @@ export class PathtracingRenderer {
     this.pathTracingUniforms["u_ibl_pdf_total_sum"] = this.iblImportanceSamplingData.totalSum;
     this.pathTracingUniforms["u_clamp_threshold"] = this.clampThreshold;
 
-    const uniformValues = new Float32Array(Object.values(this.pathTracingUniforms).flat());
+    const uniformValues = new Float32Array(
+      (Object.values(this.pathTracingUniforms) as (number | number[])[])
+        .flatMap(v => Array.isArray(v) ? v : [v])
+    );
     this.gl.bindBuffer(this.gl.UNIFORM_BUFFER, this.pathtracingUniformBuffer);
     this.gl.bufferData(this.gl.UNIFORM_BUFFER, uniformValues, this.gl.STATIC_DRAW);
     this.gl.bindBuffer(this.gl.UNIFORM_BUFFER, null);
@@ -405,13 +415,13 @@ export class PathtracingRenderer {
   }
 
 
-  render(camera: any, num_samples: number, tileFinishedCB: () => void, frameFinishedCB: (frameCount: number) => void, renderingFinishedCB?: () => void) {
+  render(camera: PathtracingCamera, num_samples: number, tileFinishedCB: () => void, frameFinishedCB: (frameCount: number) => void, renderingFinishedCB?: () => void) {
     this._isRendering = true;
     this.resetAccumulation();
     this.renderFrame(camera, num_samples, 0, tileFinishedCB, frameFinishedCB, renderingFinishedCB);
   }
 
-  renderFrame(camera: any, num_samples: number, tile: number,
+  renderFrame(camera: PathtracingCamera, num_samples: number, tile: number,
     tileFinishedCB: () => void, frameFinishedCB: (frameCount: number) => void, renderingFinishedCB?: () => void) {
     let gl = this.gl;
     if (!this._isRendering) {
