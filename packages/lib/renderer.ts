@@ -498,7 +498,7 @@ export class PathtracingRenderer {
       gl.clear(gl.COLOR_BUFFER_BIT);
     }
 
-    let slot = 3; // first 3 slots used are blocked by bvh and mesh textures
+    let slot = 5; // first 5 slots are static scene data textures
     slot = this.bindTextures(slot);
     this.updatePathracingUniforms(camera);
 
@@ -820,19 +820,16 @@ export class PathtracingRenderer {
     gl.bindTexture(gl.TEXTURE_2D, this.gpu_scene!.triangleDataTexture!);
     gl.uniform1i(this.getUniformLocation(program, "u_sampler_triangle_data"), slot++);
 
+    gl.activeTexture(gl.TEXTURE0 + slot);
+    gl.bindTexture(gl.TEXTURE_2D, this.gpu_scene!.materialDataTexture!);
+    gl.uniform1i(this.getUniformLocation(program, "u_sampler_material_data"), slot++);
+
+    gl.activeTexture(gl.TEXTURE0 + slot);
+    gl.bindTexture(gl.TEXTURE_2D, this.gpu_scene!.textureInfoDataTexture!);
+    gl.uniform1i(this.getUniformLocation(program, "u_sampler_texture_info"), slot++);
+
     let pathtracingUniformBlockIdx = this.getUniformBlockIndex(program, "PathTracingUniformBlock");
     gl.uniformBlockBinding(program, pathtracingUniformBlockIdx, 0);
-
-    if (this.gpu_scene!.sceneData.num_textures > 0) {
-      let texInfoBlockIdx = this.getUniformBlockIndex(program, "TextureInfoBlock");
-      gl.uniformBlockBinding(program, texInfoBlockIdx, 1);
-    }
-
-    const materialUniformBuffers = this.gpu_scene?.materialUniformBuffers!;
-    for (let i = 0; i < materialUniformBuffers.length; i++) {
-      let matBlockIdx = this.getUniformBlockIndex(program, `MaterialBlock${i}`);
-      gl.uniformBlockBinding(program, matBlockIdx, i + 2);
-    }
 
     gl.useProgram(null);
   }

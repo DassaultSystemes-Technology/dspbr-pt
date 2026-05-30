@@ -63,14 +63,13 @@ uniform sampler2D u_sampler_env_map_yCdf;
 layout(location = 0) out vec4 out_FragColor;
 
 #include <structs>
+#include <buffer_accessor>
 #include <texture_accessor>
 #include <rng>
 #include <constants>
 #include <lights>
 #include <utils>
 
-
-#include <buffer_accessor>
 #include <material_block>
 #include <material>
 
