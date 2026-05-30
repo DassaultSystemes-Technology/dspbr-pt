@@ -39,6 +39,7 @@ in vec2 v_uv;
     float u_ibl_pdf_total_sum;
     float u_ray_eps;
     float u_clamp_threshold;
+    float u_uniform_pad0;
     vec4  u_scene_counts;
     vec4  u_point_light_position;
     vec4  u_point_light_emission;

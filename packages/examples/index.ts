@@ -124,7 +124,6 @@ class Demo {
     });
     integrator.addBinding(this._renderer, 'maxBounces',     { label: 'Max Bounces',     step: 1,       min: 0,   max: 32    });
     integrator.addBinding(this._renderer, 'rayEps',         { label: 'Ray Offset',      step: 0.00001, min: 0,   max: 10    });
-    integrator.addBinding(this._viewer,   'tileRes',        { label: 'Tile Res',        step: 1,       min: 1,   max: 8     });
     integrator.addBinding(this._renderer, 'clampThreshold', { label: 'Clamp Threshold', step: 0.1,     min: 0,   max: 100   });
 
     // Display

@@ -266,9 +266,9 @@ export class PathtracingRenderer {
     this._enableFxaa = val;
   }
 
-  private _tileRes = 1;
+  private _tileRes = 4;
   public set tileRes(val: number) {
-    this._tileRes = val;
+    this._tileRes = Math.max(2, Math.floor(val) || 2);
   }
   public get tileRes() {
     return this._tileRes;
@@ -360,6 +360,7 @@ export class PathtracingRenderer {
     "u_ibl_pdf_total_sum": 0,
     "u_ray_eps": 0,
     "u_clamp_threshold": 0,
+    "u_uniform_pad0": 0,
     "u_scene_counts": [0, 0, 0, 0],
     "u_point_light_position": [0, 0, 0, 0],
     "u_point_light_emission": [0, 0, 0, 0]
@@ -531,7 +532,9 @@ export class PathtracingRenderer {
   }
 
   private getActiveTileRes() {
-    return this.schedulerMode === "interactive" || this.schedulerMode === "settling" ? 1 : Math.max(1, this._tileRes || 1);
+    if (this.schedulerMode === "interactive") return 1;
+    if (this.schedulerMode === "settling") return Math.min(2, Math.max(2, this._tileRes || 2));
+    return Math.max(2, this._tileRes || 2);
   }
 
   private getTileOrder(tileRes: number) {
@@ -626,42 +629,47 @@ export class PathtracingRenderer {
     // gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.disable(gl.SCISSOR_TEST);
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbos.get("postprocess")!);
-    gl.useProgram(this.tonemapProgram!);
-    gl.uniform1i(this.getUniformLocation(this.tonemapProgram!, "tex"), slot); // renderbuffer
-    gl.uniform1f(this.getUniformLocation(this.tonemapProgram!, "exposure"), this._exposure);
-    gl.uniform1i(this.getUniformLocation(this.tonemapProgram!, "gamma"), this._enableGamma ? 1.0 : 0.0);
-    gl.uniform1i(this.getUniformLocation(this.tonemapProgram!, "tonemappingMode"),
-      this.tonemappingModes.indexOf(this._tonemapping));
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-    let displayBuffer = this.renderBuffers.get("postprocess")!;
-    if (this.enableFxaa) {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbos.get("postprocess_")!);
-      gl.useProgram(this.fxaaProgram!);
-      gl.bindTexture(gl.TEXTURE_2D, this.renderBuffers.get("postprocess")!);
-      gl.uniform1i(this.getUniformLocation(this.fxaaProgram!, "tex"), slot);
-      gl.uniform2f(this.getUniformLocation(this.fxaaProgram!, "u_inv_res"), 1.0 / this.renderRes[0], 1.0 / this.renderRes[1]);
+    const tileCount = activeTileRes * activeTileRes;
+    const completedTilePass = this.tileIndex + 1 >= tileCount;
+    const shouldPresent = this.schedulerMode !== "settling" || completedTilePass;
+    if (shouldPresent) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbos.get("postprocess")!);
+      gl.useProgram(this.tonemapProgram!);
+      gl.uniform1i(this.getUniformLocation(this.tonemapProgram!, "tex"), slot); // renderbuffer
+      gl.uniform1f(this.getUniformLocation(this.tonemapProgram!, "exposure"), this._exposure);
+      gl.uniform1i(this.getUniformLocation(this.tonemapProgram!, "gamma"), this._enableGamma ? 1.0 : 0.0);
+      gl.uniform1i(this.getUniformLocation(this.tonemapProgram!, "tonemappingMode"),
+        this.tonemappingModes.indexOf(this._tonemapping));
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-      displayBuffer = this.renderBuffers.get("postprocess_")!;
+
+      let displayBuffer = this.renderBuffers.get("postprocess")!;
+      if (this.enableFxaa) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbos.get("postprocess_")!);
+        gl.useProgram(this.fxaaProgram!);
+        gl.bindTexture(gl.TEXTURE_2D, this.renderBuffers.get("postprocess")!);
+        gl.uniform1i(this.getUniformLocation(this.fxaaProgram!, "tex"), slot);
+        gl.uniform2f(this.getUniformLocation(this.fxaaProgram!, "u_inv_res"), 1.0 / this.renderRes[0], 1.0 / this.renderRes[1]);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        displayBuffer = this.renderBuffers.get("postprocess_")!;
+      }
+
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.useProgram(this.displayProgram!);
+      gl.viewport(0, 0, this.displayRes[0], this.displayRes[1]);
+      gl.bindTexture(gl.TEXTURE_2D, displayBuffer);
+      gl.uniform1i(this.getUniformLocation(this.displayProgram!, "tex"), slot);
+
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      gl.bindTexture(gl.TEXTURE_2D, null);
+
+      gl.useProgram(null);
+      gl.bindVertexArray(null);
     }
-
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.useProgram(this.displayProgram!);
-    gl.viewport(0, 0, this.displayRes[0], this.displayRes[1]);
-    gl.bindTexture(gl.TEXTURE_2D, displayBuffer);
-    gl.uniform1i(this.getUniformLocation(this.displayProgram!, "tex"), slot);
-
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    gl.bindTexture(gl.TEXTURE_2D, null);
-
-    gl.useProgram(null);
-    gl.bindVertexArray(null);
 
     this.tileFinishedCB();
     this.tileIndex++;
 
-    if (this.tileIndex >= activeTileRes * activeTileRes) {
+    if (this.tileIndex >= tileCount) {
       this.tileIndex = 0;
       this._frameCount++;
       this.frameFinishedCB(this._frameCount);

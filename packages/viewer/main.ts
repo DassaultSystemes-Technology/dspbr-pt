@@ -55,6 +55,7 @@ export class DemoViewer extends EventTarget {
   public set pixelRatio(val: number) {
     this._pixelRatio = val;
     this._renderer.pixelRatio = val;
+    this.updateAutoTileRes();
   }
 
   private _interactionPixelRatio = 0.1;
@@ -62,7 +63,12 @@ export class DemoViewer extends EventTarget {
   public set interactionPixelRatio(val: number) { this._interactionPixelRatio = val; }
 
   private _tileRes = 4;
-  public set tileRes(val: number) { this._tileRes = val; this._renderer.tileRes = val; }
+  private tileResOverride = false;
+  public set tileRes(val: number) {
+    this.tileResOverride = true;
+    this._tileRes = Math.max(2, Math.floor(val) || 2);
+    this._renderer.tileRes = this._tileRes;
+  }
   public get tileRes() { return this._tileRes; }
 
   private interactionTimeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -106,7 +112,7 @@ export class DemoViewer extends EventTarget {
     this._renderer = new PathtracingRenderer({ canvas: this.canvas });
     this._renderer.maxBounces = 5;
     this._renderer.pixelRatio = this._pixelRatio;
-    this._renderer.tileRes = this._tileRes;
+    this.updateAutoTileRes();
 
     window.addEventListener('resize', () => this.resize(), false);
 
@@ -279,10 +285,23 @@ export class DemoViewer extends EventTarget {
     );
   }
 
+  private updateAutoTileRes() {
+    if (this.tileResOverride) return;
+    const renderPixels = Math.max(1, this.canvas.width * this.canvas.height * this._pixelRatio * this._pixelRatio);
+    let tileRes = 4;
+    if (renderPixels <= 1_200_000) tileRes = 2;
+    else if (renderPixels <= 4_000_000) tileRes = 4;
+    else if (renderPixels <= 8_000_000) tileRes = 6;
+    else tileRes = 8;
+    this._tileRes = tileRes;
+    this._renderer.tileRes = tileRes;
+  }
+
   private resize() {
     this.canvas.width  = window.innerWidth;
     this.canvas.height = window.innerHeight;
     this._renderer.resize(window.innerWidth, window.innerHeight);
+    this.updateAutoTileRes();
     this.camera.aspect = window.innerWidth / window.innerHeight;
   }
 
