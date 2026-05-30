@@ -71,37 +71,43 @@ function getProgramCache(gl: WebGL2RenderingContext) {
 }
 
 export async function createProgramFromSource(gl: WebGL2RenderingContext,
-  vertexShaderSource: string, fragmentShaderSource: string, shaderChunks?: Map<string, string> ) {
+  vertexShaderSource: string, fragmentShaderSource: string, shaderChunks?: Map<string, string>, label = "shader") {
 
   if (shaderChunks) {
-    console.time("Resolving shader chunks");
+    console.time(`Resolving shader chunks: ${label}`);
     for (let [id, chunk] of shaderChunks) {
       let identifier = `#include <${id}>`;
       vertexShaderSource = vertexShaderSource.replace(identifier, chunk);
       fragmentShaderSource = fragmentShaderSource.replace(identifier, chunk);
       // console.log(fragmentShaderSource);
     }
-    console.timeEnd("Resolving shader chunks");
+    console.timeEnd(`Resolving shader chunks: ${label}`);
   }
 
   const cacheKey = `${vertexShaderSource}\0${fragmentShaderSource}`;
   const cache = getProgramCache(gl);
   const cachedProgram = cache.get(cacheKey);
   if (cachedProgram) {
-    console.debug("Shader program cache hit");
+    console.debug(`Shader program cache hit: ${label}`);
     return cachedProgram;
   }
 
-  const programPromise = compileProgramFromSource(gl, vertexShaderSource, fragmentShaderSource);
+  console.debug(`Shader program cache miss: ${label}`);
+  const programPromise = compileProgramFromSource(gl, vertexShaderSource, fragmentShaderSource, label)
+    .catch(err => {
+      cache.delete(cacheKey);
+      throw err;
+    });
   cache.set(cacheKey, programPromise);
   return programPromise;
 }
 
 async function compileProgramFromSource(gl: WebGL2RenderingContext,
-  vertexShaderSource: string, fragmentShaderSource: string) {
+  vertexShaderSource: string, fragmentShaderSource: string, label: string) {
 
   var ext = gl.getExtension('KHR_parallel_shader_compile');
 
+  const submitStart = performance.now();
   let vs = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
   let fs = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
   if (vs && fs) {
@@ -112,9 +118,11 @@ async function compileProgramFromSource(gl: WebGL2RenderingContext,
     gl.attachShader(program, vs);
     gl.attachShader(program, fs);
     gl.linkProgram(program);
+    console.debug(`Shader compile/link submitted: ${label} ${(performance.now() - submitStart).toFixed(1)}ms`);
 
     function checkToUseProgram() {
       if (gl.getProgramParameter(program!, gl.LINK_STATUS)) {
+        console.debug(`Shader compile/link ready: ${label} ${(performance.now() - submitStart).toFixed(1)}ms`);
         return true;
       } else {
         const vsLog = getShaderErrorLog(gl, vs, vertexShaderSource);
@@ -129,14 +137,17 @@ async function compileProgramFromSource(gl: WebGL2RenderingContext,
     }
 
     if (ext) {
-      function checkCompletion() {
-        if (gl.getProgramParameter(program!, ext!.COMPLETION_STATUS_KHR) == true) {
-          checkToUseProgram();
-        } else {
-          requestAnimationFrame(checkCompletion);
+      await new Promise<void>((resolve) => {
+        function checkCompletion() {
+          if (gl.getProgramParameter(program!, ext!.COMPLETION_STATUS_KHR) == true) {
+            checkToUseProgram();
+            resolve();
+          } else {
+            requestAnimationFrame(checkCompletion);
+          }
         }
-      }
-      requestAnimationFrame(checkCompletion);
+        requestAnimationFrame(checkCompletion);
+      });
       return program;
     } else {
       checkToUseProgram();

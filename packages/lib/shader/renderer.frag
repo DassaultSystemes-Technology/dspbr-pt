@@ -40,6 +40,9 @@ in vec2 v_uv;
     float u_ray_eps;
     float u_render_mode;
     float u_clamp_threshold;
+    vec4  u_scene_counts;
+    vec4  u_point_light_position;
+    vec4  u_point_light_emission;
 };
 
 uniform sampler2D u_sampler2D_PreviousTexture;

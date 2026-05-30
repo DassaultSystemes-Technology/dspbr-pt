@@ -54,6 +54,8 @@ void main()
   gl_Position = position;
 }`;
 
+type RenderProgramKey = "pt_program" | "debug_program" | "misptdl_program";
+
 enum BufferType {
   Front = 0,
   Back = 1
@@ -100,6 +102,10 @@ export class PathtracingRenderer {
 
   private quadVao: WebGLVertexArrayObject | null = null;
   private renderPrograms = new Map<string, WebGLProgram>();
+  private renderProgramPromises = new Map<RenderProgramKey, Promise<WebGLProgram>>();
+  private renderShaderMaps = new Map<RenderProgramKey, Map<string, string>>();
+  private uniformLocations = new WeakMap<WebGLProgram, Map<string, WebGLUniformLocation | null>>();
+  private uniformBlockIndices = new WeakMap<WebGLProgram, Map<string, number>>();
   private renderProgram: WebGLProgram | null = null;
   private copyProgram: WebGLProgram | null = null;
   private fxaaProgram: WebGLProgram | null = null;
@@ -334,7 +340,10 @@ export class PathtracingRenderer {
     "u_ibl_pdf_total_sum": 0,
     "u_ray_eps": 0,
     "u_render_mode": 0,
-    "u_clamp_threshold": 0
+    "u_clamp_threshold": 0,
+    "u_scene_counts": [0, 0, 0, 0],
+    "u_point_light_position": [0, 0, 0, 0],
+    "u_point_light_emission": [0, 0, 0, 0]
   };
 
   private updatePathracingUniforms(camera: PathtracingCamera) {
@@ -358,6 +367,19 @@ export class PathtracingRenderer {
     this.pathTracingUniforms["u_render_mode"] = this.integratorTypes.indexOf(this._integrator);
     this.pathTracingUniforms["u_ibl_pdf_total_sum"] = this.iblImportanceSamplingData.totalSum;
     this.pathTracingUniforms["u_clamp_threshold"] = this.clampThreshold;
+    this.pathTracingUniforms["u_scene_counts"] = [
+      this.gpu_scene?.sceneData.num_triangles ?? 0,
+      this._bvhNodeCount,
+      this._bvhIndexCount,
+      0
+    ];
+    const light = this.gpu_scene?.sceneData.lights[0];
+    this.pathTracingUniforms["u_point_light_position"] = light
+      ? [light.position[0], light.position[1], light.position[2], 1]
+      : [0, 0, 0, 0];
+    this.pathTracingUniforms["u_point_light_emission"] = light
+      ? [light.emission[0], light.emission[1], light.emission[2], 1]
+      : [0, 0, 0, 0];
 
     const uniformValues = new Float32Array(
       (Object.values(this.pathTracingUniforms) as (number | number[])[])
@@ -387,26 +409,26 @@ export class PathtracingRenderer {
 
     gl.activeTexture(gl.TEXTURE0 + slot)
     gl.bindTexture(gl.TEXTURE_2D, this.ibl);
-    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_env_map"), slot++);
+    gl.uniform1i(this.getUniformLocation(program, "u_sampler_env_map"), slot++);
 
     gl.activeTexture(gl.TEXTURE0 + slot)
     gl.bindTexture(gl.TEXTURE_2D, this.iblImportanceSamplingData.pdf);
-    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_env_map_pdf"), slot++);
+    gl.uniform1i(this.getUniformLocation(program, "u_sampler_env_map_pdf"), slot++);
 
     gl.activeTexture(gl.TEXTURE0 + slot)
     gl.bindTexture(gl.TEXTURE_2D, this.iblImportanceSamplingData.cdf);
-    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_env_map_cdf"), slot++);
+    gl.uniform1i(this.getUniformLocation(program, "u_sampler_env_map_cdf"), slot++);
 
     gl.activeTexture(gl.TEXTURE0 + slot)
     gl.bindTexture(gl.TEXTURE_2D, this.iblImportanceSamplingData.yPdf);
-    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_env_map_yPdf"), slot++);
+    gl.uniform1i(this.getUniformLocation(program, "u_sampler_env_map_yPdf"), slot++);
 
     gl.activeTexture(gl.TEXTURE0 + slot)
     gl.bindTexture(gl.TEXTURE_2D, this.iblImportanceSamplingData.yCdf);
-    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_env_map_yCdf"), slot++);
+    gl.uniform1i(this.getUniformLocation(program, "u_sampler_env_map_yCdf"), slot++);
 
     for (let t in this.gpu_scene?.texArrayTextures) {
-      gl.uniform1i(gl.getUniformLocation(program, t), slot);
+      gl.uniform1i(this.getUniformLocation(program, t), slot);
       gl.activeTexture(gl.TEXTURE0 + slot++);
       gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.gpu_scene?.texArrayTextures[t]!);
     }
@@ -414,14 +436,42 @@ export class PathtracingRenderer {
     return slot;
   }
 
+  private getUniformLocation(program: WebGLProgram, name: string): WebGLUniformLocation | null {
+    let locations = this.uniformLocations.get(program);
+    if (!locations) {
+      locations = new Map<string, WebGLUniformLocation | null>();
+      this.uniformLocations.set(program, locations);
+    }
+    if (!locations.has(name)) {
+      locations.set(name, this.gl.getUniformLocation(program, name));
+    }
+    return locations.get(name) ?? null;
+  }
+
+  private getUniformBlockIndex(program: WebGLProgram, name: string) {
+    let indices = this.uniformBlockIndices.get(program);
+    if (!indices) {
+      indices = new Map<string, number>();
+      this.uniformBlockIndices.set(program, indices);
+    }
+    if (!indices.has(name)) {
+      indices.set(name, this.gl.getUniformBlockIndex(program, name));
+    }
+    return indices.get(name)!;
+  }
+
 
   render(camera: PathtracingCamera, num_samples: number, tileFinishedCB: () => void, frameFinishedCB: (frameCount: number) => void, renderingFinishedCB?: () => void) {
     this._isRendering = true;
     this.resetAccumulation();
-    this.renderFrame(camera, num_samples, 0, tileFinishedCB, frameFinishedCB, renderingFinishedCB);
+    void this.renderFrame(camera, num_samples, 0, tileFinishedCB, frameFinishedCB, renderingFinishedCB)
+      .catch(err => {
+        console.error(err);
+        this._isRendering = false;
+      });
   }
 
-  renderFrame(camera: PathtracingCamera, num_samples: number, tile: number,
+  async renderFrame(camera: PathtracingCamera, num_samples: number, tile: number,
     tileFinishedCB: () => void, frameFinishedCB: (frameCount: number) => void, renderingFinishedCB?: () => void) {
     let gl = this.gl;
     if (!this._isRendering) {
@@ -429,14 +479,11 @@ export class PathtracingRenderer {
       return;
     }
 
-    if (this.debugMode != "None") {
-      this.renderProgram = this.renderPrograms.get("debug_program")!;
-    } else {
-      if (this.iblImportanceSampling) {
-        this.renderProgram = this.renderPrograms.get("misptdl_program")!;
-      } else {
-        this.renderProgram = this.renderPrograms.get("pt_program")!;
-      }
+    const renderProgramKey = this.getSelectedRenderProgramKey();
+    this.renderProgram = await this.getRenderProgram(renderProgramKey);
+    if (!this._isRendering) {
+      console.log("Cancel");
+      return;
     }
 
     const fbo = this.fbos.get("render")!;
@@ -480,7 +527,7 @@ export class PathtracingRenderer {
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
     gl.activeTexture(gl.TEXTURE0 + slot)
     gl.bindTexture(gl.TEXTURE_2D, copyBuffer!);
-    gl.uniform1i(gl.getUniformLocation(this.renderProgram!, "u_sampler2D_PreviousTexture"), slot);
+    gl.uniform1i(this.getUniformLocation(this.renderProgram!, "u_sampler2D_PreviousTexture"), slot);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -492,17 +539,17 @@ export class PathtracingRenderer {
     gl.bindFramebuffer(gl.FRAMEBUFFER, copyFbo);
     gl.activeTexture(gl.TEXTURE0 + slot)
     gl.bindTexture(gl.TEXTURE_2D, renderBuffer!);
-    gl.uniform1i(gl.getUniformLocation(this.copyProgram!, "tex"), slot);
+    gl.uniform1i(this.getUniformLocation(this.copyProgram!, "tex"), slot);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     // gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.disable(gl.SCISSOR_TEST);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbos.get("postprocess")!);
     gl.useProgram(this.tonemapProgram!);
-    gl.uniform1i(gl.getUniformLocation(this.tonemapProgram!, "tex"), slot); // renderbuffer
-    gl.uniform1f(gl.getUniformLocation(this.tonemapProgram!, "exposure"), this._exposure);
-    gl.uniform1i(gl.getUniformLocation(this.tonemapProgram!, "gamma"), this._enableGamma ? 1.0 : 0.0);
-    gl.uniform1i(gl.getUniformLocation(this.tonemapProgram!, "tonemappingMode"),
+    gl.uniform1i(this.getUniformLocation(this.tonemapProgram!, "tex"), slot); // renderbuffer
+    gl.uniform1f(this.getUniformLocation(this.tonemapProgram!, "exposure"), this._exposure);
+    gl.uniform1i(this.getUniformLocation(this.tonemapProgram!, "gamma"), this._enableGamma ? 1.0 : 0.0);
+    gl.uniform1i(this.getUniformLocation(this.tonemapProgram!, "tonemappingMode"),
       this.tonemappingModes.indexOf(this._tonemapping));
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
@@ -511,8 +558,8 @@ export class PathtracingRenderer {
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbos.get("postprocess_")!);
       gl.useProgram(this.fxaaProgram!);
       gl.bindTexture(gl.TEXTURE_2D, this.renderBuffers.get("postprocess")!);
-      gl.uniform1i(gl.getUniformLocation(this.fxaaProgram!, "tex"), slot);
-      gl.uniform2f(gl.getUniformLocation(this.fxaaProgram!, "u_inv_res"), 1.0 / this.renderRes[0], 1.0 / this.renderRes[1]);
+      gl.uniform1i(this.getUniformLocation(this.fxaaProgram!, "tex"), slot);
+      gl.uniform2f(this.getUniformLocation(this.fxaaProgram!, "u_inv_res"), 1.0 / this.renderRes[0], 1.0 / this.renderRes[1]);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       displayBuffer = this.renderBuffers.get("postprocess_")!;
     }
@@ -521,7 +568,7 @@ export class PathtracingRenderer {
     gl.useProgram(this.displayProgram!);
     gl.viewport(0, 0, this.displayRes[0], this.displayRes[1]);
     gl.bindTexture(gl.TEXTURE_2D, displayBuffer);
-    gl.uniform1i(gl.getUniformLocation(this.displayProgram!, "tex"), slot);
+    gl.uniform1i(this.getUniformLocation(this.displayProgram!, "tex"), slot);
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.bindTexture(gl.TEXTURE_2D, null);
@@ -543,7 +590,11 @@ export class PathtracingRenderer {
     }
 
     this._currentAnimationFrameId = requestAnimationFrame(() => {
-      this.renderFrame(camera, num_samples, ++tile % (this._tileRes * this._tileRes), tileFinishedCB, frameFinishedCB, renderingFinishedCB)
+      void this.renderFrame(camera, num_samples, ++tile % (this._tileRes * this._tileRes), tileFinishedCB, frameFinishedCB, renderingFinishedCB)
+        .catch(err => {
+          console.error(err);
+          this._isRendering = false;
+        });
     });
   };
 
@@ -743,15 +794,15 @@ export class PathtracingRenderer {
     this.stopRendering();
 
     this.scene = scene;
+    this.renderProgram = null;
+    this.renderPrograms.clear();
+    this.renderProgramPromises.clear();
+    this.renderShaderMaps.clear();
     this.gpu_scene = new PathtracingSceneDataWebGL2(this.gl, scene);
     await this.gpu_scene.init();
 
     await this.initBvh(scene);
     await this.initializeShaders();
-
-    this.renderPrograms.forEach(program => {
-      this.bindGPUBuffersAndTextures(program);
-    })
 
     this.resetAccumulation();
   }
@@ -764,36 +815,64 @@ export class PathtracingRenderer {
     let slot = 0;
     gl.activeTexture(gl.TEXTURE0 + slot);
     gl.bindTexture(gl.TEXTURE_2D, this._bvhDataTexture!);
-    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_bvh"), slot++);
+    gl.uniform1i(this.getUniformLocation(program, "u_sampler_bvh"), slot++);
 
     gl.activeTexture(gl.TEXTURE0 + slot);
     gl.bindTexture(gl.TEXTURE_2D, this._bvhIndexTexture!);
-    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_bvh_index"), slot++);
+    gl.uniform1i(this.getUniformLocation(program, "u_sampler_bvh_index"), slot++);
 
     gl.activeTexture(gl.TEXTURE0 + slot);
     gl.bindTexture(gl.TEXTURE_2D, this.gpu_scene!.triangleDataTexture!);
-    gl.uniform1i(gl.getUniformLocation(program, "u_sampler_triangle_data"), slot++);
+    gl.uniform1i(this.getUniformLocation(program, "u_sampler_triangle_data"), slot++);
 
-    let pathtracingUniformBlockIdx = gl.getUniformBlockIndex(program, "PathTracingUniformBlock");
+    let pathtracingUniformBlockIdx = this.getUniformBlockIndex(program, "PathTracingUniformBlock");
     gl.uniformBlockBinding(program, pathtracingUniformBlockIdx, 0);
 
     if (this.gpu_scene!.sceneData.num_textures > 0) {
-      let texInfoBlockIdx = gl.getUniformBlockIndex(program, "TextureInfoBlock");
+      let texInfoBlockIdx = this.getUniformBlockIndex(program, "TextureInfoBlock");
       gl.uniformBlockBinding(program, texInfoBlockIdx, 1);
     }
 
     const materialUniformBuffers = this.gpu_scene?.materialUniformBuffers!;
     for (let i = 0; i < materialUniformBuffers.length; i++) {
-      let matBlockIdx = gl.getUniformBlockIndex(program, `MaterialBlock${i}`);
+      let matBlockIdx = this.getUniformBlockIndex(program, `MaterialBlock${i}`);
       gl.uniformBlockBinding(program, matBlockIdx, i + 2);
     }
 
     gl.useProgram(null);
   }
 
+  private getSelectedRenderProgramKey(): RenderProgramKey {
+    if (this.debugMode != "None") return "debug_program";
+    return this.iblImportanceSampling ? "misptdl_program" : "pt_program";
+  }
+
+  private async getRenderProgram(key: RenderProgramKey): Promise<WebGLProgram> {
+    const existing = this.renderPrograms.get(key);
+    if (existing) return existing;
+
+    let promise = this.renderProgramPromises.get(key);
+    if (!promise) {
+      const shaderMap = this.renderShaderMaps.get(key);
+      if (!shaderMap) throw new Error(`Render shader map not initialized for ${key}`);
+      promise = glu.createProgramFromSource(this.gl, vertexShader, render_shader, shaderMap, key)
+        .then(program => {
+          this.renderPrograms.set(key, program);
+          this.bindGPUBuffersAndTextures(program);
+          return program;
+        })
+        .catch(err => {
+          this.renderProgramPromises.delete(key);
+          throw err;
+        });
+      this.renderProgramPromises.set(key, promise);
+    }
+    return promise;
+  }
+
   private async initializeShaders() {
     if (!this.gpu_scene) throw new Error("Scene not initialized");
-    console.time("Pathtracing shader generation");
+    console.time("Pathtracing shader initialization");
 
     const bufferAccessSnippet = `
     const uint MAX_TEXTURE_SIZE = ${glu.getMaxTextureSize(this.gl)}u;
@@ -811,9 +890,9 @@ export class PathtracingRenderer {
     const uint UV_OFFSET = 2u;
     const uint TANGENT_OFFSET = 3u;
     const uint COLOR_OFFSET = 4u;
-    const uint NUM_TRIANGLES = ${this.gpu_scene.sceneData.num_triangles}u;
-    const int NUM_BVH_NODES = ${this._bvhNodeCount};
-    const int NUM_BVH_INDICES = ${this._bvhIndexCount};
+    #define NUM_TRIANGLES uint(u_scene_counts.x)
+    #define NUM_BVH_NODES int(u_scene_counts.y)
+    #define NUM_BVH_INDICES int(u_scene_counts.z)
     `;
 
     const pt_trace = `
@@ -855,17 +934,18 @@ export class PathtracingRenderer {
     const misptdlShaderMap = new Map<string, string>(shaderChunks);
     misptdlShaderMap.set('integrator', misptdl_integrator_shader);
 
-    this.copyProgram = await glu.createProgramFromSource(this.gl, vertexShader, copy_shader);
-    this.displayProgram = await glu.createProgramFromSource(this.gl, vertexShader, display_shader);
-    this.tonemapProgram = await glu.createProgramFromSource(this.gl, vertexShader, tonemap_shader);
-    this.fxaaProgram = await glu.createProgramFromSource(this.gl, vertexShader, fxaa_shader);
-    this.renderPrograms.set("pt_program", await glu.createProgramFromSource(this.gl, vertexShader, render_shader, ptShaderMap));
-    this.renderPrograms.set("debug_program", await glu.createProgramFromSource(this.gl, vertexShader, render_shader, debugShaderMap));
-    this.renderPrograms.set("misptdl_program", await glu.createProgramFromSource(this.gl, vertexShader, render_shader, misptdlShaderMap));
+    this.renderShaderMaps.set("debug_program", debugShaderMap);
+    this.renderShaderMaps.set("pt_program", ptShaderMap);
+    this.renderShaderMaps.set("misptdl_program", misptdlShaderMap);
 
-    this.renderProgram = this.renderPrograms.get("misptdl_program")!;
-    // this.renderProgram = this.renderPrograms.get("pt_program")!;
+    [this.copyProgram, this.displayProgram, this.tonemapProgram, this.fxaaProgram] = await Promise.all([
+      glu.createProgramFromSource(this.gl, vertexShader, copy_shader, undefined, "copy"),
+      glu.createProgramFromSource(this.gl, vertexShader, display_shader, undefined, "display"),
+      glu.createProgramFromSource(this.gl, vertexShader, tonemap_shader, undefined, "tonemap"),
+      glu.createProgramFromSource(this.gl, vertexShader, fxaa_shader, undefined, "fxaa"),
+    ]);
+    this.renderProgram = await this.getRenderProgram("misptdl_program");
 
-    console.timeEnd("Pathtracing shader generation");
+    console.timeEnd("Pathtracing shader initialization");
   }
 }

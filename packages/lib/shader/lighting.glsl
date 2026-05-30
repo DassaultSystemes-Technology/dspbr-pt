@@ -16,18 +16,20 @@
 #ifdef HAS_POINT_LIGHT
 // For now, we only have 1 point light
 vec3 sampleAndEvaluatePointLight(const in RenderState rs) {
-  vec3 light_dir = cPointLightPosition - rs.hitPos;
+  vec3 pointLightPosition = u_point_light_position.xyz;
+  vec3 pointLightEmission = u_point_light_emission.xyz;
+  vec3 light_dir = pointLightPosition - rs.hitPos;
   float dist2 = dot(light_dir, light_dir);
   light_dir = normalize(light_dir);
 
   vec3 n =  rs.closure.backside ? -rs.closure.n : rs.closure.n;
   float cosNL = saturate(dot(light_dir, n));
 
-  bool isVisible = isVisible(rs.hitPos, cPointLightPosition);
+  bool isVisible = isVisible(rs.hitPos, pointLightPosition);
 
   vec3 L = vec3(0.0);
   if (cosNL > EPS_COS && isVisible) {
-    L = eval_dspbr(rs.closure, rs.wi, light_dir) * (cPointLightEmission / dist2) * cosNL;
+    L = eval_dspbr(rs.closure, rs.wi, light_dir) * (pointLightEmission / dist2) * cosNL;
   }
 
   return L;
@@ -115,6 +117,5 @@ float ibl_pdf(vec3 dir) {
   return w * h * texelFetch(u_sampler_env_map_yPdf, ivec2(y, 0), 0).x *
          texelFetch(u_sampler_env_map_pdf, ivec2(x, y), 0).x * pdf_w;
 }
-
 
 

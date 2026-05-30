@@ -255,14 +255,9 @@ export class PathtracingSceneDataWebGL2 {
       //`
       //_pathTracingUniforms["u_sampler2D_LightData"] = {type: "t", value: lightTexture};
 
-      let pos = lights[0].position;
-      let em = lights[0].emission;
       this._lightShaderChunk = `
       #define HAS_POINT_LIGHT 1
-      const vec3 cPointLightPosition = vec3(${pos[0]}, ${pos[1]}, ${pos[2]});
-      const vec3 cPointLightEmission = vec3(${em[0]}, ${em[1]}, ${em[2]});
       `;
     }
   }
 }
-
