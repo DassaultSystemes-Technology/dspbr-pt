@@ -33,11 +33,6 @@ import slang_material_kernel_shader from './shader/generated/slang_materials/mat
 import slang_material_adapter_shader from './shader/slang_material_adapter.glsl';
 import bvh_shader from './shader/bvh.glsl';
 import lighting_shader from './shader/lighting.glsl';
-import diffuse_shader from './shader/bsdfs/diffuse.glsl';
-import microfacet_shader from './shader/bsdfs/microfacet.glsl';
-import sheen_shader from './shader/bsdfs/sheen.glsl';
-import fresnel_shader from './shader/bsdfs/fresnel.glsl';
-import iridescence_shader from './shader/bsdfs/iridescence.glsl';
 
 import render_shader from './shader/renderer.frag';
 import debug_integrator_shader from './shader/integrator/debug.glsl';
@@ -919,11 +914,6 @@ export class PathtracingRenderer {
       ['dspbr', `${slang_material_kernel_shader}\n${slang_material_adapter_shader}`],
       ['bvh', bvh_shader],
       ['lighting', lighting_shader],
-      ['diffuse', diffuse_shader],
-      ['microfacet', microfacet_shader],
-      ['sheen', sheen_shader],
-      ['fresnel', fresnel_shader],
-      ['iridescence', iridescence_shader],
       ['mesh_constants', meshConstants]
     ]);
 

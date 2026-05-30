@@ -13,9 +13,10 @@
  * limitations under the License.
  */
 
-#ifdef HAS_POINT_LIGHT
 // For now, we only have 1 point light
 vec3 sampleAndEvaluatePointLight(const in RenderState rs) {
+  if (u_point_light_position.w <= 0.5) return vec3(0.0);
+
   vec3 pointLightPosition = u_point_light_position.xyz;
   vec3 pointLightEmission = u_point_light_emission.xyz;
   vec3 light_dir = pointLightPosition - rs.hitPos;
@@ -34,13 +35,6 @@ vec3 sampleAndEvaluatePointLight(const in RenderState rs) {
 
   return L;
 }
-#else
-// For now, we only have 1 point light
-vec3 sampleAndEvaluatePointLight(const in RenderState rs) {
-  return vec3(0);
-}
-#endif
-
 
 int sampleRow1D(sampler2D pdf, sampler2D cdf, int row, int size, inout float r, out float prop) {
   int idx = lower_bound(cdf, row, size, r);
@@ -117,5 +111,4 @@ float ibl_pdf(vec3 dir) {
   return w * h * texelFetch(u_sampler_env_map_yPdf, ivec2(y, 0), 0).x *
          texelFetch(u_sampler_env_map_pdf, ivec2(x, y), 0).x * pdf_w;
 }
-
 

@@ -77,11 +77,6 @@ layout(location = 0) out vec4 out_FragColor;
 #include <mesh_constants>
 #include <bvh>
 
-#include <fresnel>
-#include <diffuse>
-#include <iridescence>
-#include <microfacet>
-#include <sheen>
 #include <dspbr>
 #include <lighting>
 

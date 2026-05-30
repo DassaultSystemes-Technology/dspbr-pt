@@ -245,19 +245,6 @@ export class PathtracingSceneDataWebGL2 {
 
   private generateLightBuffers() {
     const lights = this._sceneData.lights;
-    if (lights.length > 0) {
-      // lightTexture = createDataTexture(lightList, THREE.RGBAFormat, THREE.FloatType);
-      // THREE.ShaderChunk[ 'lights' ] = `
-      // #define HAS_LIGHTS 1
-      // const uint LIGHT_SIZE = 2u;
-      // uniform sampler2D u_sampler2D_LightData;
-      // const int numLights = ${lightList.length};
-      //`
-      //_pathTracingUniforms["u_sampler2D_LightData"] = {type: "t", value: lightTexture};
-
-      this._lightShaderChunk = `
-      #define HAS_POINT_LIGHT 1
-      `;
-    }
+    this._lightShaderChunk = "";
   }
 }
