@@ -58,7 +58,7 @@ export class PathtracingSceneDataWebGL2 {
   }
 
   public init() {
-    console.time("Generate gpu data buffers");
+    const start = performance.now();
     const gl = this.gl;
     this.clear();
 
@@ -68,11 +68,12 @@ export class PathtracingSceneDataWebGL2 {
     this.generateMaterialDataTexture()
     this.generateLightBuffers();
 
-    console.timeEnd("Generate gpu data buffers");
+    const generateMs = performance.now() - start;
 
     const textureUsage = this._textureDataUsage! / (1024 * 1024);
     const geometryUsage = this._sceneData!.triangleBuffer!.length * 4 / (1024 * 1024);
-    console.log(`GPU Memory Consumption (MB):
+    console.log(`Generate gpu data buffers: ${generateMs.toFixed(1)}ms
+GPU Memory Consumption (MB):
     Texture: ${textureUsage.toFixed(2)}
     Geometry: ${geometryUsage.toFixed(2)}
     Total:    ${(textureUsage + geometryUsage).toFixed(2)}

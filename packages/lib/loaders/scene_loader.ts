@@ -11,9 +11,21 @@ import { CachedWebIO } from './cached_web_io';
 
 export interface LoadedPathtracingScene {
   scene: PathtracingSceneData;
+  profile: Record<string, number>;
 }
 
-export async function loadSceneFromBlobs(files: [string, File][]): Promise<LoadedPathtracingScene> {
+export interface LoadProgressEvent {
+  phase: string;
+  detail?: string;
+  meta?: string;
+}
+
+export type LoadProgressCallback = (event: LoadProgressEvent) => void;
+
+export async function loadSceneFromBlobs(files: [string, File][], progress?: LoadProgressCallback): Promise<LoadedPathtracingScene> {
+  const profile: Record<string, number> = {};
+  const totalStart = performance.now();
+  progress?.({ phase: 'Preparing decoder', detail: 'Initializing mesh compression support.' });
   await MeshoptDecoder.ready;
   await MeshoptEncoder.ready;
 
@@ -22,12 +34,23 @@ export async function loadSceneFromBlobs(files: [string, File][]): Promise<Loade
     .setVertexLayout(VertexLayout.SEPARATE)
     .registerDependencies({ 'meshopt.decoder': MeshoptDecoder, 'meshopt.encoder': MeshoptEncoder });
 
+  const readStart = performance.now();
+  progress?.({ phase: 'Reading files', detail: 'Collecting dropped glTF assets.' });
   const doc = await readDocumentFromFiles(io, files);
+  profile.readMs = performance.now() - readStart;
+  const transformStart = performance.now();
+  progress?.({ phase: 'Preparing geometry', detail: 'Expanding compressed and quantized attributes.' });
   await doc.transform(dequantize());
-  return createSceneFromDocument(doc);
+  profile.transformMs = performance.now() - transformStart;
+  const loaded = await createSceneFromDocument(doc, progress);
+  loaded.profile = { ...loaded.profile, ...profile, totalLoadMs: performance.now() - totalStart };
+  return loaded;
 }
 
-export async function loadSceneFromUrl(url: string): Promise<LoadedPathtracingScene> {
+export async function loadSceneFromUrl(url: string, progress?: LoadProgressCallback): Promise<LoadedPathtracingScene> {
+  const profile: Record<string, number> = {};
+  const totalStart = performance.now();
+  progress?.({ phase: 'Preparing decoder', detail: 'Initializing mesh compression support.' });
   await MeshoptDecoder.ready;
   await MeshoptEncoder.ready;
 
@@ -36,9 +59,17 @@ export async function loadSceneFromUrl(url: string): Promise<LoadedPathtracingSc
     .setVertexLayout(VertexLayout.SEPARATE)
     .registerDependencies({ 'meshopt.decoder': MeshoptDecoder, 'meshopt.encoder': MeshoptEncoder });
 
+  const readStart = performance.now();
+  progress?.({ phase: 'Downloading scene', detail: 'Fetching glTF document, buffers, and images.' });
   const doc = await io.read(normalizeExternalAssetUrl(url));
+  profile.readMs = performance.now() - readStart;
+  const transformStart = performance.now();
+  progress?.({ phase: 'Preparing geometry', detail: 'Expanding compressed and quantized attributes.' });
   await doc.transform(dequantize());
-  return createSceneFromDocument(doc);
+  profile.transformMs = performance.now() - transformStart;
+  const loaded = await createSceneFromDocument(doc, progress);
+  loaded.profile = { ...loaded.profile, ...profile, totalLoadMs: performance.now() - totalStart };
+  return loaded;
 }
 
 async function readDocumentFromFiles(io: WebIO, files: [string, File][]): Promise<Document> {
@@ -65,12 +96,13 @@ async function readDocumentFromFiles(io: WebIO, files: [string, File][]): Promis
   return io.readJSON({ json, resources });
 }
 
-async function createSceneFromDocument(doc: Document): Promise<LoadedPathtracingScene> {
+async function createSceneFromDocument(doc: Document, progress?: LoadProgressCallback): Promise<LoadedPathtracingScene> {
   const root = doc.getRoot();
   const gltfScene = root.listScenes()[0];
   if (!gltfScene) throw new Error('This model contains no scene.');
 
-  console.time('Scene parsing');
+  const parseStart = performance.now();
+  progress?.({ phase: 'Parsing scene', detail: 'Building CPU scene buffers and material textures.' });
   const scene = new PathtracingSceneData();
 
   // --- Texture cache ---
@@ -153,9 +185,10 @@ async function createSceneFromDocument(doc: Document): Promise<LoadedPathtracing
   }
 
   scene.triangleBuffer = combinedBuffer.slice(0, vertexOffset * VERTEX_STRIDE);
-  console.timeEnd('Scene parsing');
+  const parseMs = performance.now() - parseStart;
+  console.debug(`Scene parsing: ${parseMs.toFixed(1)}ms`);
 
-  return { scene };
+  return { scene, profile: { parseMs } };
 }
 
 // --- Primitive packing ---

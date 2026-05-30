@@ -116,8 +116,6 @@ class Demo {
       label: 'IBL Rotation', step: 0.1, min: -180, max: 180,
     }).on('change', () => this._viewer.toggleInteractionMode(true, 100));
 
-    lighting.addBinding(this._renderer, 'iblImportanceSampling', { label: 'Importance Sampling' });
-
     // Integrator
     const integrator = params.addFolder({ title: 'Integrator' });
     integrator.addBinding(this._renderer, 'debugMode', {

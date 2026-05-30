@@ -38,7 +38,6 @@ import iridescence_shader from './shader/bsdfs/iridescence.glsl';
 
 import render_shader from './shader/renderer.frag';
 import debug_integrator_shader from './shader/integrator/debug.glsl';
-import pt_integrator_shader from './shader/integrator/pt.glsl';
 import misptdl_integrator_shader from './shader/integrator/misptdl.glsl';
 
 let vertexShader = ` #version 300 es
@@ -51,7 +50,9 @@ void main()
   gl_Position = position;
 }`;
 
-type RenderProgramKey = "pt_program" | "debug_program" | "misptdl_program";
+type RenderProgramKey = "debug_program" | "misptdl_program";
+type RenderSchedulerMode = "stopped" | "interactive" | "settling" | "accumulating";
+type RenderFrameHandleKind = "raf" | "timeout";
 
 enum BufferType {
   Front = 0,
@@ -79,6 +80,14 @@ export interface PathtracingRendererParameters {
   canvas?: HTMLCanvasElement;
   context?: WebGL2RenderingContext;
 }
+
+export interface PathtracingRendererProgress {
+  phase: string;
+  detail?: string;
+  meta?: string;
+}
+
+export type PathtracingRendererProgressCallback = (event: PathtracingRendererProgress) => void;
 
 export enum RenderResMode {
   High = 0,
@@ -115,8 +124,18 @@ export class PathtracingRenderer {
 
   private _frameCount = 1;
   private _isRendering = false;
-  private _currentAnimationFrameId = -1;
   private _resetAccumulation = false;
+  private schedulerMode: RenderSchedulerMode = "stopped";
+  private framePending = false;
+  private frameHandle = 0;
+  private frameHandleKind: RenderFrameHandleKind | null = null;
+  private tileIndex = 0;
+  private tileOrders = new Map<number, number[]>();
+  private currentCamera: PathtracingCamera | null = null;
+  private currentNumSamples = -1;
+  private tileFinishedCB: () => void = () => {};
+  private frameFinishedCB: (frameCount: number) => void = () => {};
+  private renderingFinishedCB?: () => void;
 
   private _exposure = 1.0;
   public get exposure() {
@@ -127,7 +146,7 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
-  public debugModes = ["None", "Albedo", "Metalness", "Roughness", "Normals", "Tangents", "Bitangents", "Transparency", "UV0", "Clearcoat", "IBL PDF", "IBL CDF", "Specular", "SpecularTint", "Fresnel_Schlick", "Translucency", "Fresnel_Iridescence"];
+  public debugModes = ["None", "Albedo", "Metalness", "Roughness", "Normals", "Tangents", "Bitangents", "Transparency", "UV0", "Clearcoat", "IBL PDF", "IBL CDF", "Specular", "SpecularTint", "Specular F0", "Fresnel Angle", "Translucency", "Raw Thin-Film Fresnel"];
   private _debugMode: string = "None";
   public get debugMode() {
     return this._debugMode;
@@ -135,16 +154,6 @@ export class PathtracingRenderer {
   public set debugMode(val) {
     this._debugMode = val;
     console.log(val);
-    this.resetAccumulation();
-  }
-
-  public integratorTypes = ["PT", "MISPTDL"];
-  private _integrator: string = "MISPTDL";
-  public get integrator() {
-    return this._integrator;
-  }
-  public set integrator(val) {
-    this._integrator = val;
     this.resetAccumulation();
   }
 
@@ -222,15 +231,6 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
-  private _iblImportanceSampling = true;
-  public get iblImportanceSampling() {
-    return this._iblImportanceSampling;
-  }
-  public set iblImportanceSampling(val) {
-    this._iblImportanceSampling = val;
-    this.resetAccumulation();
-  }
-
   private _pixelRatio = 1.0;
   public get pixelRatio() {
     return this._pixelRatio;
@@ -303,11 +303,34 @@ export class PathtracingRenderer {
 
   resetAccumulation() {
     this._resetAccumulation = true;
+    this._frameCount = 1;
+    this.tileIndex = 0;
+    if (this._isRendering) this.scheduleFrame();
   }
 
   stopRendering() {
-    cancelAnimationFrame(this._currentAnimationFrameId);
+    if (this.frameHandle) {
+      if (this.frameHandleKind === "timeout") {
+        clearTimeout(this.frameHandle);
+      } else {
+        cancelAnimationFrame(this.frameHandle);
+      }
+    }
+    this.frameHandle = 0;
+    this.frameHandleKind = null;
+    this.framePending = false;
     this._isRendering = false;
+    this.schedulerMode = "stopped";
+  }
+
+  setInteractionMode(flag: boolean) {
+    if (flag) {
+      this.schedulerMode = "interactive";
+    } else if (this.schedulerMode !== "stopped") {
+      this.schedulerMode = "settling";
+    }
+    this.tileIndex = 0;
+    this.resetAccumulation();
   }
 
   resize(width: number, height: number) {
@@ -336,7 +359,6 @@ export class PathtracingRenderer {
     "u_focal_length": 0,
     "u_ibl_pdf_total_sum": 0,
     "u_ray_eps": 0,
-    "u_render_mode": 0,
     "u_clamp_threshold": 0,
     "u_scene_counts": [0, 0, 0, 0],
     "u_point_light_position": [0, 0, 0, 0],
@@ -361,7 +383,6 @@ export class PathtracingRenderer {
     this.pathTracingUniforms["u_inv_render_res"] = [1.0 / renderRes[0], 1.0 / renderRes[1]];
     this.pathTracingUniforms["u_focal_length"] = camera.near;
     this.pathTracingUniforms["u_ray_eps"] = this.rayEps;
-    this.pathTracingUniforms["u_render_mode"] = this.integratorTypes.indexOf(this._integrator);
     this.pathTracingUniforms["u_ibl_pdf_total_sum"] = this.iblImportanceSamplingData.totalSum;
     this.pathTracingUniforms["u_clamp_threshold"] = this.clampThreshold;
     this.pathTracingUniforms["u_scene_counts"] = [
@@ -459,39 +480,102 @@ export class PathtracingRenderer {
 
 
   render(camera: PathtracingCamera, num_samples: number, tileFinishedCB: () => void, frameFinishedCB: (frameCount: number) => void, renderingFinishedCB?: () => void) {
+    this.stopRendering();
+    this.currentCamera = camera;
+    this.currentNumSamples = num_samples;
+    this.tileFinishedCB = tileFinishedCB;
+    this.frameFinishedCB = frameFinishedCB;
+    this.renderingFinishedCB = renderingFinishedCB;
+    this.schedulerMode = "accumulating";
+    this.tileIndex = 0;
     this._isRendering = true;
     this.resetAccumulation();
-    void this.renderFrame(camera, num_samples, 0, tileFinishedCB, frameFinishedCB, renderingFinishedCB)
-      .catch(err => {
-        console.error(err);
-        this._isRendering = false;
-      });
+    this.scheduleFrame();
   }
 
-  async renderFrame(camera: PathtracingCamera, num_samples: number, tile: number,
-    tileFinishedCB: () => void, frameFinishedCB: (frameCount: number) => void, renderingFinishedCB?: () => void) {
-    let gl = this.gl;
-    if (!this._isRendering) {
-      console.log("Cancel");
+  private scheduleFrame() {
+    if (!this._isRendering || this.framePending) return;
+    if (this.currentNumSamples !== -1 && this._frameCount >= this.currentNumSamples) return;
+
+    this.framePending = true;
+    const runFrame = () => {
+      this.frameHandle = 0;
+      this.frameHandleKind = null;
+      void this.renderFrame()
+        .catch(err => {
+          console.error(err);
+          this.stopRendering();
+        })
+        .finally(() => {
+          this.framePending = false;
+          if (!this._isRendering) return;
+          if (this.currentNumSamples !== -1 && this._frameCount >= this.currentNumSamples) {
+            this.stopRendering();
+            this.renderingFinishedCB?.();
+            return;
+          }
+          this.scheduleFrame();
+        });
+    };
+
+    const useTimeoutScheduler =
+      typeof document !== "undefined" && document.visibilityState !== "visible";
+    if (useTimeoutScheduler) {
+      this.frameHandleKind = "timeout";
+      this.frameHandle = window.setTimeout(runFrame, 0);
       return;
     }
+
+    this.frameHandleKind = "raf";
+    this.frameHandle = requestAnimationFrame(runFrame);
+  }
+
+  private getActiveTileRes() {
+    return this.schedulerMode === "interactive" || this.schedulerMode === "settling" ? 1 : Math.max(1, this._tileRes || 1);
+  }
+
+  private getTileOrder(tileRes: number) {
+    const existing = this.tileOrders.get(tileRes);
+    if (existing) return existing;
+
+    const tiles: number[] = [];
+    const used = new Set<number>();
+    for (let stride = tileRes; stride >= 1; stride = Math.floor(stride / 2)) {
+      for (let y = 0; y < tileRes; y += stride) {
+        for (let x = 0; x < tileRes; x += stride) {
+          const tile = y * tileRes + x;
+          if (!used.has(tile)) {
+            used.add(tile);
+            tiles.push(tile);
+          }
+        }
+      }
+      if (stride === 1) break;
+    }
+    this.tileOrders.set(tileRes, tiles);
+    return tiles;
+  }
+
+  private async renderFrame() {
+    let gl = this.gl;
+    const camera = this.currentCamera;
+    if (!this._isRendering || !camera) return;
 
     const renderProgramKey = this.getSelectedRenderProgramKey();
     this.renderProgram = await this.getRenderProgram(renderProgramKey);
-    if (!this._isRendering) {
-      console.log("Cancel");
-      return;
-    }
+    if (!this._isRendering) return;
 
     const fbo = this.fbos.get("render")!;
     const copyFbo = this.fbos.get("render_")!;
     const renderBuffer = this.renderBuffers.get("render")!;
     const copyBuffer = this.renderBuffers.get("render_")!;
     const renderRes = this.renderRes;
+    const activeTileRes = this.getActiveTileRes();
+    const tileOrder = this.getTileOrder(activeTileRes);
 
     if (this._resetAccumulation) {
       this._frameCount = 1;
-      tile = 0;
+      this.tileIndex = 0;
       this._resetAccumulation = false;
       gl.clearColor(0, 0, 0, 0);
       gl.bindFramebuffer(gl.FRAMEBUFFER, copyFbo);
@@ -499,6 +583,7 @@ export class PathtracingRenderer {
       gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
       gl.clear(gl.COLOR_BUFFER_BIT);
     }
+    const tile = tileOrder[this.tileIndex % tileOrder.length] ?? 0;
 
     let slot = 5; // first 5 slots are static scene data textures
     slot = this.bindTextures(slot);
@@ -509,10 +594,10 @@ export class PathtracingRenderer {
 
     // pathtracing render pass
     gl.enable(gl.SCISSOR_TEST);
-    const tx = this._tileRes || 1;
-    const ty = this._tileRes || 1;
-    const tilex = tile % this._tileRes;
-    const tiley = Math.floor(tile / this._tileRes);
+    const tx = activeTileRes;
+    const ty = activeTileRes;
+    const tilex = tile % activeTileRes;
+    const tiley = Math.floor(tile / activeTileRes);
 
     gl.scissor(
       Math.ceil(tilex * renderRes[0] / tx),
@@ -573,26 +658,17 @@ export class PathtracingRenderer {
     gl.useProgram(null);
     gl.bindVertexArray(null);
 
-    tileFinishedCB();
+    this.tileFinishedCB();
+    this.tileIndex++;
 
-    if (tile == (this._tileRes * this._tileRes) - 1) {
+    if (this.tileIndex >= activeTileRes * activeTileRes) {
+      this.tileIndex = 0;
       this._frameCount++;
-      frameFinishedCB(this._frameCount);
+      this.frameFinishedCB(this._frameCount);
+      if (this.schedulerMode === "settling") {
+        this.schedulerMode = "accumulating";
+      }
     }
-
-    if (num_samples !== -1 && this._frameCount >= num_samples) {
-      if(renderingFinishedCB)
-        renderingFinishedCB(); // finished rendering num_samples
-      this._isRendering = false;
-    }
-
-    this._currentAnimationFrameId = requestAnimationFrame(() => {
-      void this.renderFrame(camera, num_samples, ++tile % (this._tileRes * this._tileRes), tileFinishedCB, frameFinishedCB, renderingFinishedCB)
-        .catch(err => {
-          console.error(err);
-          this._isRendering = false;
-        });
-    });
   };
 
   private initFramebuffers() {
@@ -682,7 +758,7 @@ export class PathtracingRenderer {
   }
 
   private async precomputeIBLImportanceSamplingData(texture: any) {
-    console.time("Precomputing IBL importance sampling data...");
+    const start = performance.now();
     const image = texture.image;
     const w = image.width;
     const h = image.height;
@@ -716,7 +792,7 @@ export class PathtracingRenderer {
     texture["yCdf"] = yCdf;
     texture["totalSum"] = totalSum;
 
-    console.timeEnd("Precomputing IBL importance sampling data...");
+    console.debug(`Precomputing IBL importance sampling data: ${(performance.now() - start).toFixed(1)}ms`);
   }
 
   setIBL(texture: any) {
@@ -759,9 +835,7 @@ export class PathtracingRenderer {
       gl.deleteTexture(this._bvhIndexTexture!);
     }
 
-    console.time('BvhGeneration');
     const { nodeData, triangleIndices, stats } = await buildBvh(sceneData.triangleBuffer!, VERTEX_STRIDE);
-    console.timeEnd('BvhGeneration');
     console.log(`BVH: ${stats.nodeCount} nodes, ${stats.triangleCount} triangles`);
     this._bvhNodeCount = stats.nodeCount;
     this._bvhIndexCount = triangleIndices.length;
@@ -786,8 +860,9 @@ export class PathtracingRenderer {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32I, w, h, 0, gl.RED_INTEGER, gl.INT, paddedIndices);
   }
 
-  public async setScene(scene: PathtracingSceneData) {
-    const gl = this.gl
+  public async setScene(scene: PathtracingSceneData, progress?: PathtracingRendererProgressCallback) {
+    const profile: Record<string, number> = {};
+    const totalStart = performance.now();
     this.stopRendering();
 
     this.scene = scene;
@@ -795,11 +870,27 @@ export class PathtracingRenderer {
     this.renderPrograms.clear();
     this.renderProgramPromises.clear();
     this.renderShaderMaps.clear();
+    progress?.({ phase: 'Uploading scene', detail: 'Creating WebGL textures and buffers.' });
+    const gpuStart = performance.now();
     this.gpu_scene = new PathtracingSceneDataWebGL2(this.gl, scene);
     await this.gpu_scene.init();
+    profile.gpuUploadMs = performance.now() - gpuStart;
 
+    progress?.({ phase: 'Building BVH', detail: 'Creating acceleration structure for ray traversal.' });
+    const bvhStart = performance.now();
     await this.initBvh(scene);
+    profile.bvhBuildMs = performance.now() - bvhStart;
+    progress?.({ phase: 'Compiling shaders', detail: 'Preparing MIS path tracing shader programs.' });
+    const shaderStart = performance.now();
     await this.initializeShaders();
+    profile.shaderInitMs = performance.now() - shaderStart;
+    profile.rendererSetupMs = performance.now() - totalStart;
+    progress?.({
+      phase: 'Ready',
+      detail: 'Scene uploaded and renderer initialized.',
+      meta: `GPU ${profile.gpuUploadMs.toFixed(0)}ms | BVH ${profile.bvhBuildMs.toFixed(0)}ms | shaders ${profile.shaderInitMs.toFixed(0)}ms`,
+    });
+    console.table(profile);
 
     this.resetAccumulation();
   }
@@ -838,7 +929,7 @@ export class PathtracingRenderer {
 
   private getSelectedRenderProgramKey(): RenderProgramKey {
     if (this.debugMode != "None") return "debug_program";
-    return this.iblImportanceSampling ? "misptdl_program" : "pt_program";
+    return "misptdl_program";
   }
 
   private async getRenderProgram(key: RenderProgramKey): Promise<WebGLProgram> {
@@ -866,7 +957,6 @@ export class PathtracingRenderer {
 
   private async initializeShaders() {
     if (!this.gpu_scene) throw new Error("Scene not initialized");
-    console.time("Pathtracing shader initialization");
 
     const bufferAccessSnippet = `
     const uint MAX_TEXTURE_SIZE = ${glu.getMaxTextureSize(this.gl)}u;
@@ -889,16 +979,6 @@ export class PathtracingRenderer {
     #define NUM_BVH_INDICES int(u_scene_counts.z)
     `;
 
-    const pt_trace = `
-      vec4 contribution = trace_pt(r);
-    `
-    const debug_trace = `
-      vec4 contribution = trace_debug(r);
-    `
-    const misptdl_trace = `
-      vec4 contribution = trace_misptdl(r);
-    `
-
     // console.log(this.scene.materialBufferShaderChunk);
     const shaderChunks = new Map<string, string>([
       ['structs', structs_shader],
@@ -920,13 +1000,10 @@ export class PathtracingRenderer {
     const debugShaderMap = new Map<string, string>(shaderChunks);
     debugShaderMap.set('integrator', debug_integrator_shader);
     debugShaderMap.set('debug_bsdf_helpers', `${fresnel_shader}\n${iridescence_shader}`);
-    const ptShaderMap = new Map<string, string>(shaderChunks);
-    ptShaderMap.set('integrator', pt_integrator_shader);
     const misptdlShaderMap = new Map<string, string>(shaderChunks);
     misptdlShaderMap.set('integrator', misptdl_integrator_shader);
 
     this.renderShaderMaps.set("debug_program", debugShaderMap);
-    this.renderShaderMaps.set("pt_program", ptShaderMap);
     this.renderShaderMaps.set("misptdl_program", misptdlShaderMap);
 
     [this.copyProgram, this.displayProgram, this.tonemapProgram, this.fxaaProgram] = await Promise.all([
@@ -936,7 +1013,5 @@ export class PathtracingRenderer {
       glu.createProgramFromSource(this.gl, vertexShader, fxaa_shader, undefined, "fxaa"),
     ]);
     this.renderProgram = await this.getRenderProgram("misptdl_program");
-
-    console.timeEnd("Pathtracing shader initialization");
   }
 }

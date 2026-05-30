@@ -11,9 +11,10 @@ const int D_IBL_PDF = 10;
 const int D_IBL_CDF = 11;
 const int D_SPECULAR = 12;
 const int D_SPECULAR_TINT = 13;
-const int D_FRESNEL_SCHLICK = 14;
-const int D_TRANSLUCENCY = 15;
-const int D_FRESNEL_IRIDESCENCE = 16;
+const int D_SPECULAR_F0 = 14;
+const int D_FRESNEL_ANGLE = 15;
+const int D_TRANSLUCENCY = 16;
+const int D_RAW_THIN_FILM_FRESNEL = 17;
 
 vec4 trace(const bvh_ray ray) {
   bvh_hit hit;
@@ -62,10 +63,14 @@ vec4 trace(const bvh_ray ray) {
     if (int(u_debug_mode) == D_SPECULAR_TINT) {
       contrib = c.specular_tint;
     }
-    if (int(u_debug_mode) == D_FRESNEL_SCHLICK) {
-      contrib = fresnel_schlick(c.specular_f0, c.specular_f90, dot(c.n, rs.wi));
+    if (int(u_debug_mode) == D_SPECULAR_F0) {
+      contrib = c.specular_f0;
     }
-    if (int(u_debug_mode) == D_FRESNEL_IRIDESCENCE) {
+    if (int(u_debug_mode) == D_FRESNEL_ANGLE) {
+      float angleTerm = pow(1.0 - clamp(abs(dot(c.n, rs.wi)), 0.0, 1.0), 5.0);
+      contrib = vec3(angleTerm);
+    }
+    if (int(u_debug_mode) == D_RAW_THIN_FILM_FRESNEL) {
       contrib = evalIridescence(1.0, c.iridescence_ior, cos_theta, c.iridescence_thickness, c.specular_f0);
     }
     color = vec4(contrib, 1.0);

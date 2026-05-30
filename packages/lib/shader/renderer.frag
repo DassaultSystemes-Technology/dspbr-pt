@@ -38,7 +38,6 @@ in vec2 v_uv;
     float u_focal_length;
     float u_ibl_pdf_total_sum;
     float u_ray_eps;
-    float u_render_mode;
     float u_clamp_threshold;
     vec4  u_scene_counts;
     vec4  u_point_light_position;
@@ -79,9 +78,6 @@ layout(location = 0) out vec4 out_FragColor;
 #include <dspbr>
 #include <lighting>
 #include <debug_bsdf_helpers>
-
-const int RM_PT = 0;
-const int RM_MISPTDL = 1;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Pathtracing Integrator Common
@@ -140,10 +136,6 @@ bool check_russian_roulette_path_termination(int bounce, inout vec3 path_weight)
   return (bounce > RR_START_DEPTH) && (rng_float() <= RR_TERMINATION_PROB) ? true : false;
 }
 
-
-// #include <debug_integrator>
-// #include <pt_integrator>
-// #include <misptdl_integrator>
 
 ///////////////////////////////////////////////////////////////////////////////
 // Ray Generation

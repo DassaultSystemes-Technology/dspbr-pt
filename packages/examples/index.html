@@ -16,17 +16,33 @@
   </div>
 
   <div id="startpage" class="overlay">
-    <div>
-      <p>Drag&Drop</p>
-      <p>[.glb|.gltf+assets|.hdr]</p>
+    <div class="overlay-card start-card">
+      <div class="overlay-kicker">dspbr-pt Viewer</div>
+      <h1>Drop a Scene</h1>
+      <p class="overlay-copy">Load a <code>.glb</code>, a <code>.gltf</code> with assets, or an <code>.hdr</code> environment.</p>
+      <div class="overlay-chip-row">
+        <span class="overlay-chip">.glb</span>
+        <span class="overlay-chip">.gltf + assets</span>
+        <span class="overlay-chip">.hdr</span>
+      </div>
     </div>
   </div>
 
   <div id="loadscreen" class="overlay" style="visibility: hidden">
-    <div>
-      <p id="status"></p>
+    <div class="overlay-card load-card">
+      <div class="overlay-kicker">Preparing Renderer</div>
+      <h2 id="status">Loading Scene...</h2>
+      <p id="status-detail" class="overlay-copy">Parsing assets, uploading resources, and compiling shaders.</p>
+      <div class="spinner" style="visibility: hidden;">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+      <div class="loading-bar">
+        <div class="loading-bar-fill"></div>
+      </div>
+      <p id="status-meta" class="overlay-meta">Large assets and fresh shaders can take a moment.</p>
     </div>
-    <div class="spinner" style="visibility: hidden;"></div>
   </div>
 
 

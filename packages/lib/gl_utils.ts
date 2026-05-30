@@ -74,14 +74,14 @@ export async function createProgramFromSource(gl: WebGL2RenderingContext,
   vertexShaderSource: string, fragmentShaderSource: string, shaderChunks?: Map<string, string>, label = "shader") {
 
   if (shaderChunks) {
-    console.time(`Resolving shader chunks: ${label}`);
+    const resolveStart = performance.now();
     for (let [id, chunk] of shaderChunks) {
       let identifier = `#include <${id}>`;
       vertexShaderSource = vertexShaderSource.replace(identifier, chunk);
       fragmentShaderSource = fragmentShaderSource.replace(identifier, chunk);
       // console.log(fragmentShaderSource);
     }
-    console.timeEnd(`Resolving shader chunks: ${label}`);
+    console.debug(`Resolving shader chunks: ${label} ${(performance.now() - resolveStart).toFixed(1)}ms`);
   }
 
   const cacheKey = `${vertexShaderSource}\0${fragmentShaderSource}`;

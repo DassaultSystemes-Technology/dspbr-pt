@@ -15,7 +15,7 @@
 
 import { SimpleDropzone } from 'simple-dropzone';
 import { PathtracingRenderer, loadSceneFromBlobs, loadSceneFromUrl, loadIblFromUrl, loadIblFromBlob } from 'dspbr-pt';
-import type { PathtracingSceneData, IblTextureLike } from 'dspbr-pt';
+import type { PathtracingSceneData, IblTextureLike, LoadProgressEvent, PathtracingRendererProgress } from 'dspbr-pt';
 import { PerspectiveCamera } from './perspective_camera';
 import { WasdCameraController } from './wasd_camera_controller';
 import { Vec3, Box3 } from './math';
@@ -34,6 +34,8 @@ export class DemoViewer extends EventTarget {
   private container?: HTMLElement;
   private startpage?: HTMLElement;
   private status?: HTMLElement;
+  private statusDetail?: HTMLElement;
+  private statusMeta?: HTMLElement;
   private loadscreen?: HTMLElement;
 
   private camera: PerspectiveCamera;
@@ -64,9 +66,9 @@ export class DemoViewer extends EventTarget {
   public get tileRes() { return this._tileRes; }
 
   private interactionTimeoutId: ReturnType<typeof setTimeout> | null = null;
-  private restoreTileModeAfterNextFrame = false;
   private lastTimeStamp = 0.0;
   private sceneBounds?: Box3;
+  private sceneLoading = false;
 
   constructor(params: { container: HTMLElement }) {
     super();
@@ -81,6 +83,8 @@ export class DemoViewer extends EventTarget {
     this.startpage  = document.getElementById('startpage')!;
     this.loadscreen = document.getElementById('loadscreen')!;
     this.status     = document.getElementById('status')!;
+    this.statusDetail = document.getElementById('status-detail')!;
+    this.statusMeta = document.getElementById('status-meta')!;
     this.spinner    = document.getElementsByClassName('spinner')[0] as HTMLElement;
 
     const aspect = window.innerWidth / window.innerHeight;
@@ -123,9 +127,8 @@ export class DemoViewer extends EventTarget {
 
   public toggleInteractionMode(flag: boolean, timeout?: number) {
     if (flag) {
-      this.restoreTileModeAfterNextFrame = false;
       this._renderer.pixelRatio = this._interactionPixelRatio;
-      this._renderer.tileRes = 1;
+      this._renderer.setInteractionMode(true);
       if (timeout && !this.interactionTimeoutId) {
         this.interactionTimeoutId = setTimeout(() => {
           this.interactionTimeoutId = null;
@@ -138,20 +141,23 @@ export class DemoViewer extends EventTarget {
         this.interactionTimeoutId = null;
       }
       this._renderer.pixelRatio = this._pixelRatio;
-      this._renderer.tileRes = 1;
-      this.restoreTileModeAfterNextFrame = true;
+      this._renderer.setInteractionMode(false);
     }
   }
 
   private async loadDropFiles(fileMap: Map<string, File>) {
     for (const [key, value] of fileMap) {
       if (key.match(/\.hdr$/)) {
-        this.showStatusScreen('Loading HDR...');
-        await this.loadIbl(URL.createObjectURL(value));
-        this.hideLoadscreen();
+        this.showStatusScreen({ phase: 'Loading HDR', detail: 'Reading dropped environment map.' });
+        try {
+          await this.loadIbl(URL.createObjectURL(value));
+          this.hideLoadscreen();
+        } catch (err) {
+          this.showLoadError('Failed to load HDR', err);
+        }
       }
       if (key.match(/\.glb$/) || key.match(/\.gltf$/)) {
-        this.showStatusScreen('Loading Scene...');
+        this.showStatusScreen({ phase: 'Loading Scene', detail: 'Reading dropped scene files.' });
         const files: [string, File][] = Array.from(fileMap);
         await this.loadSceneFromFiles(files);
       }
@@ -159,23 +165,31 @@ export class DemoViewer extends EventTarget {
   }
 
   private async loadSceneFromFiles(files: [string, File][]) {
+    this.sceneLoading = true;
     try {
-      const { scene } = await loadSceneFromBlobs(files);
+      const { scene, profile } = await loadSceneFromBlobs(files, event => this.showStatusScreen(event));
+      this.showStatusScreen({ phase: 'Scene parsed', detail: 'Preparing renderer resources.', meta: formatProfile(profile) });
       await this.applyScene(scene);
     } catch (err) {
       console.error('Failed to load scene:', err);
-      this.hideLoadscreen();
+      this.showLoadError('Failed to load scene', err);
+    } finally {
+      this.sceneLoading = false;
     }
   }
 
   public async loadSceneFromUrl(url: string) {
-    this.showStatusScreen('Loading Scene...');
+    this.sceneLoading = true;
+    this.showStatusScreen({ phase: 'Loading Scene', detail: 'Fetching scene assets.' });
     try {
-      const { scene } = await loadSceneFromUrl(url);
+      const { scene, profile } = await loadSceneFromUrl(url, event => this.showStatusScreen(event));
+      this.showStatusScreen({ phase: 'Scene parsed', detail: 'Preparing renderer resources.', meta: formatProfile(profile) });
       await this.applyScene(scene);
     } catch (err) {
       console.error('Failed to load scene:', err);
-      this.hideLoadscreen();
+      this.showLoadError('Failed to load scene', err);
+    } finally {
+      this.sceneLoading = false;
     }
     this.hideStartpage();
   }
@@ -185,7 +199,7 @@ export class DemoViewer extends EventTarget {
     this.updateCameraFromBounds();
     this.centerView();
 
-    await this._renderer.setScene(scene);
+    await this._renderer.setScene(scene, event => this.showStatusScreen(event));
     this.startPathtracing();
     this.hideLoadscreen();
 
@@ -211,14 +225,18 @@ export class DemoViewer extends EventTarget {
     }
     let ibl: IblTextureLike;
     if (url.startsWith('blob:')) {
+      if (!this.sceneLoading) this.showStatusScreen({ phase: 'Loading HDR', detail: 'Reading local environment map.' });
       const resp = await fetch(url);
       ibl = await loadIblFromBlob(await resp.blob());
     } else {
+      if (!this.sceneLoading) this.showStatusScreen({ phase: 'Loading HDR', detail: 'Fetching environment map.' });
       ibl = await loadIblFromUrl(url);
     }
+    if (!this.sceneLoading) this.showStatusScreen({ phase: 'Preparing IBL', detail: 'Uploading environment and precomputing sampling data.' });
     this._renderer.setIBL(ibl);
     this._renderer.useIBL = true;
     this._renderer.showBackground = true;
+    if (!this.sceneLoading) this.hideLoadscreen();
   }
 
   public saveImage() {
@@ -252,12 +270,7 @@ export class DemoViewer extends EventTarget {
     this._renderer.render(
       this.camera,
       -1,
-      () => {
-        if (this.restoreTileModeAfterNextFrame) {
-          this.restoreTileModeAfterNextFrame = false;
-          this._renderer.tileRes = this._tileRes;
-        }
-      },
+      () => {},
       () => {
         const now = performance.now();
         this._fps = 1000.0 / (now - this.lastTimeStamp);
@@ -276,16 +289,35 @@ export class DemoViewer extends EventTarget {
   showStartpage() { this.startpage!.style.visibility = 'visible'; }
   hideStartpage() { this.startpage!.style.visibility = 'hidden'; }
 
-  showStatusScreen(msg: string) {
-    this.status!.innerText = msg;
+  showStatusScreen(event: LoadProgressEvent | PathtracingRendererProgress) {
+    this.loadscreen!.classList.remove('error-mode');
+    this.status!.innerText = event.phase;
+    this.statusDetail!.innerText = event.detail ?? '';
+    this.statusMeta!.innerText = event.meta ?? 'Large assets and fresh shaders can take a moment.';
     this.loadscreen!.style.visibility = 'visible';
     this.spinner.style.visibility = 'visible';
+  }
+
+  showLoadError(title: string, err: unknown) {
+    this.status!.innerText = title;
+    this.statusDetail!.innerText = err instanceof Error ? err.message : String(err);
+    this.statusMeta!.innerText = 'Check the browser console for details.';
+    this.loadscreen!.classList.add('error-mode');
+    this.loadscreen!.style.visibility = 'visible';
+    this.spinner.style.visibility = 'hidden';
   }
 
   hideLoadscreen() {
     this.loadscreen!.style.visibility = 'hidden';
     this.spinner.style.visibility = 'hidden';
   }
+}
+
+function formatProfile(profile: Record<string, number>) {
+  const parts = Object.entries(profile)
+    .filter(([, value]) => Number.isFinite(value))
+    .map(([key, value]) => `${key.replace(/Ms$/, '')} ${value.toFixed(0)}ms`);
+  return parts.join(' | ');
 }
 
 export { PerspectiveCamera } from './perspective_camera';
