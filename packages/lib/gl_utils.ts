@@ -59,6 +59,17 @@ function getShaderErrorLog(gl: WebGL2RenderingContext, shader: WebGLShader, sour
   return "";
 }
 
+const programCache = new WeakMap<WebGL2RenderingContext, Map<string, Promise<WebGLProgram>>>();
+
+function getProgramCache(gl: WebGL2RenderingContext) {
+  let cache = programCache.get(gl);
+  if (!cache) {
+    cache = new Map<string, Promise<WebGLProgram>>();
+    programCache.set(gl, cache);
+  }
+  return cache;
+}
+
 export async function createProgramFromSource(gl: WebGL2RenderingContext,
   vertexShaderSource: string, fragmentShaderSource: string, shaderChunks?: Map<string, string> ) {
 
@@ -72,6 +83,22 @@ export async function createProgramFromSource(gl: WebGL2RenderingContext,
     }
     console.timeEnd("Resolving shader chunks");
   }
+
+  const cacheKey = `${vertexShaderSource}\0${fragmentShaderSource}`;
+  const cache = getProgramCache(gl);
+  const cachedProgram = cache.get(cacheKey);
+  if (cachedProgram) {
+    console.debug("Shader program cache hit");
+    return cachedProgram;
+  }
+
+  const programPromise = compileProgramFromSource(gl, vertexShaderSource, fragmentShaderSource);
+  cache.set(cacheKey, programPromise);
+  return programPromise;
+}
+
+async function compileProgramFromSource(gl: WebGL2RenderingContext,
+  vertexShaderSource: string, fragmentShaderSource: string) {
 
   var ext = gl.getExtension('KHR_parallel_shader_compile');
 
