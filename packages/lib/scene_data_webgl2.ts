@@ -1,4 +1,3 @@
-import { Scene } from 'three';
 import * as glu from './gl_utils';
 import { PathtracingSceneData } from './scene_data';
 
@@ -144,34 +143,31 @@ export class PathtracingSceneDataWebGL2 {
     const gl = this.gl;
     const texArrays = this._sceneData.texArrays;
 
-    // create texture arrays
-    const getImageData = (image: ImageBitmap) => {
+    const getImageData = (image: CanvasImageSource) => {
+      const w = (image as HTMLCanvasElement).width;
+      const h = (image as HTMLCanvasElement).height;
       const canvas = document.createElement('canvas');
-      canvas.width = image.width;
-      canvas.height = image.height;
-
-      const context = canvas.getContext('2d');
-
-      if (context) {
-        context.drawImage(image, 0, 0);
-        return context.getImageData(0, 0, image.width, image.height);
-      } else {
-        throw Error("Couldn't parse image data from texture");
-      }
-    }
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error("Couldn't get 2D context for texture");
+      ctx.drawImage(image, 0, 0);
+      return ctx.getImageData(0, 0, w, h);
+    };
 
     let i = 0;
     for (const textureList of texArrays.values()) {
-      const width = textureList[0].image.width;
-      const height = textureList[0].image.height;
+      const firstImage = textureList[0]!.image as HTMLCanvasElement;
+      const width = firstImage.width;
+      const height = firstImage.height;
       const texSize = width * height * 4;
       let data = new Uint8Array(texSize * textureList.length);
 
       this._textureDataUsage += data.length;
 
-      data.set(getImageData(textureList[0].image).data);
+      data.set(getImageData(textureList[0]!.image as CanvasImageSource).data);
       for (let t = 1; t < textureList.length; t++) {
-        data.set(getImageData(textureList[t].image).data, texSize * t);
+        data.set(getImageData(textureList[t]!.image as CanvasImageSource).data, texSize * t);
       }
 
       let texArray = gl.createTexture();
