@@ -69,9 +69,11 @@ void configure_material(const in uint matIdx, in RenderState rs, out MaterialClo
   vec4 occlusionRoughnessMetallic = get_texture_value(matData.metallicRoughnessTextureId, uv);
   c.metallic = matData.metallic * occlusionRoughnessMetallic.z;
   float roughness = matData.roughness * occlusionRoughnessMetallic.y;
+  c.roughness = roughness;
 
   float anisotropy = get_texture_value(matData.anisotropyTextureId, uv).x * 2.0 - 1.0;
-  c.alpha = roughness_conversion(roughness, matData.anisotropy * anisotropy);
+  c.anisotropy = matData.anisotropy * anisotropy;
+  c.alpha = roughness_conversion(roughness, c.anisotropy);
 
   vec4 specularColor = get_texture_value(matData.specularColorTextureId, rs.uv0);
   c.specular_tint = matData.specularTint * pow(specularColor.rgb, vec3(2.2));
@@ -110,6 +112,7 @@ void configure_material(const in uint matIdx, in RenderState rs, out MaterialClo
 
   float anisotropyRotation = atan(ansiotropyDirection.y, ansiotropyDirection.x) + PI;
   c.t = rotation_to_tangent(anisotropyRotation, c.n, c.t);
+  c.anisotropyTangent = c.t.xyz;
 
   if (c.backside && !c.thin_walled) {
     c.f0 = ((1.0 - c.ior) / (1.0 + c.ior)) * ((1.0 - c.ior) / (1.0 + c.ior));
@@ -125,8 +128,8 @@ void configure_material(const in uint matIdx, in RenderState rs, out MaterialClo
   vec4 clearcoat = get_texture_value(matData.clearcoatTextureId, uv);
   c.clearcoat = matData.clearcoat * clearcoat.y;
   vec4 clearcoatRoughness = get_texture_value(matData.clearcoatRoughnessTextureId, uv);
-  float clearcoat_alpha =
-      matData.clearcoatRoughness * matData.clearcoatRoughness * clearcoatRoughness.x * clearcoatRoughness.x;
+  c.clearcoatRoughness = matData.clearcoatRoughness * clearcoatRoughness.x;
+  float clearcoat_alpha = c.clearcoatRoughness * c.clearcoatRoughness;
   c.clearcoat_alpha = max(clearcoat_alpha, MINIMUM_ROUGHNESS);
 
   c.attenuationColor = matData.attenuationColor;

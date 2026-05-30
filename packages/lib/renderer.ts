@@ -29,7 +29,8 @@ import structs_shader from './shader/structs.glsl';
 import rng_shader from './shader/rng.glsl';
 import utils_shader from './shader/utils.glsl';
 import material_shader from './shader/material.glsl';
-import dspbr_shader from './shader/dspbr.glsl';
+import slang_material_kernel_shader from './shader/generated/slang_materials/material_kernel.glsl';
+import slang_material_adapter_shader from './shader/slang_material_adapter.glsl';
 import bvh_shader from './shader/bvh.glsl';
 import lighting_shader from './shader/lighting.glsl';
 import diffuse_shader from './shader/bsdfs/diffuse.glsl';
@@ -826,7 +827,7 @@ export class PathtracingRenderer {
       ['buffer_accessor', bufferAccessSnippet],
       ['texture_accessor', this.gpu_scene.texAccessorShaderChunk],
       ['material_block', this.gpu_scene.materialBufferShaderChunk],
-      ['dspbr', dspbr_shader],
+      ['dspbr', `${slang_material_kernel_shader}\n${slang_material_adapter_shader}`],
       ['bvh', bvh_shader],
       ['lighting', lighting_shader],
       ['diffuse', diffuse_shader],

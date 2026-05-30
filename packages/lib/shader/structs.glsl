@@ -110,6 +110,10 @@ struct MaterialClosure {
   float iridescence_ior;
   float iridescence_thickness;
   vec3 translucencyColor;
+  float roughness;
+  float anisotropy;
+  float clearcoatRoughness;
+  vec3 anisotropyTangent;
 };
 
 struct RenderState {
