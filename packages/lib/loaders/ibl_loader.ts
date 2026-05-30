@@ -1,4 +1,5 @@
 import { normalizeExternalAssetUrl } from './url_normalization';
+import { fetchCachedAsset } from './asset_cache';
 
 export interface IblTextureLike {
   image: {
@@ -193,7 +194,7 @@ export async function loadIblFromBlob(blob: Blob): Promise<IblTextureLike> {
 }
 
 export async function loadIblFromUrl(url: string): Promise<IblTextureLike> {
-  const response = await fetch(normalizeExternalAssetUrl(url));
+  const response = await fetchCachedAsset(normalizeExternalAssetUrl(url));
   if (!response.ok) {
     throw new Error(`Failed to load HDR: ${response.status} ${response.statusText}`);
   }

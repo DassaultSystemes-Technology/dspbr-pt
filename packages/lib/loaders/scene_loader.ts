@@ -7,6 +7,7 @@ import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
 import { PathtracingSceneData, Light, VERTEX_STRIDE, type SceneTextureLike } from '../scene_data';
 import { MaterialData } from '../material';
 import { normalizeExternalAssetUrl } from './url_normalization';
+import { CachedWebIO } from './cached_web_io';
 
 export interface LoadedPathtracingScene {
   scene: PathtracingSceneData;
@@ -16,7 +17,7 @@ export async function loadSceneFromBlobs(files: [string, File][]): Promise<Loade
   await MeshoptDecoder.ready;
   await MeshoptEncoder.ready;
 
-  const io = new WebIO()
+  const io = new CachedWebIO()
     .registerExtensions(ALL_EXTENSIONS)
     .setVertexLayout(VertexLayout.SEPARATE)
     .registerDependencies({ 'meshopt.decoder': MeshoptDecoder, 'meshopt.encoder': MeshoptEncoder });
@@ -30,7 +31,7 @@ export async function loadSceneFromUrl(url: string): Promise<LoadedPathtracingSc
   await MeshoptDecoder.ready;
   await MeshoptEncoder.ready;
 
-  const io = new WebIO()
+  const io = new CachedWebIO()
     .registerExtensions(ALL_EXTENSIONS)
     .setVertexLayout(VertexLayout.SEPARATE)
     .registerDependencies({ 'meshopt.decoder': MeshoptDecoder, 'meshopt.encoder': MeshoptEncoder });
