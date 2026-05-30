@@ -4,8 +4,8 @@ export const scenes = {
     "credit": "Official <a href=\"https://github.com/KhronosGroup/glTF-Sample-Models/tree/master/2.0/DamagedHelmet\">glTF Sample Model</a> (Original: Battle Damaged Sci-fi Helmet - PBR by <a href\"https://sketchfab.com/theblueturtle_\">theblueturtle_</a>, on <a href\"https://sketchfab.com/models/b81008d513954189a063ff901f7abfe4\">Sketchfab</a>.)"
   },
   "Tea Time": {
-    "url": "https://raw.githubusercontent.com/DassaultSystemes-Technology/dspbr-pt/main/assets/scenes/teatime/teatime.glb",
-    "credit": "by <a href=\"https://www.artstation.com/jamesray\">James Ray Cock</a>, Jurita Burger and <a href=\"https://www.artstation.com/ricocilliers\">Rico Cilliers</a> on <a href=\"https://polyhaven.com/a/tea_set_01\">polyhaven.com</a>"
+    "url": "https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Assets@main/Models/DiffuseTransmissionTeacup/glTF-Binary/DiffuseTransmissionTeacup.glb",
+    "credit": "Official <a href=\"https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/DiffuseTransmissionTeacup\">glTF Sample Asset</a>"
   },
   "Potted Plant": {
     "url": "https://raw.githubusercontent.com/DassaultSystemes-Technology/dspbr-pt/main/assets/scenes/potted_plant/potted_plant_1k.glb",
@@ -54,4 +54,3 @@ export const ibls = {
     "intensity": 1.5
   }
 };
-
