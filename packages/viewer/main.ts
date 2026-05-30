@@ -59,15 +59,12 @@ export class DemoViewer extends EventTarget {
   public get interactionPixelRatio() { return this._interactionPixelRatio; }
   public set interactionPixelRatio(val: number) { this._interactionPixelRatio = val; }
 
-  private _pathtracedInteraction = true;
-  public get pathtracedInteraction() { return this._pathtracedInteraction; }
-  public set pathtracedInteraction(flag: boolean) { this._pathtracedInteraction = flag; }
-
   private _tileRes = 4;
   public set tileRes(val: number) { this._tileRes = val; this._renderer.tileRes = val; }
   public get tileRes() { return this._tileRes; }
 
   private interactionTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private restoreTileModeAfterNextFrame = false;
   private lastTimeStamp = 0.0;
   private sceneBounds?: Box3;
 
@@ -96,10 +93,10 @@ export class DemoViewer extends EventTarget {
       this._renderer.resetAccumulation();
     });
     this.controls.addEventListener('start', () => {
-      if (this._pathtracedInteraction) this.toggleInteractionMode(true);
+      this.toggleInteractionMode(true);
     });
     this.controls.addEventListener('end', () => {
-      if (this._pathtracedInteraction) this.toggleInteractionMode(false);
+      this.toggleInteractionMode(false);
     });
 
     this._renderer = new PathtracingRenderer({ canvas: this.canvas });
@@ -126,6 +123,7 @@ export class DemoViewer extends EventTarget {
 
   public toggleInteractionMode(flag: boolean, timeout?: number) {
     if (flag) {
+      this.restoreTileModeAfterNextFrame = false;
       this._renderer.pixelRatio = this._interactionPixelRatio;
       this._renderer.tileRes = 1;
       if (timeout && !this.interactionTimeoutId) {
@@ -140,7 +138,8 @@ export class DemoViewer extends EventTarget {
         this.interactionTimeoutId = null;
       }
       this._renderer.pixelRatio = this._pixelRatio;
-      this._renderer.tileRes = this._tileRes;
+      this._renderer.tileRes = 1;
+      this.restoreTileModeAfterNextFrame = true;
     }
   }
 
@@ -253,7 +252,12 @@ export class DemoViewer extends EventTarget {
     this._renderer.render(
       this.camera,
       -1,
-      () => {},
+      () => {
+        if (this.restoreTileModeAfterNextFrame) {
+          this.restoreTileModeAfterNextFrame = false;
+          this._renderer.tileRes = this._tileRes;
+        }
+      },
       () => {
         const now = performance.now();
         this._fps = 1000.0 / (now - this.lastTimeStamp);

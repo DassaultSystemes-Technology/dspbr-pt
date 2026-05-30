@@ -78,6 +78,7 @@ layout(location = 0) out vec4 out_FragColor;
 
 #include <dspbr>
 #include <lighting>
+#include <debug_bsdf_helpers>
 
 const int RM_PT = 0;
 const int RM_MISPTDL = 1;

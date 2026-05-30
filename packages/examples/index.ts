@@ -137,7 +137,6 @@ class Demo {
       options: buildOptions(this._renderer.tonemappingModes),
     });
     display.addBinding(this._renderer, 'enableGamma',         { label: 'Gamma' });
-    display.addBinding(this._viewer,   'pathtracedInteraction',{ label: 'Pathtraced Navigation' });
     display.addBinding(this._renderer, 'showBackground',      { label: 'Background from IBL' });
     display.addBinding(this._viewer,   'pixelRatio',          { label: 'Pixel Ratio',    step: 0.1, min: 0.1, max: 1 });
     display.addBinding(this._viewer,   'interactionPixelRatio',{ label: 'Interaction Ratio', step: 0.1, min: 0.1, max: 1 });

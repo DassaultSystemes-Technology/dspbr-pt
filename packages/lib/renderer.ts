@@ -33,6 +33,8 @@ import slang_material_kernel_shader from './shader/generated/slang_materials/mat
 import slang_material_adapter_shader from './shader/slang_material_adapter.glsl';
 import bvh_shader from './shader/bvh.glsl';
 import lighting_shader from './shader/lighting.glsl';
+import fresnel_shader from './shader/bsdfs/fresnel.glsl';
+import iridescence_shader from './shader/bsdfs/iridescence.glsl';
 
 import render_shader from './shader/renderer.frag';
 import debug_integrator_shader from './shader/integrator/debug.glsl';
@@ -911,11 +913,13 @@ export class PathtracingRenderer {
       ['dspbr', `${slang_material_kernel_shader}\n${slang_material_adapter_shader}`],
       ['bvh', bvh_shader],
       ['lighting', lighting_shader],
+      ['debug_bsdf_helpers', ''],
       ['mesh_constants', meshConstants]
     ]);
 
     const debugShaderMap = new Map<string, string>(shaderChunks);
     debugShaderMap.set('integrator', debug_integrator_shader);
+    debugShaderMap.set('debug_bsdf_helpers', `${fresnel_shader}\n${iridescence_shader}`);
     const ptShaderMap = new Map<string, string>(shaderChunks);
     ptShaderMap.set('integrator', pt_integrator_shader);
     const misptdlShaderMap = new Map<string, string>(shaderChunks);
