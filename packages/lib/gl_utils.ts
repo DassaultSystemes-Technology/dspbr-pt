@@ -120,34 +120,32 @@ export async function createProgramFromSource(gl: WebGL2RenderingContext,
   }
 }
 
-export function createDataTexture(gl: WebGL2RenderingContext,
-  data: Float32Array) :  WebGLTexture {
-  if(!data) throw Error("No data provided for data texture creation!");
+export function createDataTexture(gl: WebGL2RenderingContext, data: Float32Array): WebGLTexture {
+  if (!data) throw new Error('No data provided for data texture creation!');
 
-  let maxTextureSize = getMaxTextureSize(gl);
+  const maxSize    = getMaxTextureSize(gl);
+  const numBlocks  = (data.length / 4) | 0;
+  const sX         = Math.min(numBlocks, maxSize);
+  const sY         = Math.max(1, Math.ceil(numBlocks / maxSize));
+  const paddedLen  = sX * sY * 4;
 
-  let numRGBAblocks = (data.length / 4) | 0;
-  let sX = Math.min(numRGBAblocks, maxTextureSize);
-  let sY = Math.max(1, ((numRGBAblocks + maxTextureSize - 1) / maxTextureSize) | 0);
-  // console.log(`Create data texture: ${sX} x ${sY}`);
+  // Pad to a full rectangle so a single texImage2D call covers every texel.
+  // This avoids the Firefox "lazy initialization" warning triggered by partial
+  // sub-image uploads, which forces a full GPU clear just before shader execution.
+  const upload = paddedLen > data.length
+    ? (() => { const p = new Float32Array(paddedLen); p.set(data); return p; })()
+    : data;
 
-  let tex = gl.createTexture();
+  const tex = gl.createTexture()!;
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, sX, sY, 0, gl.RGBA, gl.FLOAT, null);
-
-  if (sY > 1) {
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, sX, sY - 1, gl.RGBA, gl.FLOAT, data, 0);
-  }
-
-  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, sY - 1, numRGBAblocks - sX * (sY - 1), 1, gl.RGBA, gl.FLOAT, data, sX * (sY - 1) * 4);
-
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, sX, sY, 0, gl.RGBA, gl.FLOAT, upload);
   gl.bindTexture(gl.TEXTURE_2D, null);
 
-  return tex as WebGLTexture;
+  return tex;
 }
 
 export function createTexture(gl: WebGL2RenderingContext, target: any, internalformat: any, width: number, height: number, format: any, type: any, srcData: ArrayBufferView, srcOffset: number, minFilter: any = WebGL2RenderingContext.LINEAR, magFilter: any = WebGL2RenderingContext.LINEAR, wrapS: any = WebGL2RenderingContext.REPEAT, wrapT: any = WebGL2RenderingContext.REPEAT) {
@@ -164,4 +162,3 @@ export function createTexture(gl: WebGL2RenderingContext, target: any, internalf
 
   return tex;
 }
-

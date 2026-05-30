@@ -15,6 +15,7 @@ const float EPS_PDF = 0.001;
 
 const float MINIMUM_ROUGHNESS = 0.0001;
 const float TFAR_MAX = 100000.0;
+const float BVH_FAR  = 1e30;
 
 const int RR_START_DEPTH = 2;
 const float RR_TERMINATION_PROB = 0.1;

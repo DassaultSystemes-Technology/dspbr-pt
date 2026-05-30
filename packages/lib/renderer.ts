@@ -13,9 +13,8 @@
  * limitations under the License.
  */
 
-// @ts-ignore
-import { SimpleTriangleBVH } from './bvh';
-import { PathtracingSceneData } from './scene_data'
+import { buildBvh } from './bvh/tinybvh_builder';
+import { PathtracingSceneData, VERTEX_STRIDE } from './scene_data'
 import { PathtracingSceneDataWebGL2 } from './scene_data_webgl2'
 
 import * as glu from './gl_utils';
@@ -690,30 +689,34 @@ export class PathtracingRenderer {
 
   private _bvhDataTexture?: WebGLTexture;
   private _bvhIndexTexture?: WebGLTexture;
+  private _bvhNodeCount = 0;
+  private _bvhIndexCount = 0;
 
-  private initBvh(sceneData: PathtracingSceneData) {
+  private async initBvh(sceneData: PathtracingSceneData) {
     const gl = this.gl;
-    console.time("BvhGeneration");
-    const bvh = new SimpleTriangleBVH(20);
-    bvh.build(sceneData.triangleBuffer!);
-    console.timeEnd("BvhGeneration");
 
     if (this._bvhDataTexture) {
       gl.deleteTexture(this._bvhDataTexture!);
       gl.deleteTexture(this._bvhIndexTexture!);
     }
 
-    this._bvhDataTexture = glu.createDataTexture(gl, bvh.createAndCopyToFlattenedArray_StandardFormat());
+    console.time('BvhGeneration');
+    const { nodeData, triangleIndices, stats } = await buildBvh(sceneData.triangleBuffer!, VERTEX_STRIDE);
+    console.timeEnd('BvhGeneration');
+    console.log(`BVH: ${stats.nodeCount} nodes, ${stats.triangleCount} triangles`);
+    this._bvhNodeCount = stats.nodeCount;
+    this._bvhIndexCount = triangleIndices.length;
 
-    const maxTextureSize = glu.getMaxTextureSize(gl);
-    const numIndices = bvh.m_pTriIndices.length;
-    const h = Math.ceil(numIndices / maxTextureSize);
-    let w = Math.min(numIndices, maxTextureSize);
+    // Node data: 4 RGBA texels per node (16 floats) — packed into power-of-2 2D texture
+    this._bvhDataTexture = glu.createDataTexture(gl, nodeData);
 
-    const paddedIndexBuffer = new Int32Array(w * h);
-    for (let i = 0; i < bvh.m_pTriIndices.length; i++) {
-      paddedIndexBuffer[i] = bvh.m_pTriIndices[i];
-    }
+    // Triangle index remapping: 1 int per entry
+    const maxSize = glu.getMaxTextureSize(gl);
+    const numIdx = triangleIndices.length;
+    const w = Math.min(numIdx, maxSize);
+    const h = Math.ceil(numIdx / maxSize);
+    const paddedIndices = new Int32Array(w * h);
+    paddedIndices.set(triangleIndices);
 
     this._bvhIndexTexture = gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, this._bvhIndexTexture);
@@ -721,7 +724,7 @@ export class PathtracingRenderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32I, w, h, 0, gl.RED_INTEGER, gl.INT, paddedIndexBuffer);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32I, w, h, 0, gl.RED_INTEGER, gl.INT, paddedIndices);
   }
 
   public async setScene(scene: PathtracingSceneData) {
@@ -732,7 +735,7 @@ export class PathtracingRenderer {
     this.gpu_scene = new PathtracingSceneDataWebGL2(this.gl, scene);
     await this.gpu_scene.init();
 
-    this.initBvh(scene);
+    await this.initBvh(scene);
     await this.initializeShaders();
 
     this.renderPrograms.forEach(program => {
@@ -798,6 +801,8 @@ export class PathtracingRenderer {
     const uint TANGENT_OFFSET = 3u;
     const uint COLOR_OFFSET = 4u;
     const uint NUM_TRIANGLES = ${this.gpu_scene.sceneData.num_triangles}u;
+    const int NUM_BVH_NODES = ${this._bvhNodeCount};
+    const int NUM_BVH_INDICES = ${this._bvhIndexCount};
     `;
 
     const pt_trace = `
