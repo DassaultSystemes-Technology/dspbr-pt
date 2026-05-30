@@ -6,10 +6,10 @@
     "packages/*"
   ],
   "scripts": {
-    "clean": "rimraf demos/ && rimraf packages/dspbr-pt/dist",
-    "build": "yarn run clean && yarn workspaces foreach run build",
-    "dev": "yarn workspace dspbr-pt-demos run dev",
-    "validation": "yarn workspace dspbr-pt-cli run validation"
+    "clean": "rimraf dist/ packages/lib/dist packages/viewer/dist",
+    "build:slang-materials": "node tools/generate_slang_materials.mjs",
+    "build": "yarn workspaces foreach --topological run build",
+    "dev": "yarn workspace dspbr-pt-demos run dev"
   },
   "repository": {
     "type": "git",
@@ -17,19 +17,9 @@
   },
   "author": "Bastian Sdorra <bastian.SDORRA@3ds.com>",
   "license": "Apache-2.0",
-  "bugs": {
-    "url": "https://github.com/DassaultSystemes-Technology/dspbr-pt/issues"
-  },
-  "homepage": "https://github.com/DassaultSystemes-Technology/dspbr-pt#readme",
   "devDependencies": {
-    "@parcel/packager-ts": "2.5.0",
-    "@parcel/transformer-typescript-types": "2.5.0",
-    "os-browserify": "^0.3.0",
     "rimraf": "^3.0.2",
-    "typescript": ">=3.0.0"
+    "typescript": "^5.5.0"
   },
-  "packageManager": "yarn@3.2.0",
-  "resolutions": {
-    "@gltf-transform/extensions": "patch:@gltf-transform/extensions@npm:2.1.4#.yarn/patches/@gltf-transform-extensions-npm-2.1.4-295216e8ed.patch"
-  }
+  "packageManager": "yarn@3.2.0"
 }

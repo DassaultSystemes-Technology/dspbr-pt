@@ -1,33 +1,27 @@
 {
   "name": "dspbr-pt-viewer",
+  "version": "0.0.0",
   "private": true,
+  "type": "module",
   "devDependencies": {
-    "@parcel/transformer-glsl": "^2.4.1",
-    "@parcel/transformer-typescript-types": "^2.5.0",
-    "parcel": "^2.5.0",
-    "patch-package": "^6.4.7",
-    "rimraf": "^3.0.2"
+    "tsup": "^8.0.0",
+    "typescript": "^5.5.0"
   },
   "dependencies": {
-    "@gltf-transform/core": "^2.1.4",
-    "@gltf-transform/extensions": "^2.1.4",
-    "@gltf-transform/functions": "^2.1.4",
-    "@types/events": "^3.0.0",
-    "@types/three": "^0.139.0",
     "dspbr-pt": "0.4.0",
-    "meshoptimizer": "^0.17.0",
     "simple-dropzone": "^0.8.1",
-    "three": "^0.139.2",
-    "tweakpane": "^3.0.8"
+    "tweakpane": "^4.0.0"
   },
-  "browserslist": [
-    "last 1 Chrome version"
-  ],
-  "source": "main.ts",
-  "types": "dist/index.d.ts",
-  "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/main.js",
+      "types": "./dist/main.d.ts"
+    }
+  },
+  "main": "dist/main.js",
+  "types": "dist/main.d.ts",
   "scripts": {
-    "build": "rimraf dist && parcel build main.ts --dist-dir dist/ --public-url ./ --no-source-maps",
-    "postinstall": "npx patch-package"
+    "build": "tsup",
+    "build:watch": "tsup --watch"
   }
 }
