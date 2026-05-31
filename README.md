@@ -1,49 +1,61 @@
-# Enterprise PBR Sample Renderer ([Demo Viewer](https://dassaultsystemes-technology.github.io/dspbr-pt/index.html))
-<!-- |  [Validation Report](https://dassaultsystemes-technology.github.io/dspbr-pt/report/)) -->
+# Enterprise PBR WebGL Path Tracer
 
-A WebGL2 GPU path-tracer that runs in your browser.<br>
-Features physical materials by implementing the [Enterprise PBR Shading Model (DSPBR)](https://github.com/DassaultSystemes-Technology/EnterprisePBRShadingModel)
+[Viewer App](https://dassaultsystemes-technology.github.io/dspbr-pt/index.html)
 
-[Demo Viewer (glTF drag&drop)](https://dassaultsystemes-technology.github.io/dspbr-pt/index.html)
-
-[Minimal Demo](https://dassaultsystemes-technology.github.io/dspbr-pt/simple.html) [[ Code ](packages/examples/simple.ts)]
-
+[Minimal Demo](https://dassaultsystemes-technology.github.io/dspbr-pt/simple.html) [[ Code ](packages/app/simple.ts)]
 
 ## Features
-* Browser-based, unbiased[*](#Notes) GPU path-tracing
-* Implements parts of the [Enterprise PBR Shading Model (DSPBR)](https://github.com/DassaultSystemes-Technology/EnterprisePBRShadingModel)
+* Browser-based WebGL2 GPU path tracing
+* MIS path tracing with IBL importance sampling
+* glTF/glb loading via glTF-Transform, including GitHub/raw URL normalization and local asset caching
+* TinyBVH WASM acceleration structure builds with indexed geometry upload
+* Slang-generated material evaluation for [Enterprise PBR Shading Model (DSPBR)](https://github.com/DassaultSystemes-Technology/EnterprisePBRShadingModel)
+* Public `PathtracingViewport` API for simple embedding
+* Supported material features include:
   * [x] Rough Metal & Dielectrics (opaque/transparent)<br>
   Using energy preserving, multi-scattering GGX BRDF and directional albedo scaling for diffuse/sheen components
   * [x] Sheen
   * [x] Clearcoat
   * [x] Emission
   * [x] Iridescence
-* Three.js scene compatibility
-* Implements most of the new glTF PBR Next material extensions [1,2] and extension proposal pull requests (marked as PR below).
-  * [KHR_materials_anisotropy (PR)](https://github.com/KhronosGroup/glTF/pull/2027)
+* Implements most of the glTF PBR material extensions [1,2].
+  * [KHR_materials_anisotropy](https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_anisotropy/README.md)
   * [KHR_materials_clearcoat](https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_materials_clearcoat/README.md)
-  * [KHR_materials_emission_strength (PR)](https://github.com/KhronosGroup/glTF/pull/1994)
+  * [KHR_materials_emission_strength](https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_emissive_strength/README.md)
   * [KHR_materials_ior](https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_ior)
-  * [KHR_materials_iridescence (PR)](https://github.com/KhronosGroup/glTF/pull/2027)
+  * [KHR_materials_iridescence](https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_iridescence/README.md)
   * [KHR_materials_sheen](https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_materials_sheen/README.md)
   * [KHR_materials_specular](https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_specular)
-  <!-- * [KHR_materials_translucency PR](https://github.com/KhronosGroup/glTF/pull/1825) -->
   * [KHR_materials_transmission](https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_materials_transmission/README.md)
   * [KHR_materials_volume](https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_volume)
-
-<!-- * [Validated](https://dassaultsystemes-technology.github.io/dspbr-pt/report/) against the official Dassault Systèmes Stellar renderer for the available set of validation scenes. Currently, this only covers a subset of the material features. Please see below for more info on the [validation suite](#Validation). -->
+  * [KHR_materials_diffuse_transmission (Release Candidate)](https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_diffuse_transmission/README.md)
 
 ## Development
+
+Package layout:
+
+* `packages/lib`: renderer, loaders, shaders, public viewport API
+* `packages/viewer`: reusable camera/controller/viewer helpers
+* `packages/app`: full viewer UI and minimal integration example
 
 ```bash
 # yarn is mandatory as this project uses yarn workspaces
 yarn install
 
+# Regenerate the Slang material GLSL artifact
+yarn build:slang-materials
+
 # Builds all packages
 yarn build
 
+# Validate assembled WebGL shader variants with glslangValidator
+yarn validate:shaders
+
 # Launch the demo viewer with HMR enabled -> auto update on code change during development
 yarn run dev
+
+# Launch the same dev server and open the minimal integration example
+yarn run dev:example
 ```
 
 
@@ -75,6 +87,19 @@ npm run render -- -- <scene_path> --ibl <hdr_path> --res <width> <height> --samp
 npm run render -- -- "./assets/scene.gltf" --ibl "./assets/ibl.hdr" -r 512 512 -s 32
 ``` -->
 
+
+## Third-party
+
+This project stands on a lot of excellent open source work. Thanks to the authors and maintainers of:
+
+* [TinyBVH](https://github.com/jbikker/tinybvh), by Jacco Bikker, for the compact high-performance BVH builder and traversal code that backs the WASM acceleration structure path.
+* [glTF Transform](https://github.com/donmccurdy/glTF-Transform), by Don McCurdy and contributors, for the glTF parsing, extension handling, and asset processing foundation.
+* [meshoptimizer](https://github.com/zeux/meshoptimizer), by Arseny Kapoulkine, for mesh compression decoding support used by glTF assets.
+* [Slang](https://github.com/shader-slang/slang), from the shader-slang project and its research contributors, for the shader language/toolchain used to generate the material model code.
+* [Tweakpane](https://github.com/cocopon/tweakpane), by Hiroki Tani and contributors, for the compact viewer control UI.
+* [simple-dropzone](https://www.npmjs.com/package/simple-dropzone), for the browser drag-and-drop file loading used by the viewer.
+* [Vite](https://vite.dev/) and [tsup](https://tsup.egoist.dev/) for the development server and package build workflow.
+* The [Khronos glTF Sample Assets](https://github.com/KhronosGroup/glTF-Sample-Assets) and related sample model repositories, for the scenes that make testing and demos practical.
 
 
 ## License
