@@ -49,6 +49,7 @@ uniform sampler2D u_sampler2D_PreviousTexture;
 
 // Pathracing data buffers
 uniform sampler2D u_sampler_triangle_data;
+uniform isampler2D u_sampler_triangle_indices;
 uniform sampler2D u_sampler_bvh;
 uniform isampler2D u_sampler_bvh_index;
 

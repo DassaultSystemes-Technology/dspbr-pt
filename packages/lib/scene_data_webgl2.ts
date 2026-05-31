@@ -8,6 +8,8 @@ export class PathtracingSceneDataWebGL2 {
 
   private _triangleDataTexture?: WebGLTexture;
   public get triangleDataTexture() { return this._triangleDataTexture; }
+  private _triangleIndexTexture?: WebGLTexture;
+  public get triangleIndexTexture() { return this._triangleIndexTexture; }
 
   private _materialDataTexture?: WebGLTexture;
   public get materialDataTexture() { return this._materialDataTexture; }
@@ -27,6 +29,14 @@ export class PathtracingSceneDataWebGL2 {
   public get lightShaderChunk() { return this._lightShaderChunk; }
 
   private _textureDataUsage = 0;
+  private _geometryDataUsage = 0;
+  public get memoryUsage() {
+    return {
+      textureBytes: this._textureDataUsage,
+      geometryBytes: this._geometryDataUsage,
+      totalBytes: this._textureDataUsage + this._geometryDataUsage,
+    };
+  }
 
   constructor(gl: WebGL2RenderingContext, sceneData: PathtracingSceneData) {
     this.gl = gl;
@@ -36,6 +46,7 @@ export class PathtracingSceneDataWebGL2 {
   public clear() {
     const gl = this.gl;
     if (this._triangleDataTexture) gl.deleteTexture(this._triangleDataTexture);
+    if (this._triangleIndexTexture) gl.deleteTexture(this._triangleIndexTexture);
     if (this._materialDataTexture) gl.deleteTexture(this._materialDataTexture);
     if (this._textureInfoDataTexture) gl.deleteTexture(this._textureInfoDataTexture);
 
@@ -49,12 +60,15 @@ export class PathtracingSceneDataWebGL2 {
     }
     this._texArrayTextures = {};
     this._materialDataTexture = undefined;
+    this._triangleDataTexture = undefined;
+    this._triangleIndexTexture = undefined;
     this._textureInfoDataTexture = undefined;
     this._defaultTextureArray = undefined;
     this._materialBufferShaderChunk = "";
     this._texAccessorShaderChunk = "";
     this._lightShaderChunk = "";
     this._textureDataUsage = 0;
+    this._geometryDataUsage = 0;
   }
 
   public init() {
@@ -62,7 +76,8 @@ export class PathtracingSceneDataWebGL2 {
     const gl = this.gl;
     this.clear();
 
-    this._triangleDataTexture = glu.createDataTexture(gl, this._sceneData.triangleBuffer!);
+    this._triangleDataTexture = glu.createDataTexture(gl, this._sceneData.vertexBuffer!);
+    this._triangleIndexTexture = this.createIndexTexture(this._sceneData.triangleIndexBuffer!);
 
     this.generateTextureArrays();
     this.generateMaterialDataTexture()
@@ -70,14 +85,39 @@ export class PathtracingSceneDataWebGL2 {
 
     const generateMs = performance.now() - start;
 
+    this._geometryDataUsage = (
+      this._sceneData!.vertexBuffer!.byteLength +
+      this._sceneData!.triangleIndexBuffer!.byteLength
+    );
     const textureUsage = this._textureDataUsage! / (1024 * 1024);
-    const geometryUsage = this._sceneData!.triangleBuffer!.length * 4 / (1024 * 1024);
+    const geometryUsage = this._geometryDataUsage / (1024 * 1024);
     console.log(`Generate gpu data buffers: ${generateMs.toFixed(1)}ms
 GPU Memory Consumption (MB):
     Texture: ${textureUsage.toFixed(2)}
     Geometry: ${geometryUsage.toFixed(2)}
     Total:    ${(textureUsage + geometryUsage).toFixed(2)}
     `);
+  }
+
+  private createIndexTexture(data: Uint32Array) {
+    const gl = this.gl;
+    const maxSize = glu.getMaxTextureSize(gl);
+    const indexCount = Math.max(1, data.length);
+    const width = Math.min(indexCount, maxSize);
+    const height = Math.max(1, Math.ceil(data.length / maxSize));
+    const padded = width * height > data.length
+      ? (() => { const p = new Int32Array(width * height); p.set(data); return p; })()
+      : new Int32Array(data.buffer, data.byteOffset, data.length);
+
+    const texture = gl.createTexture()!;
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32I, width, height, 0, gl.RED_INTEGER, gl.INT, padded);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    return texture;
   }
 
   public updateMaterial(idx: number) {

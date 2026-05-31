@@ -90,37 +90,40 @@ int get_mesh_triangle_index(int bvhTriIndex) {
     ivec2(bvhTriIndex % int(MAX_TEXTURE_SIZE), bvhTriIndex / int(MAX_TEXTURE_SIZE)), 0).x);
 }
 
+int get_triangle_vertex_index(uint triIndex, uint corner) {
+  uint indexOffset = triIndex * TRIANGLE_INDEX_STRIDE + corner;
+  return int(texelFetch(u_sampler_triangle_indices,
+    ivec2(int(indexOffset % MAX_TEXTURE_SIZE), int(indexOffset / MAX_TEXTURE_SIZE)), 0).x);
+}
+
+vec4 fetch_vertex(uint triIndex, uint corner, uint attributeOffset) {
+  int vertexIndex = get_triangle_vertex_index(triIndex, corner);
+  uint texel = uint(vertexIndex) * VERTEX_STRIDE + attributeOffset;
+  return texelFetch(u_sampler_triangle_data,
+    ivec2(int(texel % MAX_TEXTURE_SIZE), int(texel / MAX_TEXTURE_SIZE)), 0);
+}
+
 uint get_material_idx(const uint triIndex) {
-  ivec2 idx = getStructParameterTexCoord(triIndex, 0u, TRIANGLE_STRIDE);
-  return uint(texelFetch(u_sampler_triangle_data, idx, 0).w);
+  return uint(fetch_vertex(triIndex, 0u, POSITION_OFFSET).w);
 }
 
 void get_triangle(const in uint index, out vec3 p0, out vec3 p1, out vec3 p2) {
-  ivec2 idx0 = getStructParameterTexCoord(index, POSITION_OFFSET, TRIANGLE_STRIDE);
-  ivec2 idx1 = getStructParameterTexCoord(index, POSITION_OFFSET + VERTEX_STRIDE, TRIANGLE_STRIDE);
-  ivec2 idx2 = getStructParameterTexCoord(index, POSITION_OFFSET + 2u * VERTEX_STRIDE, TRIANGLE_STRIDE);
-  p0 = texelFetch(u_sampler_triangle_data, idx0, 0).xyz;
-  p1 = texelFetch(u_sampler_triangle_data, idx1, 0).xyz;
-  p2 = texelFetch(u_sampler_triangle_data, idx2, 0).xyz;
+  p0 = fetch_vertex(index, 0u, POSITION_OFFSET).xyz;
+  p1 = fetch_vertex(index, 1u, POSITION_OFFSET).xyz;
+  p2 = fetch_vertex(index, 2u, POSITION_OFFSET).xyz;
 }
 
 vec3 compute_interpolated_normal(const in uint index, const in vec2 uv) {
-  ivec2 idx0 = getStructParameterTexCoord(index, NORMAL_OFFSET, TRIANGLE_STRIDE);
-  ivec2 idx1 = getStructParameterTexCoord(index, NORMAL_OFFSET + VERTEX_STRIDE, TRIANGLE_STRIDE);
-  ivec2 idx2 = getStructParameterTexCoord(index, NORMAL_OFFSET + 2u * VERTEX_STRIDE, TRIANGLE_STRIDE);
-  vec3 n0 = texelFetch(u_sampler_triangle_data, idx0, 0).xyz;
-  vec3 n1 = texelFetch(u_sampler_triangle_data, idx1, 0).xyz;
-  vec3 n2 = texelFetch(u_sampler_triangle_data, idx2, 0).xyz;
+  vec3 n0 = fetch_vertex(index, 0u, NORMAL_OFFSET).xyz;
+  vec3 n1 = fetch_vertex(index, 1u, NORMAL_OFFSET).xyz;
+  vec3 n2 = fetch_vertex(index, 2u, NORMAL_OFFSET).xyz;
   return normalize((1.0 - uv.x - uv.y) * n0 + uv.x * n1 + uv.y * n2);
 }
 
 vec2 compute_interpolated_uv(const in uint index, const in vec2 hit_uv, int set) {
-  ivec2 idx0 = getStructParameterTexCoord(index, UV_OFFSET, TRIANGLE_STRIDE);
-  ivec2 idx1 = getStructParameterTexCoord(index, UV_OFFSET + VERTEX_STRIDE, TRIANGLE_STRIDE);
-  ivec2 idx2 = getStructParameterTexCoord(index, UV_OFFSET + 2u * VERTEX_STRIDE, TRIANGLE_STRIDE);
-  vec4 uv0 = texelFetch(u_sampler_triangle_data, idx0, 0);
-  vec4 uv1 = texelFetch(u_sampler_triangle_data, idx1, 0);
-  vec4 uv2 = texelFetch(u_sampler_triangle_data, idx2, 0);
+  vec4 uv0 = fetch_vertex(index, 0u, UV_OFFSET);
+  vec4 uv1 = fetch_vertex(index, 1u, UV_OFFSET);
+  vec4 uv2 = fetch_vertex(index, 2u, UV_OFFSET);
   if (set == 0)
     return (1.0 - hit_uv.x - hit_uv.y) * uv0.xy + hit_uv.x * uv1.xy + hit_uv.y * uv2.xy;
   else
@@ -128,12 +131,9 @@ vec2 compute_interpolated_uv(const in uint index, const in vec2 hit_uv, int set)
 }
 
 vec4 compute_interpolated_tangent(const in uint index, const in vec2 uv, vec3 n) {
-  ivec2 idx0 = getStructParameterTexCoord(index, TANGENT_OFFSET, TRIANGLE_STRIDE);
-  ivec2 idx1 = getStructParameterTexCoord(index, TANGENT_OFFSET + VERTEX_STRIDE, TRIANGLE_STRIDE);
-  ivec2 idx2 = getStructParameterTexCoord(index, TANGENT_OFFSET + 2u * VERTEX_STRIDE, TRIANGLE_STRIDE);
-  vec4 t0 = texelFetch(u_sampler_triangle_data, idx0, 0);
-  vec4 t1 = texelFetch(u_sampler_triangle_data, idx1, 0);
-  vec4 t2 = texelFetch(u_sampler_triangle_data, idx2, 0);
+  vec4 t0 = fetch_vertex(index, 0u, TANGENT_OFFSET);
+  vec4 t1 = fetch_vertex(index, 1u, TANGENT_OFFSET);
+  vec4 t2 = fetch_vertex(index, 2u, TANGENT_OFFSET);
   float handedness = (t0.w == t1.w && t0.w == t2.w) ? t0.w : 0.0;
   vec3 tangent = normalize((1.0 - uv.x - uv.y) * t0.xyz + uv.x * t1.xyz + uv.y * t2.xyz);
   if (length(tangent) > 0.99 && abs(handedness) > 0.99)
@@ -142,12 +142,9 @@ vec4 compute_interpolated_tangent(const in uint index, const in vec2 uv, vec3 n)
 }
 
 vec4 calculateInterpolatedVertexColors(const in uint index, const in vec2 hit_uv) {
-  ivec2 idx0 = getStructParameterTexCoord(index, COLOR_OFFSET, TRIANGLE_STRIDE);
-  ivec2 idx1 = getStructParameterTexCoord(index, COLOR_OFFSET + VERTEX_STRIDE, TRIANGLE_STRIDE);
-  ivec2 idx2 = getStructParameterTexCoord(index, COLOR_OFFSET + 2u * VERTEX_STRIDE, TRIANGLE_STRIDE);
-  vec4 c0 = texelFetch(u_sampler_triangle_data, idx0, 0);
-  vec4 c1 = texelFetch(u_sampler_triangle_data, idx1, 0);
-  vec4 c2 = texelFetch(u_sampler_triangle_data, idx2, 0);
+  vec4 c0 = fetch_vertex(index, 0u, COLOR_OFFSET);
+  vec4 c1 = fetch_vertex(index, 1u, COLOR_OFFSET);
+  vec4 c2 = fetch_vertex(index, 2u, COLOR_OFFSET);
   return (1.0 - hit_uv.x - hit_uv.y) * c0 + hit_uv.x * c1 + hit_uv.y * c2;
 }
 

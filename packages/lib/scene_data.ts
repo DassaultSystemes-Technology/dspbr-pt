@@ -38,7 +38,24 @@ export class PathtracingSceneData {
   private _triangleBuffer?: Float32Array;
   public set triangleBuffer(buffer: Float32Array | undefined) { this._triangleBuffer = buffer; }
   public get triangleBuffer(): Float32Array | undefined { return this._triangleBuffer; }
-  public get num_triangles() { return this._triangleBuffer ? this._triangleBuffer.length / (VERTEX_STRIDE * 3) : 0; }
+  public get vertexBuffer(): Float32Array | undefined { return this._triangleBuffer; }
+
+  private _triangleIndexBuffer?: Uint32Array;
+  public set triangleIndexBuffer(buffer: Uint32Array | undefined) { this._triangleIndexBuffer = buffer; }
+  public get triangleIndexBuffer(): Uint32Array | undefined { return this._triangleIndexBuffer; }
+
+  public get num_triangles() {
+    if (this._triangleIndexBuffer) return this._triangleIndexBuffer.length / 3;
+    return this._triangleBuffer ? this._triangleBuffer.length / (VERTEX_STRIDE * 3) : 0;
+  }
+
+  private _bvhPositionBuffer?: Float32Array;
+  public set bvhPositionBuffer(buffer: Float32Array | undefined) { this._bvhPositionBuffer = buffer; }
+  public get bvhPositionBuffer(): Float32Array | undefined { return this._bvhPositionBuffer; }
+
+  private _bvhIndexBuffer?: Uint32Array;
+  public set bvhIndexBuffer(buffer: Uint32Array | undefined) { this._bvhIndexBuffer = buffer; }
+  public get bvhIndexBuffer(): Uint32Array | undefined { return this._bvhIndexBuffer; }
 
   public getPositionBuffer() {
     if (!this.triangleBuffer) return new Float32Array();

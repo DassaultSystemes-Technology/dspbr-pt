@@ -121,24 +121,45 @@ async function createSceneFromDocument(doc: Document, progress?: LoadProgressCal
     return textureCache.get(key)!;
   };
 
-  // --- Count total non-indexed vertices (full DFS) ---
-  function countVertices(node: any): number {
-    let n = 0;
+  // --- Count indexed geometry (full DFS) ---
+  function countGeometry(node: any): { shadingVertices: number; bvhVertices: number; bvhIndices: number } {
+    const totals = { shadingVertices: 0, bvhVertices: 0, bvhIndices: 0 };
     const mesh = node.getMesh?.();
     if (mesh) {
       for (const prim of mesh.listPrimitives()) {
         const idx = prim.getIndices();
-        if (idx) n += idx.getCount();
+        const pos = prim.getAttribute('POSITION');
+        if (idx && pos) {
+          totals.shadingVertices += pos.getCount();
+          totals.bvhVertices += pos.getCount();
+          totals.bvhIndices += idx.getCount();
+        }
       }
     }
-    for (const child of node.listChildren()) n += countVertices(child);
-    return n;
+    for (const child of node.listChildren()) {
+      const childTotals = countGeometry(child);
+      totals.shadingVertices += childTotals.shadingVertices;
+      totals.bvhVertices += childTotals.bvhVertices;
+      totals.bvhIndices += childTotals.bvhIndices;
+    }
+    return totals;
   }
-  let totalVertices = 0;
-  for (const node of gltfScene.listChildren()) totalVertices += countVertices(node);
+  const geometryTotals = { shadingVertices: 0, bvhVertices: 0, bvhIndices: 0 };
+  for (const node of gltfScene.listChildren()) {
+    const nodeTotals = countGeometry(node);
+    geometryTotals.shadingVertices += nodeTotals.shadingVertices;
+    geometryTotals.bvhVertices += nodeTotals.bvhVertices;
+    geometryTotals.bvhIndices += nodeTotals.bvhIndices;
+  }
 
-  const combinedBuffer = new Float32Array(totalVertices * VERTEX_STRIDE);
+  const combinedBuffer = new Float32Array(geometryTotals.shadingVertices * VERTEX_STRIDE);
+  const triangleIndexBuffer = new Uint32Array(geometryTotals.bvhIndices);
+  const bvhPositionBuffer = new Float32Array(geometryTotals.bvhVertices * 3);
+  const bvhIndexBuffer = new Uint32Array(geometryTotals.bvhIndices);
   let vertexOffset = 0;
+  let triangleIndexOffset = 0;
+  let bvhVertexOffset = 0;
+  let bvhIndexOffset = 0;
 
   // --- Traverse scene graph ---
   const matCache = new Map<unknown, Promise<number>>();
@@ -180,11 +201,38 @@ async function createSceneFromDocument(doc: Document, progress?: LoadProgressCal
     for (const prim of mesh.listPrimitives()) {
       const matGltf = prim.getMaterial();
       const matIdx = matGltf ? await ensureMaterial(matGltf) : 0;
-      vertexOffset += packPrimitive(prim, worldMatrix, matIdx, combinedBuffer, vertexOffset);
+      const packed = packPrimitive(
+        prim,
+        worldMatrix,
+        matIdx,
+        combinedBuffer,
+        vertexOffset,
+        triangleIndexBuffer,
+        triangleIndexOffset,
+        bvhPositionBuffer,
+        bvhVertexOffset,
+        bvhIndexBuffer,
+        bvhIndexOffset,
+      );
+      vertexOffset += packed.shadingVertexCount;
+      triangleIndexOffset += packed.shadingIndexCount;
+      bvhVertexOffset += packed.bvhVertexCount;
+      bvhIndexOffset += packed.bvhIndexCount;
     }
   }
 
-  scene.triangleBuffer = combinedBuffer.slice(0, vertexOffset * VERTEX_STRIDE);
+  scene.triangleBuffer = vertexOffset * VERTEX_STRIDE === combinedBuffer.length
+    ? combinedBuffer
+    : combinedBuffer.slice(0, vertexOffset * VERTEX_STRIDE);
+  scene.triangleIndexBuffer = triangleIndexOffset === triangleIndexBuffer.length
+    ? triangleIndexBuffer
+    : triangleIndexBuffer.slice(0, triangleIndexOffset);
+  scene.bvhPositionBuffer = bvhVertexOffset * 3 === bvhPositionBuffer.length
+    ? bvhPositionBuffer
+    : bvhPositionBuffer.slice(0, bvhVertexOffset * 3);
+  scene.bvhIndexBuffer = bvhIndexOffset === bvhIndexBuffer.length
+    ? bvhIndexBuffer
+    : bvhIndexBuffer.slice(0, bvhIndexOffset);
   const parseMs = performance.now() - parseStart;
   console.debug(`Scene parsing: ${parseMs.toFixed(1)}ms`);
 
@@ -199,9 +247,15 @@ function packPrimitive(
   matIdx: number,
   buffer: Float32Array,
   vertexOffset: number,
-): number {
+  triangleIndexBuffer: Uint32Array,
+  triangleIndexOffset: number,
+  bvhPositionBuffer: Float32Array,
+  bvhVertexOffset: number,
+  bvhIndexBuffer: Uint32Array,
+  bvhIndexOffset: number,
+): { shadingVertexCount: number; shadingIndexCount: number; bvhVertexCount: number; bvhIndexCount: number } {
   const indices = prim.getIndices();
-  if (!indices) return 0;
+  if (!indices) return { shadingVertexCount: 0, shadingIndexCount: 0, bvhVertexCount: 0, bvhIndexCount: 0 };
 
   const posAcc = prim.getAttribute('POSITION');
   const normAcc = prim.getAttribute('NORMAL');
@@ -210,7 +264,7 @@ function packPrimitive(
   const tangentAcc = prim.getAttribute('TANGENT');
   const colorAcc = prim.getAttribute('COLOR_0');
 
-  if (!posAcc) return 0;
+  if (!posAcc) return { shadingVertexCount: 0, shadingIndexCount: 0, bvhVertexCount: 0, bvhIndexCount: 0 };
 
   const positions = toFloat32(posAcc);
   const normals = normAcc ? toFloat32(normAcc) : null;
@@ -221,17 +275,31 @@ function packPrimitive(
   const indexArray = toUint32(indices);
 
   const normalMatrix = getNormalMatrix(worldMatrix);
-  const vertexCount = indexArray.length;
+  const vertexCount = posAcc.getCount();
+  const indexCount = indexArray.length;
+  const bvhVertexCount = vertexCount;
+
+  for (let i = 0; i < indexCount; i++) {
+    const idx = indexArray[i]!;
+    triangleIndexBuffer[triangleIndexOffset + i] = vertexOffset + idx;
+    bvhIndexBuffer[bvhIndexOffset + i] = bvhVertexOffset + idx;
+  }
 
   for (let i = 0; i < vertexCount; i++) {
-    const vi = indexArray[i]!;
+    const src = i * 3;
+    const [wx, wy, wz] = transformPoint(
+      positions[src + 0]!,
+      positions[src + 1]!,
+      positions[src + 2]!,
+      worldMatrix,
+    );
     const dst = (vertexOffset + i) * VERTEX_STRIDE;
+    const bvhDst = (bvhVertexOffset + i) * 3;
+    bvhPositionBuffer[bvhDst + 0] = wx;
+    bvhPositionBuffer[bvhDst + 1] = wy;
+    bvhPositionBuffer[bvhDst + 2] = wz;
 
     // position (world space)
-    const px = positions[vi * 3 + 0]!;
-    const py = positions[vi * 3 + 1]!;
-    const pz = positions[vi * 3 + 2]!;
-    const [wx, wy, wz] = transformPoint(px, py, pz, worldMatrix);
     buffer[dst + 0] = wx;
     buffer[dst + 1] = wy;
     buffer[dst + 2] = wz;
@@ -239,9 +307,9 @@ function packPrimitive(
 
     // normal (world space, normal matrix)
     if (normals) {
-      const nx = normals[vi * 3 + 0]!;
-      const ny = normals[vi * 3 + 1]!;
-      const nz = normals[vi * 3 + 2]!;
+      const nx = normals[src + 0]!;
+      const ny = normals[src + 1]!;
+      const nz = normals[src + 2]!;
       const [wnx, wny, wnz] = transformDir(nx, ny, nz, normalMatrix);
       buffer[dst + 4] = wnx;
       buffer[dst + 5] = wny;
@@ -250,18 +318,18 @@ function packPrimitive(
     buffer[dst + 7] = 0.0;
 
     // uv0
-    buffer[dst + 8]  = uvs ? (uvs[vi * 2 + 0] ?? 0) : 0;
-    buffer[dst + 9]  = uvs ? (uvs[vi * 2 + 1] ?? 0) : 0;
+    buffer[dst + 8]  = uvs ? (uvs[i * 2 + 0] ?? 0) : 0;
+    buffer[dst + 9]  = uvs ? (uvs[i * 2 + 1] ?? 0) : 0;
     // uv1
-    buffer[dst + 10] = uv1s ? (uv1s[vi * 2 + 0] ?? 0) : 0;
-    buffer[dst + 11] = uv1s ? (uv1s[vi * 2 + 1] ?? 0) : 0;
+    buffer[dst + 10] = uv1s ? (uv1s[i * 2 + 0] ?? 0) : 0;
+    buffer[dst + 11] = uv1s ? (uv1s[i * 2 + 1] ?? 0) : 0;
 
     // tangent (xyz + handedness) — transform xyz by normal matrix
     if (tangents) {
-      const tx = tangents[vi * 4 + 0]!;
-      const ty = tangents[vi * 4 + 1]!;
-      const tz = tangents[vi * 4 + 2]!;
-      const tw = tangents[vi * 4 + 3]!;
+      const tx = tangents[i * 4 + 0]!;
+      const ty = tangents[i * 4 + 1]!;
+      const tz = tangents[i * 4 + 2]!;
+      const tw = tangents[i * 4 + 3]!;
       const [wtx, wty, wtz] = transformDir(tx, ty, tz, normalMatrix);
       buffer[dst + 12] = wtx;
       buffer[dst + 13] = wty;
@@ -270,13 +338,18 @@ function packPrimitive(
     }
 
     // color (rgba)
-    buffer[dst + 16] = colors ? (colors[vi * 4 + 0] ?? 1) : 1;
-    buffer[dst + 17] = colors ? (colors[vi * 4 + 1] ?? 1) : 1;
-    buffer[dst + 18] = colors ? (colors[vi * 4 + 2] ?? 1) : 1;
-    buffer[dst + 19] = colors ? (colors[vi * 4 + 3] ?? 1) : 1;
+    buffer[dst + 16] = colors ? (colors[i * 4 + 0] ?? 1) : 1;
+    buffer[dst + 17] = colors ? (colors[i * 4 + 1] ?? 1) : 1;
+    buffer[dst + 18] = colors ? (colors[i * 4 + 2] ?? 1) : 1;
+    buffer[dst + 19] = colors ? (colors[i * 4 + 3] ?? 1) : 1;
   }
 
-  return vertexCount;
+  return {
+    shadingVertexCount: vertexCount,
+    shadingIndexCount: indexCount,
+    bvhVertexCount,
+    bvhIndexCount: indexCount,
+  };
 }
 
 // --- Material parsing ---

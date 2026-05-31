@@ -13,8 +13,8 @@
  * limitations under the License.
  */
 
-import { buildBvh } from './bvh/tinybvh_builder';
-import { PathtracingSceneData, VERTEX_STRIDE } from './scene_data'
+import { buildBvh, buildIndexedBvh } from './bvh/tinybvh_builder';
+import { PathtracingSceneData } from './scene_data'
 import { PathtracingSceneDataWebGL2 } from './scene_data_webgl2'
 
 import * as glu from './gl_utils';
@@ -51,7 +51,7 @@ void main()
 }`;
 
 type RenderProgramKey = "debug_program" | "misptdl_program";
-type RenderSchedulerMode = "stopped" | "interactive" | "settling" | "accumulating";
+export type RenderSchedulerMode = "stopped" | "interactive" | "settling" | "accumulating";
 type RenderFrameHandleKind = "raf" | "timeout";
 
 enum BufferType {
@@ -88,6 +88,39 @@ export interface PathtracingRendererProgress {
 }
 
 export type PathtracingRendererProgressCallback = (event: PathtracingRendererProgress) => void;
+
+export interface PathtracingRendererDiagnostics {
+  backend: 'webgl2';
+  sampleCount: number;
+  mode: RenderSchedulerMode;
+  renderResolution: string;
+  displayResolution: string;
+  tileResolution: number;
+  framePending: boolean;
+  scene?: {
+    triangles: number;
+    vertices: number;
+    indices: number;
+    materials: number;
+    textures: number;
+    lights: number;
+  };
+  bvh?: {
+    nodes: number;
+    indices: number;
+    triangles: number;
+    buildMs: number;
+    memoryBytes: number;
+  };
+  memory?: {
+    textureBytes: number;
+    geometryBytes: number;
+    bvhBytes: number;
+    totalBytes: number;
+  };
+  profiling: Record<string, number>;
+  shaderPrograms: string[];
+}
 
 export enum RenderResMode {
   High = 0,
@@ -136,6 +169,17 @@ export class PathtracingRenderer {
   private tileFinishedCB: () => void = () => {};
   private frameFinishedCB: (frameCount: number) => void = () => {};
   private renderingFinishedCB?: () => void;
+  public readonly diagnostics: PathtracingRendererDiagnostics = {
+    backend: 'webgl2',
+    sampleCount: 0,
+    mode: 'stopped',
+    renderResolution: '0x0',
+    displayResolution: '0x0',
+    tileResolution: 1,
+    framePending: false,
+    profiling: {},
+    shaderPrograms: [],
+  };
 
   private _exposure = 1.0;
   public get exposure() {
@@ -305,6 +349,10 @@ export class PathtracingRenderer {
     this._resetAccumulation = true;
     this._frameCount = 1;
     this.tileIndex = 0;
+    if (this._isRendering && this.schedulerMode === "accumulating") {
+      this.schedulerMode = "settling";
+    }
+    this.updateDiagnostics();
     if (this._isRendering) this.scheduleFrame();
   }
 
@@ -321,6 +369,7 @@ export class PathtracingRenderer {
     this.framePending = false;
     this._isRendering = false;
     this.schedulerMode = "stopped";
+    this.updateDiagnostics();
   }
 
   setInteractionMode(flag: boolean) {
@@ -331,6 +380,7 @@ export class PathtracingRenderer {
     }
     this.tileIndex = 0;
     this.resetAccumulation();
+    this.updateDiagnostics();
   }
 
   resize(width: number, height: number) {
@@ -340,6 +390,7 @@ export class PathtracingRenderer {
 
     this.initFramebuffers();
     this.resetAccumulation();
+    this.updateDiagnostics();
   }
 
   private pathtracingUniformBuffer: WebGLBuffer | null;
@@ -487,10 +538,11 @@ export class PathtracingRenderer {
     this.tileFinishedCB = tileFinishedCB;
     this.frameFinishedCB = frameFinishedCB;
     this.renderingFinishedCB = renderingFinishedCB;
-    this.schedulerMode = "accumulating";
+    this.schedulerMode = "settling";
     this.tileIndex = 0;
     this._isRendering = true;
     this.resetAccumulation();
+    this.updateDiagnostics();
     this.scheduleFrame();
   }
 
@@ -499,6 +551,7 @@ export class PathtracingRenderer {
     if (this.currentNumSamples !== -1 && this._frameCount >= this.currentNumSamples) return;
 
     this.framePending = true;
+    this.updateDiagnostics();
     const runFrame = () => {
       this.frameHandle = 0;
       this.frameHandleKind = null;
@@ -509,6 +562,7 @@ export class PathtracingRenderer {
         })
         .finally(() => {
           this.framePending = false;
+          this.updateDiagnostics();
           if (!this._isRendering) return;
           if (this.currentNumSamples !== -1 && this._frameCount >= this.currentNumSamples) {
             this.stopRendering();
@@ -529,6 +583,7 @@ export class PathtracingRenderer {
 
     this.frameHandleKind = "raf";
     this.frameHandle = requestAnimationFrame(runFrame);
+    this.updateDiagnostics();
   }
 
   private getActiveTileRes() {
@@ -588,7 +643,7 @@ export class PathtracingRenderer {
     }
     const tile = tileOrder[this.tileIndex % tileOrder.length] ?? 0;
 
-    let slot = 5; // first 5 slots are static scene data textures
+    let slot = 6; // first slots are static BVH, geometry, material, and texture-info data
     slot = this.bindTextures(slot);
     this.updatePathracingUniforms(camera);
 
@@ -676,6 +731,7 @@ export class PathtracingRenderer {
       if (this.schedulerMode === "settling") {
         this.schedulerMode = "accumulating";
       }
+      this.updateDiagnostics();
     }
   };
 
@@ -843,10 +899,19 @@ export class PathtracingRenderer {
       gl.deleteTexture(this._bvhIndexTexture!);
     }
 
-    const { nodeData, triangleIndices, stats } = await buildBvh(sceneData.triangleBuffer!, VERTEX_STRIDE);
+    const { nodeData, triangleIndices, stats } = sceneData.bvhPositionBuffer && sceneData.bvhIndexBuffer
+      ? await buildIndexedBvh(sceneData.bvhPositionBuffer, sceneData.bvhIndexBuffer)
+      : await buildBvh(sceneData.getPositionBuffer(), 3);
     console.log(`BVH: ${stats.nodeCount} nodes, ${stats.triangleCount} triangles`);
     this._bvhNodeCount = stats.nodeCount;
     this._bvhIndexCount = triangleIndices.length;
+    this.diagnostics.bvh = {
+      nodes: stats.nodeCount,
+      indices: triangleIndices.length,
+      triangles: stats.triangleCount,
+      buildMs: stats.buildTimeMs,
+      memoryBytes: nodeData.byteLength + triangleIndices.byteLength,
+    };
 
     // Node data: 4 RGBA texels per node (16 floats) — packed into power-of-2 2D texture
     this._bvhDataTexture = glu.createDataTexture(gl, nodeData);
@@ -874,6 +939,14 @@ export class PathtracingRenderer {
     this.stopRendering();
 
     this.scene = scene;
+    this.diagnostics.scene = {
+      triangles: scene.num_triangles,
+      vertices: (scene.vertexBuffer?.length ?? 0) / 20,
+      indices: scene.triangleIndexBuffer?.length ?? 0,
+      materials: scene.num_materials,
+      textures: scene.num_textures,
+      lights: scene.lights.length,
+    };
     this.renderProgram = null;
     this.renderPrograms.clear();
     this.renderProgramPromises.clear();
@@ -883,6 +956,7 @@ export class PathtracingRenderer {
     this.gpu_scene = new PathtracingSceneDataWebGL2(this.gl, scene);
     await this.gpu_scene.init();
     profile.gpuUploadMs = performance.now() - gpuStart;
+    this.updateMemoryDiagnostics();
 
     progress?.({ phase: 'Building BVH', detail: 'Creating acceleration structure for ray traversal.' });
     const bvhStart = performance.now();
@@ -893,6 +967,8 @@ export class PathtracingRenderer {
     await this.initializeShaders();
     profile.shaderInitMs = performance.now() - shaderStart;
     profile.rendererSetupMs = performance.now() - totalStart;
+    this.diagnostics.profiling = { ...this.diagnostics.profiling, ...profile };
+    this.updateDiagnostics();
     progress?.({
       phase: 'Ready',
       detail: 'Scene uploaded and renderer initialized.',
@@ -901,6 +977,29 @@ export class PathtracingRenderer {
     console.table(profile);
 
     this.resetAccumulation();
+  }
+
+  private updateMemoryDiagnostics() {
+    const gpuMemory = this.gpu_scene?.memoryUsage;
+    const bvhBytes = this.diagnostics.bvh?.memoryBytes ?? 0;
+    if (!gpuMemory) return;
+    this.diagnostics.memory = {
+      textureBytes: gpuMemory.textureBytes,
+      geometryBytes: gpuMemory.geometryBytes,
+      bvhBytes,
+      totalBytes: gpuMemory.totalBytes + bvhBytes,
+    };
+  }
+
+  private updateDiagnostics() {
+    this.diagnostics.sampleCount = Math.max(0, this._frameCount - 1);
+    this.diagnostics.mode = this.schedulerMode;
+    this.diagnostics.renderResolution = `${this.renderRes[0]}x${this.renderRes[1]}`;
+    this.diagnostics.displayResolution = `${this.displayRes[0]}x${this.displayRes[1]}`;
+    this.diagnostics.tileResolution = this.getActiveTileRes();
+    this.diagnostics.framePending = this.framePending;
+    this.diagnostics.shaderPrograms = Array.from(this.renderPrograms.keys());
+    this.updateMemoryDiagnostics();
   }
 
   private bindGPUBuffersAndTextures(program: WebGLProgram) {
@@ -920,6 +1019,10 @@ export class PathtracingRenderer {
     gl.activeTexture(gl.TEXTURE0 + slot);
     gl.bindTexture(gl.TEXTURE_2D, this.gpu_scene!.triangleDataTexture!);
     gl.uniform1i(this.getUniformLocation(program, "u_sampler_triangle_data"), slot++);
+
+    gl.activeTexture(gl.TEXTURE0 + slot);
+    gl.bindTexture(gl.TEXTURE_2D, this.gpu_scene!.triangleIndexTexture!);
+    gl.uniform1i(this.getUniformLocation(program, "u_sampler_triangle_indices"), slot++);
 
     gl.activeTexture(gl.TEXTURE0 + slot);
     gl.bindTexture(gl.TEXTURE_2D, this.gpu_scene!.materialDataTexture!);
@@ -976,7 +1079,7 @@ export class PathtracingRenderer {
 
     const meshConstants = `
     const uint VERTEX_STRIDE = 5u;
-    const uint TRIANGLE_STRIDE = 3u*VERTEX_STRIDE;
+    const uint TRIANGLE_INDEX_STRIDE = 3u;
     const uint POSITION_OFFSET = 0u;
     const uint NORMAL_OFFSET = 1u;
     const uint UV_OFFSET = 2u;

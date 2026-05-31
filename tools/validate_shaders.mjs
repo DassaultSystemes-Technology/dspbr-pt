@@ -107,7 +107,7 @@ MaterialData get_material(uint idx) {
   debug_bsdf_helpers: '',
   mesh_constants: `
 const uint VERTEX_STRIDE = 5u;
-const uint TRIANGLE_STRIDE = 3u * VERTEX_STRIDE;
+const uint TRIANGLE_INDEX_STRIDE = 3u;
 const uint POSITION_OFFSET = 0u;
 const uint NORMAL_OFFSET = 1u;
 const uint UV_OFFSET = 2u;
