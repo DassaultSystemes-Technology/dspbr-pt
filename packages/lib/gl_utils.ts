@@ -38,6 +38,11 @@ function createShader(gl: WebGL2RenderingContext, type: number, source: string) 
   if (shader) {
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      const log = getShaderErrorLog(gl, shader, source);
+      gl.deleteShader(shader);
+      throw new Error(`Shader compile error:\n${log}`);
+    }
     return shader;
 
   }
@@ -105,6 +110,10 @@ export async function createProgramFromSource(gl: WebGL2RenderingContext,
 async function compileProgramFromSource(gl: WebGL2RenderingContext,
   vertexShaderSource: string, fragmentShaderSource: string, label: string) {
 
+  if (gl.isContextLost()) {
+    throw new Error(`WebGL context lost before compiling ${label}`);
+  }
+
   var ext = gl.getExtension('KHR_parallel_shader_compile');
 
   const submitStart = performance.now();
@@ -121,18 +130,23 @@ async function compileProgramFromSource(gl: WebGL2RenderingContext,
     console.debug(`Shader compile/link submitted: ${label} ${(performance.now() - submitStart).toFixed(1)}ms`);
 
     function checkToUseProgram() {
+      if (gl.isContextLost()) {
+        gl.deleteShader(vs);
+        gl.deleteShader(fs);
+        gl.deleteProgram(program);
+        throw new Error(`WebGL context lost while compiling ${label}`);
+      }
       if (gl.getProgramParameter(program!, gl.LINK_STATUS)) {
         console.debug(`Shader compile/link ready: ${label} ${(performance.now() - submitStart).toFixed(1)}ms`);
         return true;
       } else {
         const vsLog = getShaderErrorLog(gl, vs, vertexShaderSource);
         const fsLog = getShaderErrorLog(gl, fs, fragmentShaderSource);
+        const programLog = gl.getProgramInfoLog(program!) || "No program info log.";
         gl.deleteShader(vs);
         gl.deleteShader(fs);
-        console.log(vsLog);
-        console.log(fsLog);
         gl.deleteProgram(program);
-        throw new Error("Program link error: " + gl.getProgramInfoLog(program!));
+        throw new Error(`Program link error (${label}):\n${programLog}\n${vsLog}\n${fsLog}`);
       }
     }
 

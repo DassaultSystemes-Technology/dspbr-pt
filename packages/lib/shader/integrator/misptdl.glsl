@@ -12,9 +12,13 @@ vec3 eval_direct_light_contribution(in RenderState rs, float r0, float r1) {
     float cosNL = saturate(dot(ibl_sample_dir, n));
     if (cosNL > EPS_COS && ibl_sample_pdf > EPS_PDF) {
       if (!isOccluded(rs.hitPos, ibl_sample_dir)) {
-        L = ibl_eval(ibl_sample_dir) * eval_dspbr(rs.closure, rs.wi, ibl_sample_dir) * cosNL / ibl_sample_pdf;
+        MaterialBsdfState_0 bsdf_state = make_slang_bsdf_state(rs.closure);
+        DirectionContext_0 directions = make_slang_directions(rs.wi, ibl_sample_dir);
+        NormalContext_0 normals = make_slang_normal_context(rs.closure);
+        vec3 bsdf = evalMaterialBsdf_0(bsdf_state, directions, normals) / max(abs(dot(rs.closure.n, ibl_sample_dir)), EPS);
+        float brdf_sample_pdf = pdfMaterialBsdf_0(bsdf_state, directions, normals);
+        L = ibl_eval(ibl_sample_dir) * bsdf * cosNL / ibl_sample_pdf;
 
-        float brdf_sample_pdf = dspbr_pdf(rs.closure, rs.wi, ibl_sample_dir);
         if (brdf_sample_pdf > EPS_PDF) {
           float mis_weight = mis_balance_heuristic(ibl_sample_pdf, brdf_sample_pdf);
           L *= mis_weight;

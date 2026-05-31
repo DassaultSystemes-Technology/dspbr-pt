@@ -27,11 +27,15 @@ export class WasdCameraController {
   private lastPointerX = 0;
   private lastPointerY = 0;
   private lastTouchDistance = 0;
+  private lastTouchCenterX = 0;
+  private lastTouchCenterY = 0;
   private readonly activeTouchPointers = new Map<number, { x: number; y: number }>();
   private rafId = 0;
   private lastTickTime = 0;
   private pendingWheelDistance = 0;
   private orbitTarget = new Vec3(0, 0, 0);
+  private previousTouchAction = '';
+  private previousUserSelect = '';
 
   public enabled = true;
   public autoRotate = false;
@@ -86,6 +90,10 @@ export class WasdCameraController {
   }
 
   private attach() {
+    this.previousTouchAction = this.domElement.style.touchAction;
+    this.previousUserSelect = this.domElement.style.userSelect;
+    this.domElement.style.touchAction = 'none';
+    this.domElement.style.userSelect = 'none';
     this.domElement.addEventListener('contextmenu', this.onContextMenu);
     this.domElement.addEventListener('pointerdown', this.onPointerDown);
     window.addEventListener('pointermove', this.onPointerMove);
@@ -93,10 +101,12 @@ export class WasdCameraController {
     window.addEventListener('pointercancel', this.onPointerUp);
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
-    this.domElement.addEventListener('wheel', this.onWheel, { passive: true });
+    this.domElement.addEventListener('wheel', this.onWheel, { passive: false });
   }
 
   private detach() {
+    this.domElement.style.touchAction = this.previousTouchAction;
+    this.domElement.style.userSelect = this.previousUserSelect;
     this.domElement.removeEventListener('contextmenu', this.onContextMenu);
     this.domElement.removeEventListener('pointerdown', this.onPointerDown);
     window.removeEventListener('pointermove', this.onPointerMove);
@@ -114,16 +124,14 @@ export class WasdCameraController {
     if (event.pointerType === 'touch') {
       event.preventDefault();
       this.activeTouchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      this.updateTouchGestureBaseline();
     }
     this.domElement.focus?.();
     this.domElement.setPointerCapture?.(event.pointerId);
     this.dragging = true;
-    this.draggingButton = event.button;
+    this.draggingButton = event.pointerType === 'touch' ? 0 : event.button;
     this.lastPointerX = event.clientX;
     this.lastPointerY = event.clientY;
-    if (event.pointerType === 'touch' && this.activeTouchPointers.size >= 2) {
-      this.lastTouchDistance = this.computeTouchDistance();
-    }
     this.beginInteraction();
   };
 
@@ -134,15 +142,21 @@ export class WasdCameraController {
       this.activeTouchPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (this.activeTouchPointers.size >= 2) {
         const next = this.computeTouchDistance();
+        const center = this.computeTouchCenter();
         if (this.lastTouchDistance > 0 && next > 0) {
           this.camera.getWorldDirection(_forward);
           const delta = (next - this.lastTouchDistance) * this.pinchZoomSpeed;
           this.camera.position.addScaledVector(_forward, delta);
-          this.camera.updateMatrixWorld();
-          this.syncAnglesFromCamera();
-          this.dispatch('change');
+        }
+        if (center) {
+          this.applyPan(center.x - this.lastTouchCenterX, center.y - this.lastTouchCenterY);
+          this.lastTouchCenterX = center.x;
+          this.lastTouchCenterY = center.y;
         }
         this.lastTouchDistance = next;
+        this.camera.updateMatrixWorld();
+        this.syncAnglesFromCamera();
+        this.dispatch('change');
         return;
       }
     }
@@ -172,16 +186,18 @@ export class WasdCameraController {
       this.domElement.releasePointerCapture?.(event.pointerId);
     }
     if (this.activeTouchPointers.size >= 2) {
-      this.lastTouchDistance = this.computeTouchDistance();
+      this.updateTouchGestureBaseline();
       return;
     }
     if (this.activeTouchPointers.size === 1) {
       const t = this.activeTouchPointers.values().next().value;
       if (t) { this.lastPointerX = t.x; this.lastPointerY = t.y; }
-      this.lastTouchDistance = 0;
+      this.updateTouchGestureBaseline();
       return;
     }
     this.lastTouchDistance = 0;
+    this.lastTouchCenterX = 0;
+    this.lastTouchCenterY = 0;
     this.dragging = false;
     this.draggingButton = -1;
     this.endInteractionIfIdle();
@@ -189,6 +205,7 @@ export class WasdCameraController {
 
   private readonly onWheel = (event: WheelEvent) => {
     if (!this.enabled) return;
+    event.preventDefault();
     this.beginInteraction();
     this.pendingWheelDistance += -this.normalizeWheelDeltaY(event) * this.wheelSpeed;
   };
@@ -304,6 +321,30 @@ export class WasdCameraController {
     const touches = Array.from(this.activeTouchPointers.values());
     if (touches.length < 2) return 0;
     return Math.hypot(touches[1]!.x - touches[0]!.x, touches[1]!.y - touches[0]!.y);
+  }
+
+  private computeTouchCenter() {
+    const touches = Array.from(this.activeTouchPointers.values());
+    if (touches.length === 0) return null;
+    let x = 0;
+    let y = 0;
+    for (const touch of touches) {
+      x += touch.x;
+      y += touch.y;
+    }
+    return { x: x / touches.length, y: y / touches.length };
+  }
+
+  private updateTouchGestureBaseline() {
+    this.lastTouchDistance = this.computeTouchDistance();
+    const center = this.computeTouchCenter();
+    if (!center) {
+      this.lastTouchCenterX = 0;
+      this.lastTouchCenterY = 0;
+      return;
+    }
+    this.lastTouchCenterX = center.x;
+    this.lastTouchCenterY = center.y;
   }
 
   private normalizeWheelDeltaY(event: WheelEvent) {
