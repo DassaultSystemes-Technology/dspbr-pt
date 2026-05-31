@@ -40,6 +40,10 @@ class Demo {
   private _ui: Pane;
   private _uiTabs: ReturnType<Pane['addTab']>;
   private _container: HTMLElement;
+  private _diagnosticsPanel: HTMLDivElement;
+  private _diagnosticsButton: HTMLButtonElement;
+  private _diagnosticsVisible = false;
+  private _diagnosticsTimer = 0;
 
   private _defaultIblKey = 'Artist Workshop';
   private _currentIbl    = this._defaultIblKey;
@@ -53,6 +57,17 @@ class Demo {
     this._viewer    = new DemoViewer({ container: this._container });
     this._renderer  = this._viewer.renderer;
     this._ui        = new Pane({ title: 'dspbr-pt' });
+    this._diagnosticsPanel = document.createElement('div');
+    this._diagnosticsPanel.className = 'diagnostics-panel';
+    this._diagnosticsPanel.hidden = true;
+    document.body.appendChild(this._diagnosticsPanel);
+    this._diagnosticsButton = document.createElement('button');
+    this._diagnosticsButton.type = 'button';
+    this._diagnosticsButton.className = 'diagnostics-toggle';
+    this._diagnosticsButton.textContent = 'Diagnostics';
+    this._diagnosticsButton.setAttribute('aria-pressed', 'false');
+    this._diagnosticsButton.addEventListener('click', () => this.toggleDiagnostics());
+    document.body.appendChild(this._diagnosticsButton);
 
     this._params = new Proxy(new URLSearchParams(window.location.search), {
       get: (sp, prop: string) => sp.get(prop),
@@ -62,6 +77,13 @@ class Demo {
       const { scene } = (ev as CustomEvent<{ scene: PathtracingSceneData }>).detail;
       this._scene = scene;
       this.initMaterialSelector();
+      this.renderDiagnosticsPanel();
+    });
+    window.addEventListener('keydown', ev => {
+      if (ev.key === 'd' || ev.key === 'D' || ev.key === '`') {
+        if (isEditingElement(ev.target)) return;
+        this.toggleDiagnostics();
+      }
     });
 
     if (this._params['src']) {
@@ -94,6 +116,7 @@ class Demo {
 
     params.addButton({ title: 'Center View' }).on('click', () => this._viewer.centerView());
     params.addButton({ title: 'Save Image'  }).on('click', () => this._viewer.saveImage());
+    params.addButton({ title: 'Diagnostics' }).on('click', () => this.toggleDiagnostics());
 
     // Scene
     const scene = params.addFolder({ title: 'Scene' });
@@ -157,6 +180,85 @@ class Demo {
       min: 0,
       max: 60,
     });
+
+    this._diagnosticsTimer = window.setInterval(() => {
+      if (this._diagnosticsVisible) this.renderDiagnosticsPanel();
+    }, 500);
+  }
+
+  private toggleDiagnostics() {
+    this._diagnosticsVisible = !this._diagnosticsVisible;
+    this._diagnosticsPanel.hidden = !this._diagnosticsVisible;
+    this._diagnosticsButton.setAttribute('aria-pressed', this._diagnosticsVisible ? 'true' : 'false');
+    if (this._diagnosticsVisible) this.renderDiagnosticsPanel();
+  }
+
+  private renderDiagnosticsPanel() {
+    const d = this._renderer.diagnostics;
+    const profiling = d.profiling ?? {};
+    const scene = d.scene;
+    const bvh = d.bvh;
+    const memory = d.memory;
+    this._diagnosticsPanel.innerHTML = [
+      `<div class="diagnostics-card">`,
+      this.renderDiagnosticsSection('Scene', [
+        ['Triangles', formatNumber(scene?.triangles)],
+        ['Vertices', formatNumber(scene?.vertices)],
+        ['Vertex Idx', formatNumber(scene?.indices)],
+        ['Materials', formatNumber(scene?.materials)],
+        ['Textures', formatNumber(scene?.textures)],
+        ['Lights', formatNumber(scene?.lights)],
+      ]),
+      this.renderDiagnosticsSection('Renderer', [
+        ['Backend', d.backend],
+        ['Mode', d.mode],
+        ['Samples', formatNumber(d.sampleCount)],
+        ['FPS', Number.isFinite(this._viewer.fps) ? this._viewer.fps.toFixed(1) : 'n/a'],
+        ['Render', d.renderResolution],
+        ['Display', d.displayResolution],
+        ['Tile', `${d.tileResolution}x${d.tileResolution}`],
+      ]),
+      this.renderDiagnosticsSection('Load', [
+        ['Read', formatMs(profiling.readMs)],
+        ['Transform', formatMs(profiling.transformMs)],
+        ['Parse', formatMs(profiling.parseMs)],
+        ['Upload', formatMs(profiling.gpuUploadMs)],
+        ['BVH', formatMs(profiling.bvhBuildMs)],
+        ['Shader', formatMs(profiling.shaderInitMs)],
+        ['Setup', formatMs(profiling.rendererSetupMs)],
+      ]),
+      this.renderDiagnosticsSection('BVH', [
+        ['Triangles', formatNumber(bvh?.triangles)],
+        ['Nodes', formatNumber(bvh?.nodes)],
+        ['Tri Remap', formatNumber(bvh?.indices)],
+        ['Build', formatMs(bvh?.buildMs)],
+        ['Memory', formatMiB(bvh?.memoryBytes)],
+      ]),
+      this.renderDiagnosticsSection('Memory', [
+        ['Textures', formatMiB(memory?.textureBytes)],
+        ['Geometry', formatMiB(memory?.geometryBytes)],
+        ['BVH', formatMiB(memory?.bvhBytes)],
+        ['Total', formatMiB(memory?.totalBytes)],
+      ]),
+      this.renderDiagnosticsSection('Shaders', [
+        ['Programs', d.shaderPrograms.length > 0 ? d.shaderPrograms.join(', ') : 'n/a'],
+        ['Frame Queued', d.framePending ? 'yes' : 'no'],
+      ], { wide: true, wrap: true }),
+      `</div>`,
+    ].join('');
+  }
+
+  private renderDiagnosticsSection(title: string, rows: Array<[string, string]>, options: { wide?: boolean; wrap?: boolean } = {}) {
+    const classes = `diagnostics-section${options.wide ? ' diagnostics-section-wide' : ''}`;
+    return [
+      `<section class="${classes}">`,
+      `<h3>${escapeHtml(title)}</h3>`,
+      ...rows.map(([label, value]) => {
+        const valueClass = `diagnostics-value${options.wrap ? ' diagnostics-value-wrap' : ''}`;
+        return `<div class="diagnostics-row${options.wide ? ' diagnostics-row-wide' : ''}"><span class="diagnostics-label">${escapeHtml(label)}</span><span class="${valueClass}">${escapeHtml(value)}</span></div>`;
+      }),
+      `</section>`,
+    ].join('');
   }
 
   private initMaterialSelector() {
@@ -292,6 +394,35 @@ class Demo {
 
 function buildOptions(labels: string[]): Record<string, string> {
   return Object.fromEntries([['', ''], ...labels.map(l => [l, l])]);
+}
+
+function formatNumber(value: number | undefined) {
+  return Number.isFinite(value) ? Math.round(value!).toLocaleString('en-US') : 'n/a';
+}
+
+function formatMs(value: number | undefined) {
+  return Number.isFinite(value) ? `${value!.toFixed(0)}ms` : 'n/a';
+}
+
+function formatMiB(value: number | undefined) {
+  return Number.isFinite(value) ? `${(value! / (1024 * 1024)).toFixed(1)} MiB` : 'n/a';
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[ch]!));
+}
+
+function isEditingElement(target: EventTarget | null) {
+  const el = target as HTMLElement | null;
+  if (!el) return false;
+  const tag = el.tagName?.toLowerCase();
+  return tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable;
 }
 
 new Demo();

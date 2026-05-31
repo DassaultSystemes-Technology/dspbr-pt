@@ -10,7 +10,8 @@
     "build:slang-materials": "node tools/generate_slang_materials.mjs",
     "validate:shaders": "node tools/validate_shaders.mjs",
     "build": "yarn workspaces foreach --topological run build",
-    "dev": "yarn workspace dspbr-pt-demos run dev"
+    "dev": "yarn workspace dspbr-pt-viewer-app run dev",
+    "dev:example": "yarn workspace dspbr-pt-viewer-app run dev --host 127.0.0.1 --open /simple.html"
   },
   "repository": {
     "type": "git",

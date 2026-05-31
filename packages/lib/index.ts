@@ -1,8 +1,11 @@
 export { PathtracingRenderer } from './renderer';
-export type { PathtracingCamera, PathtracingRendererParameters, PathtracingRendererProgress, PathtracingRendererProgressCallback } from './renderer';
+export type { PathtracingCamera, PathtracingRendererDiagnostics, PathtracingRendererParameters, PathtracingRendererProgress, PathtracingRendererProgressCallback, RenderSchedulerMode } from './renderer';
+export { PathtracingViewport, createPathtracingViewport } from './pathtracing_viewport';
+export type { LookAtCameraOptions, PathtracingViewportEventMap, PathtracingViewportOptions, PathtracingViewportProgressCallback, PathtracingViewportSettings, Vec3Like } from './pathtracing_viewport';
 export { PathtracingSceneData } from './scene_data';
 export type { SceneTextureLike } from './scene_data';
 export { loadSceneFromUrl, loadSceneFromBlobs } from './loaders/scene_loader';
 export type { LoadedPathtracingScene, LoadProgressEvent, LoadProgressCallback } from './loaders/scene_loader';
 export { loadIblFromUrl, loadIblFromBlob, parseIblFromHdrBuffer } from './loaders/ibl_loader';
 export type { IblTextureLike } from './loaders/ibl_loader';
+export { normalizeExternalAssetUrl } from './loaders/url_normalization';

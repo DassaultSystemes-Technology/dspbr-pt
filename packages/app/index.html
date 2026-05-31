@@ -18,12 +18,22 @@
   <div id="startpage" class="overlay">
     <div class="overlay-card start-card">
       <div class="overlay-kicker">dspbr-pt Viewer</div>
-      <h1>Drop a Scene</h1>
-      <p class="overlay-copy">Load a <code>.glb</code>, a <code>.gltf</code> with assets, or an <code>.hdr</code> environment.</p>
+      <h1>Drop a Scene and Start Tracing</h1>
+      <p class="overlay-copy">Load a <code>.glb</code>, a <code>.gltf</code> with its assets, or an <code>.hdr</code> environment to inspect DSPBR materials and lighting.</p>
       <div class="overlay-chip-row">
         <span class="overlay-chip">.glb</span>
         <span class="overlay-chip">.gltf + assets</span>
         <span class="overlay-chip">.hdr</span>
+      </div>
+      <div class="overlay-guidance-grid">
+        <div class="overlay-guidance-block">
+          <div class="overlay-guidance-title">Camera</div>
+          <p class="overlay-guidance-copy">Left drag orbits, right drag pans, and the wheel zooms. Use middle drag or <code>W A S D</code> to move, <code>Q / E</code> vertically, and <code>Shift</code> for faster motion.</p>
+        </div>
+        <div class="overlay-guidance-block">
+          <div class="overlay-guidance-title">Load Via URL</div>
+          <p class="overlay-guidance-copy">Use <code>?src=...</code> for scenes and <code>&amp;ibl=...</code> for environments. Direct asset URLs and plain GitHub <code>blob</code>/<code>raw</code> links are normalized automatically.</p>
+        </div>
       </div>
     </div>
   </div>

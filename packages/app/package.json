@@ -1,5 +1,5 @@
 {
-  "name": "dspbr-pt-demos",
+  "name": "dspbr-pt-viewer-app",
   "private": true,
   "type": "module",
   "dependencies": {
