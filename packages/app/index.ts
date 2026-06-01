@@ -18,6 +18,10 @@ import { DemoViewer } from 'dspbr-pt-viewer';
 import type { PathtracingRenderer, PathtracingSceneData } from 'dspbr-pt';
 import * as Assets from './asset_index';
 
+const VERTEX_STRIDE = 20;
+const MATERIAL_OFFSET = 3;
+const PICK_EPSILON = 1e-7;
+
 if (!window.File || !window.FileReader || !window.FileList || !window.Blob) {
   alert('The File APIs are not fully supported in this browser.');
 }
@@ -41,9 +45,10 @@ class Demo {
   private _uiTabs: ReturnType<Pane['addTab']>;
   private _container: HTMLElement;
   private _diagnosticsPanel: HTMLDivElement;
-  private _diagnosticsButton: HTMLButtonElement;
   private _diagnosticsVisible = false;
   private _diagnosticsTimer = 0;
+  private _materialSelection = { index: 0 };
+  private _materialSelector?: { refresh: () => void };
 
   private _defaultIblKey = 'Artist Workshop';
   private _currentIbl    = this._defaultIblKey;
@@ -61,13 +66,6 @@ class Demo {
     this._diagnosticsPanel.className = 'diagnostics-panel';
     this._diagnosticsPanel.hidden = true;
     document.body.appendChild(this._diagnosticsPanel);
-    this._diagnosticsButton = document.createElement('button');
-    this._diagnosticsButton.type = 'button';
-    this._diagnosticsButton.className = 'diagnostics-toggle';
-    this._diagnosticsButton.textContent = 'Diagnostics';
-    this._diagnosticsButton.setAttribute('aria-pressed', 'false');
-    this._diagnosticsButton.addEventListener('click', () => this.toggleDiagnostics());
-    document.body.appendChild(this._diagnosticsButton);
 
     this._params = new Proxy(new URLSearchParams(window.location.search), {
       get: (sp, prop: string) => sp.get(prop),
@@ -85,6 +83,9 @@ class Demo {
         this.toggleDiagnostics();
       }
     });
+    this._viewer.viewCanvas.addEventListener('pointerdown', ev => this.captureMaterialPickPointer(ev), true);
+    this._viewer.viewCanvas.addEventListener('pointerup', ev => this.captureMaterialPickPointer(ev), true);
+    this._viewer.viewCanvas.addEventListener('click', ev => this.handleCanvasClick(ev), true);
 
     if (this._params['src']) {
       this._viewer.loadSceneFromUrl(this.resolveUrlFromIndex(this._params['src']!));
@@ -144,23 +145,24 @@ class Demo {
     integrator.addBinding(this._renderer, 'debugMode', {
       label: 'Debug Mode',
       options: buildOptions(this._renderer.debugModes),
-    });
-    integrator.addBinding(this._renderer, 'maxBounces',     { label: 'Max Bounces',     step: 1,       min: 0,   max: 32    });
-    integrator.addBinding(this._renderer, 'rayEps',         { label: 'Ray Offset',      step: 0.00001, min: 0,   max: 10    });
-    integrator.addBinding(this._renderer, 'clampThreshold', { label: 'Clamp Threshold', step: 0.1,     min: 0,   max: 100   });
+    }).on('change', () => this._viewer.restartPathtracing());
+    integrator.addBinding(this._viewer, 'sampleLimit',   { label: 'Sample Limit',    step: 1,       min: 1,   max: 4096  });
+    integrator.addBinding(this._renderer, 'maxBounces',     { label: 'Max Bounces',     step: 1,       min: 0,   max: 32    }).on('change', () => this._viewer.restartPathtracing());
+    integrator.addBinding(this._renderer, 'rayEps',         { label: 'Ray Offset',      step: 0.00001, min: 0,   max: 10    }).on('change', () => this._viewer.restartPathtracing());
+    integrator.addBinding(this._renderer, 'clampThreshold', { label: 'Clamp Threshold', step: 0.1,     min: 0,   max: 100   }).on('change', () => this._viewer.restartPathtracing());
 
     // Display
     const display = params.addFolder({ title: 'Display' });
-    display.addBinding(this._renderer, 'exposure',    { label: 'Display Exposure', step: 0.01, min: 0, max: 10 });
+    display.addBinding(this._renderer, 'exposure',    { label: 'Display Exposure', step: 0.01, min: 0, max: 10 }).on('change', () => this._viewer.restartPathtracing());
     display.addBinding(this._renderer, 'tonemapping', {
       label: 'Tonemapping',
       options: buildOptions(this._renderer.tonemappingModes),
-    });
-    display.addBinding(this._renderer, 'enableGamma',         { label: 'Gamma' });
-    display.addBinding(this._renderer, 'showBackground',      { label: 'Background from IBL' });
-    display.addBinding(this._viewer,   'pixelRatio',          { label: 'Pixel Ratio',    step: 0.1, min: 0.1, max: 1 });
+    }).on('change', () => this._viewer.restartPathtracing());
+    display.addBinding(this._renderer, 'enableGamma',         { label: 'Gamma' }).on('change', () => this._viewer.restartPathtracing());
+    display.addBinding(this._renderer, 'showBackground',      { label: 'Background from IBL' }).on('change', () => this._viewer.restartPathtracing());
+    display.addBinding(this._viewer,   'pixelRatio',          { label: 'Pixel Ratio',    step: 0.1, min: 0.1, max: 1 }).on('change', () => this._viewer.restartPathtracing());
     display.addBinding(this._viewer,   'interactionPixelRatio',{ label: 'Interaction Ratio', step: 0.1, min: 0.1, max: 1 });
-    display.addBinding(this._renderer, 'enableFxaa',          { label: 'FXAA' });
+    display.addBinding(this._renderer, 'enableFxaa',          { label: 'FXAA' }).on('change', () => this._viewer.restartPathtracing());
 
     // Background color
     const bgState = { color: { r: 0, g: 0, b: 0 } };
@@ -170,6 +172,7 @@ class Demo {
       color: { type: 'int' },
     }).on('change', ev => {
       this._renderer.backgroundColor = [ev.value.r / 255, ev.value.g / 255, ev.value.b / 255, 1];
+      this._viewer.restartPathtracing();
     });
 
     // FPS monitor
@@ -189,7 +192,6 @@ class Demo {
   private toggleDiagnostics() {
     this._diagnosticsVisible = !this._diagnosticsVisible;
     this._diagnosticsPanel.hidden = !this._diagnosticsVisible;
-    this._diagnosticsButton.setAttribute('aria-pressed', this._diagnosticsVisible ? 'true' : 'false');
     if (this._diagnosticsVisible) this.renderDiagnosticsPanel();
   }
 
@@ -272,12 +274,76 @@ class Demo {
     }
 
     const matNames = materials.map((m, i) => ({ text: m.name || `material_${i}`, value: i }));
-    const sel = { index: 0 };
-    matTab.addBinding(sel, 'index', { options: matNames }).on('change', ev => {
+    this._materialSelection.index = Math.min(this._materialSelection.index, Math.max(0, materials.length - 1));
+    this._materialSelector = matTab.addBinding(this._materialSelection, 'index', { options: matNames }).on('change', ev => {
       this.initMaterialParamUI(ev.value);
     });
 
     if (materials.length > 0) this.initMaterialParamUI(0);
+  }
+
+  private handleCanvasClick(ev: MouseEvent) {
+    if (!ev.altKey || ev.button !== 0) return;
+    ev.preventDefault();
+    ev.stopImmediatePropagation();
+    const materialIdx = this.pickMaterialAt(ev.clientX, ev.clientY);
+    if (materialIdx === undefined) return;
+    this.selectMaterial(materialIdx);
+  }
+
+  private captureMaterialPickPointer(ev: PointerEvent) {
+    if (!ev.altKey || ev.button !== 0) return;
+    ev.preventDefault();
+    ev.stopImmediatePropagation();
+  }
+
+  private selectMaterial(materialIdx: number) {
+    if (!this._scene || materialIdx < 0 || materialIdx >= this._scene.materials.length) return;
+    this._materialSelection.index = materialIdx;
+    this._materialSelector?.refresh();
+    this.showMaterialsTab();
+    this.initMaterialParamUI(materialIdx);
+  }
+
+  private showMaterialsTab() {
+    const tab = this._uiTabs as any;
+    const selectedIndex = tab.controller?.tab?.selectedIndex;
+    if (selectedIndex) {
+      selectedIndex.rawValue = 1;
+      return;
+    }
+    const tabButtons = this._ui.element.querySelectorAll<HTMLButtonElement>('.tp-tbiv_b');
+    tabButtons[1]?.click();
+  }
+
+  private pickMaterialAt(clientX: number, clientY: number): number | undefined {
+    const scene = this._scene;
+    const vertexBuffer = scene?.vertexBuffer;
+    const indexBuffer = scene?.triangleIndexBuffer;
+    if (!scene || !vertexBuffer || !indexBuffer) return undefined;
+
+    const ray = createCameraRay(this._viewer.activeCamera, this._viewer.viewCanvas, clientX, clientY);
+    let bestT = Number.POSITIVE_INFINITY;
+    let bestMaterial = -1;
+
+    for (let i = 0; i < indexBuffer.length; i += 3) {
+      const i0 = indexBuffer[i]! * VERTEX_STRIDE;
+      const i1 = indexBuffer[i + 1]! * VERTEX_STRIDE;
+      const i2 = indexBuffer[i + 2]! * VERTEX_STRIDE;
+      const t = intersectRayTriangle(
+        ray.ox, ray.oy, ray.oz,
+        ray.dx, ray.dy, ray.dz,
+        vertexBuffer[i0]!, vertexBuffer[i0 + 1]!, vertexBuffer[i0 + 2]!,
+        vertexBuffer[i1]!, vertexBuffer[i1 + 1]!, vertexBuffer[i1 + 2]!,
+        vertexBuffer[i2]!, vertexBuffer[i2 + 1]!, vertexBuffer[i2 + 2]!,
+      );
+      if (t < bestT) {
+        bestT = t;
+        bestMaterial = Math.round(vertexBuffer[i0 + MATERIAL_OFFSET] ?? -1);
+      }
+    }
+
+    return bestMaterial >= 0 ? bestMaterial : undefined;
   }
 
   private initMaterialParamUI(matIdx: number) {
@@ -346,6 +412,7 @@ class Demo {
     const volume = add('Volume');
     volume.addBinding(thinWalledState, 'thinWalled').on('change', ev => { mat.thinWalled = ev.value ? 1 : 0; });
     volume.addBinding(mat, 'ior',               { min: 0, max: 3, step: 0.01 });
+    volume.addBinding(mat, 'dispersion',        { min: 0, max: 1, step: 0.001 });
     volume.addBinding(mat, 'attenuationDistance',{ step: 0.00001, min: 0, max: 1e5 });
     volume.addBinding(colors, 'attenuationColor', colorOpts).on('change', ev => {
       mat.attenuationColor = [ev.value.r / 255, ev.value.g / 255, ev.value.b / 255];
@@ -390,6 +457,83 @@ class Demo {
     el.innerHTML = `${id === 'ibl-info' ? 'IBL' : 'Scene'}: ${name}`;
     if (credit) el.innerHTML += ` - ${credit}`;
   }
+}
+
+function createCameraRay(
+  camera: {
+    fov: number;
+    near: number;
+    matrixWorld: { elements: ArrayLike<number> };
+    position: { x: number; y: number; z: number };
+  },
+  canvas: HTMLCanvasElement,
+  clientX: number,
+  clientY: number,
+) {
+  const rect = canvas.getBoundingClientRect();
+  const x = ((clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1;
+  const y = 1 - ((clientY - rect.top) / Math.max(1, rect.height)) * 2;
+  const aspect = Math.max(1e-6, rect.width / Math.max(1, rect.height));
+  const filmHeight = Math.tan(camera.fov * 0.5 * Math.PI / 180) * camera.near;
+
+  const vx = x * aspect * filmHeight;
+  const vy = y * filmHeight;
+  const vz = -camera.near;
+  const viewLen = Math.hypot(vx, vy, vz) || 1;
+  const nx = vx / viewLen;
+  const ny = vy / viewLen;
+  const nz = vz / viewLen;
+  const e = camera.matrixWorld.elements;
+  const dx = e[0]! * nx + e[4]! * ny + e[8]! * nz;
+  const dy = e[1]! * nx + e[5]! * ny + e[9]! * nz;
+  const dz = e[2]! * nx + e[6]! * ny + e[10]! * nz;
+  const dirLen = Math.hypot(dx, dy, dz) || 1;
+
+  return {
+    ox: camera.position.x,
+    oy: camera.position.y,
+    oz: camera.position.z,
+    dx: dx / dirLen,
+    dy: dy / dirLen,
+    dz: dz / dirLen,
+  };
+}
+
+function intersectRayTriangle(
+  ox: number, oy: number, oz: number,
+  dx: number, dy: number, dz: number,
+  ax: number, ay: number, az: number,
+  bx: number, by: number, bz: number,
+  cx: number, cy: number, cz: number,
+) {
+  const e1x = bx - ax;
+  const e1y = by - ay;
+  const e1z = bz - az;
+  const e2x = cx - ax;
+  const e2y = cy - ay;
+  const e2z = cz - az;
+
+  const px = dy * e2z - dz * e2y;
+  const py = dz * e2x - dx * e2z;
+  const pz = dx * e2y - dy * e2x;
+  const det = e1x * px + e1y * py + e1z * pz;
+  if (Math.abs(det) < PICK_EPSILON) return Number.POSITIVE_INFINITY;
+
+  const invDet = 1 / det;
+  const tx = ox - ax;
+  const ty = oy - ay;
+  const tz = oz - az;
+  const u = (tx * px + ty * py + tz * pz) * invDet;
+  if (u < 0 || u > 1) return Number.POSITIVE_INFINITY;
+
+  const qx = ty * e1z - tz * e1y;
+  const qy = tz * e1x - tx * e1z;
+  const qz = tx * e1y - ty * e1x;
+  const v = (dx * qx + dy * qy + dz * qz) * invDet;
+  if (v < 0 || u + v > 1) return Number.POSITIVE_INFINITY;
+
+  const t = (e2x * qx + e2y * qy + e2z * qz) * invDet;
+  return t > PICK_EPSILON ? t : Number.POSITIVE_INFINITY;
 }
 
 function buildOptions(labels: string[]): Record<string, string> {

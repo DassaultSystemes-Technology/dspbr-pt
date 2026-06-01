@@ -43,6 +43,8 @@ export class DemoViewer extends EventTarget {
 
   private _renderer: PathtracingRenderer;
   public get renderer() { return this._renderer; }
+  public get viewCanvas() { return this.canvas; }
+  public get activeCamera() { return this.camera; }
 
   private _fps = 0.0;
   public get fps() { return this._fps; }
@@ -71,10 +73,18 @@ export class DemoViewer extends EventTarget {
   }
   public get tileRes() { return this._tileRes; }
 
+  private _sampleLimit = 512;
+  public get sampleLimit() { return this._sampleLimit; }
+  public set sampleLimit(val: number) {
+    this._sampleLimit = Math.max(1, Math.floor(val) || 1);
+    this.restartPathtracing();
+  }
+
   private interactionTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private lastTimeStamp = 0.0;
   private sceneBounds?: Box3;
   private sceneLoading = false;
+  private sceneReady = false;
 
   constructor(params: { container: HTMLElement }) {
     super();
@@ -100,7 +110,8 @@ export class DemoViewer extends EventTarget {
 
     this.controls = new WasdCameraController(this.camera, this.canvas);
     this.controls.addEventListener('change', () => {
-      this._renderer.resetAccumulation();
+      if (this._renderer.diagnostics.mode === 'stopped') this.startPathtracing();
+      else this._renderer.resetAccumulation();
     });
     this.controls.addEventListener('start', () => {
       this.toggleInteractionMode(true);
@@ -206,6 +217,7 @@ export class DemoViewer extends EventTarget {
     this.centerView();
 
     await this._renderer.setScene(scene, event => this.showStatusScreen(event));
+    this.sceneReady = true;
     this.startPathtracing();
     this.hideLoadscreen();
 
@@ -273,9 +285,10 @@ export class DemoViewer extends EventTarget {
   }
 
   private startPathtracing() {
+    if (!this.sceneReady) return;
     this._renderer.render(
       this.camera,
-      -1,
+      this._sampleLimit,
       () => {},
       () => {
         const now = performance.now();
@@ -283,6 +296,11 @@ export class DemoViewer extends EventTarget {
         this.lastTimeStamp = now;
       },
     );
+  }
+
+  public restartPathtracing() {
+    if (!this.sceneReady) return;
+    this.startPathtracing();
   }
 
   private updateAutoTileRes() {

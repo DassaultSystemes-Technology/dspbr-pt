@@ -7,6 +7,7 @@ const settings = {
   toneMapping: 'None',
   pixelRatio: Math.min(window.devicePixelRatio, 1),
   interactionPixelRatio: 0.1,
+  sampleLimit: 512,
 };
 
 const root = document.getElementById('viewport')!;
@@ -49,6 +50,7 @@ pane.addBinding(settings, 'pixelRatio', { label: 'Pixel Ratio', min: 0.1, max: 1
   .on('change', ev => viewport.setSettings({ pixelRatio: ev.value }));
 pane.addBinding(settings, 'interactionPixelRatio', { label: 'Interaction Ratio', min: 0.1, max: 1.0 })
   .on('change', ev => viewport.setSettings({ interactionPixelRatio: ev.value }));
+pane.addBinding(settings, 'sampleLimit', { label: 'Sample Limit', min: 1, max: 4096, step: 1 });
 
 const iblUrl =
   'https://raw.githubusercontent.com/DassaultSystemes-Technology/dspbr-pt/main/assets/ibl/artist_workshop_1k.hdr';
@@ -67,7 +69,7 @@ async function main() {
 
   await viewport.loadIblFromUrl(iblUrl);
   await viewport.loadSceneFromUrl(sceneUrl);
-  viewport.start();
+  viewport.start(settings.sampleLimit);
 }
 
 main();
