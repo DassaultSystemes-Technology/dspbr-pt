@@ -53,7 +53,7 @@ pane.addBinding(settings, 'interactionPixelRatio', { label: 'Interaction Ratio',
 pane.addBinding(settings, 'sampleLimit', { label: 'Sample Limit', min: 1, max: 4096, step: 1 });
 
 const iblUrl =
-  'https://raw.githubusercontent.com/DassaultSystemes-Technology/dspbr-pt/main/assets/ibl/artist_workshop_1k.hdr';
+  'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/artist_workshop_2k.hdr';
 const sceneUrl =
   'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/DamagedHelmet/glTF/DamagedHelmet.gltf';
 

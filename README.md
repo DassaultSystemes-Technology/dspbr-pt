@@ -84,7 +84,7 @@ npm run render -- -- <scene_path> --ibl <hdr_path> --res <width> <height> --samp
 ```bash
 # Example
 # Writes output image to ./output.png
-npm run render -- -- "./assets/scene.gltf" --ibl "./assets/ibl.hdr" -r 512 512 -s 32
+npm run render -- -- "https://example.com/scene.gltf" --ibl "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/artist_workshop_2k.hdr" -r 512 512 -s 32
 ``` -->
 
 

@@ -35,18 +35,23 @@ export const scenes = {
 
 export const ibls = {
   "Artist Workshop": {
-    "url": "https://raw.githubusercontent.com/DassaultSystemes-Technology/dspbr-pt/main/assets/ibl/artist_workshop_1k.hdr",
-    "credit": "by Oliksiy Yakovlyev from <a href=\"polyhaven.com\">polyhaven.com</a> <a href=\"https://creativecommons.org/publicdomain/zero/1.0/\">(CC0)</a>",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/artist_workshop_2k.hdr",
+    "credit": "Poly Haven environment by Oliksiy Yakovlyev.",
     "intensity": 1.5
   },
-  "Studio_05": {
-    "url": "https://raw.githubusercontent.com/DassaultSystemes-Technology/dspbr-pt/main/assets/ibl/studio_small_05_1k.hdr",
-    "credit": "by <a href=\"https://gregzaal.com/\">Greg Zaal</a> from <a href=\"polyhaven.com\">polyhaven.com</a> <a href=\"https://creativecommons.org/publicdomain/zero/1.0/\">(CC0)</a>",
+  "Studio Kontrast 02": {
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/studio_kontrast_02_2k.hdr",
+    "credit": "Poly Haven environment by Grzegorz Wronkowski.",
     "intensity": 1.5
   },
-  "Footprint Court": {
-    "url": "https://raw.githubusercontent.com/DassaultSystemes-Technology/dspbr-pt/main/assets/ibl/Footprint_Court_Env.hdr",
-    "credit": "from <a href=\"http://www.hdrlabs.com/sibl/archive.html\">hdrlabs.com</a> <a href=\"https://creativecommons.org/licenses/by-nc-sa/3.0/\">(CC BY-NC-SA 3.0)</a>",
+  "Adams Place Bridge": {
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/adams_place_bridge_2k.hdr",
+    "credit": "Poly Haven environment by Andreas Mischok.",
+    "intensity": 1.5
+  },
+  "Modern Buildings": {
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/modern_buildings_2_2k.hdr",
+    "credit": "Poly Haven environment by Alexander Scholten.",
     "intensity": 1.5
   }
 };
