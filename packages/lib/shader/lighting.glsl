@@ -30,7 +30,7 @@ vec3 sampleAndEvaluatePointLight(const in RenderState rs) {
 
   vec3 L = vec3(0.0);
   if (cosNL > EPS_COS && isVisible) {
-    L = eval_dspbr(rs.closure, rs.wi, light_dir) * (pointLightEmission / dist2) * cosNL;
+    L = dspbr_eval(rs.closure, rs.wi, light_dir) * (pointLightEmission / dist2) * cosNL;
   }
 
   return L;

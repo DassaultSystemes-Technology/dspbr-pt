@@ -1,120 +1,146 @@
-import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(__dirname, '..');
-const gltfPtRoot = path.resolve(workspaceRoot, '../gltf-pt');
-const sourceRoot = path.join(gltfPtRoot, 'packages/lib/wavefront/shaders/slang/materials');
-const compileSourcePath = path.join(sourceRoot, 'material_kernel_smoke.slang');
+const require = createRequire(import.meta.url);
+
 const outputDir = path.join(workspaceRoot, 'packages/lib/shader/generated/slang_materials');
-const rawGlslPath = path.join(workspaceRoot, '.tmp/slang_material_kernel.raw.glsl');
+const tempDir = path.join(workspaceRoot, '.tmp/slang-pbr-materials');
+const generatedGlslPath = path.join(tempDir, 'slang-pbr.include.glsl');
+const generatedMetadataPath = path.join(tempDir, 'slang-pbr.codegen.json');
 const glslPath = path.join(outputDir, 'material_kernel.glsl');
 const metadataPath = path.join(outputDir, 'material_kernel.codegen.json');
+const energyCompensation = process.env.SLANG_PBR_ENERGY_COMPENSATION ?? 'analytic';
 
-function findSlangc() {
+function getLocalPackageRoot() {
   const candidates = [
-    process.env.SLANGC,
-    'slangc',
-    '/opt/shader-slang-bin/bin/slangc',
+    process.env.SLANG_PBR_ROOT,
+    path.resolve(workspaceRoot, '../slang-pbr'),
+    path.resolve(workspaceRoot, '../gltf-pt/vendor/slang-pbr'),
   ].filter(Boolean);
+
   for (const candidate of candidates) {
-    const result = spawnSync(candidate, ['-version'], { encoding: 'utf8' });
-    if (result.status === 0) return candidate;
+    const packageJsonPath = path.join(candidate, 'package.json');
+    if (existsSync(packageJsonPath)) return candidate;
   }
   return null;
 }
 
-async function collectSlangSources(dir) {
-  const entries = await readdir(dir, { withFileTypes: true });
-  const sources = [];
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      sources.push(...await collectSlangSources(fullPath));
-    } else if (entry.isFile() && entry.name.endsWith('.slang')) {
-      sources.push(fullPath);
-    }
+function resolvePackagePath(specifier, localPackageRoot) {
+  if (localPackageRoot) {
+    if (specifier === 'slang-pbr/package.json') return path.join(localPackageRoot, 'package.json');
+    if (specifier === 'slang-pbr/tools/generate') return path.join(localPackageRoot, 'tools/generate.mjs');
+    if (specifier === 'slang-pbr/enterprise_pbr.slang') return path.join(localPackageRoot, 'src/enterprise_pbr.slang');
+    if (specifier === 'slang-pbr/manifest') return path.join(localPackageRoot, 'src/api.manifest.json');
   }
-  return sources.sort();
+
+  try {
+    return require.resolve(specifier);
+  } catch (error) {
+    throw new Error(
+      `Could not resolve ${specifier}. Run yarn install after adding the slang-pbr dependency, ` +
+      `or set SLANG_PBR_ROOT to a local slang-pbr checkout.`,
+      { cause: error },
+    );
+  }
 }
 
-async function hashFiles(paths) {
-  const hash = createHash('sha256');
-  for (const sourceFile of paths) {
-    const relativePath = path.relative(gltfPtRoot, sourceFile).replace(/\\/g, '/');
-    hash.update(relativePath);
-    hash.update('\0');
-    hash.update(await readFile(sourceFile));
-    hash.update('\0');
+function runGenerator(generatorPath) {
+  const result = spawnSync(process.execPath, [
+    generatorPath,
+    '--target', 'glsl',
+    '--kind', 'include',
+    '--out-dir', tempDir,
+    '--energy-compensation', energyCompensation,
+  ], {
+    cwd: workspaceRoot,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  if (result.status !== 0) {
+    process.stderr.write(result.stderr || result.stdout || '');
+    process.exit(result.status || 1);
   }
-  return hash.digest('hex');
+  if (result.stdout) process.stdout.write(result.stdout);
 }
 
-function stripSmokeWrapper(glsl) {
-  const lines = glsl
-    .replace(/^#version\s+\d+\s*\n/, '')
-    .replace(/^layout\(row_major\)\s+uniform;\n/, '')
-    .replace(/^layout\(row_major\)\s+buffer;\n/, '')
+function prepareWebGlInclude(glsl) {
+  return glsl
+    .replace(/^#version\s+\d+\s*\n/gm, '')
+    .replace(/^#extension\s+[^\n]+\n/gm, '')
+    .replace(/^layout\(row_major\)\s+uniform;\n/gm, '')
+    .replace(/^layout\(row_major\)\s+buffer;\n/gm, '')
     .replace(/^#line[^\n]*\n/gm, '')
-    .replace(/layout\(std430,\s*binding\s*=\s*0\)\s*buffer\s+StructuredBuffer_vectorx3Cfloatx2C4x3E_t_0\s*\{\s*vec4\s+_data\[\];\s*\}\s*materialKernelSmokeOutput_0;\s*/s, '')
-    .replace(/SurfaceMaterial_0\s+makeSmokeSurfaceMaterial_0\(\)\s*\{[\s\S]*?\n\}\s*\n\s*struct SurfaceLayerNormals_0/, 'struct SurfaceLayerNormals_0')
-    .replace(/SurfaceLayerNormals_0\s+makeSmokeLayerNormals_0\(\)\s*\{[\s\S]*?\n\}\s*\n\s*vec3 clamp01_0/, 'vec3 clamp01_0')
-    .replace(/layout\(local_size_x\s*=\s*1,\s*local_size_y\s*=\s*1,\s*local_size_z\s*=\s*1\)\s*in;\s*void\s+main\(\)\s*\{[\s\S]*?\n\}\s*$/m, '')
+    .replace(/^\s*\[\[(?:unroll|loop|flatten|branch)\]\]\s*\n/gm, '')
     .trim();
-
-  return `// AUTO-GENERATED by tools/generate_slang_materials.mjs
-// Include-safe GLSL library emitted from ../gltf-pt Slang material sources.
-// Do not edit by hand.
-
-${lines}
-`;
 }
 
 async function main() {
   await mkdir(outputDir, { recursive: true });
-  const sourceFiles = await collectSlangSources(sourceRoot);
-  const slangc = findSlangc();
-  let targets;
-  const compiler = { command: slangc, available: Boolean(slangc) };
+  await rm(tempDir, { recursive: true, force: true });
+  await mkdir(tempDir, { recursive: true });
 
-  if (!slangc) {
-    throw new Error('slangc not found; set SLANGC or install /opt/shader-slang-bin/bin/slangc');
-  } else {
-    await mkdir(path.dirname(rawGlslPath), { recursive: true });
-    const result = spawnSync(slangc, [
-      compileSourcePath,
-      '-target', 'glsl',
-      '-profile', 'glsl_450',
-      '-entry', 'materialKernelSmokeMain',
-      '-stage', 'compute',
-      '-o', rawGlslPath,
-    ], { cwd: workspaceRoot, encoding: 'utf8' });
+  const localPackageRoot = getLocalPackageRoot();
+  const generatorPath = resolvePackagePath('slang-pbr/tools/generate', localPackageRoot);
+  const packageJsonPath = resolvePackagePath('slang-pbr/package.json', localPackageRoot);
+  const packageJson = JSON.parse(await readFile(packageJsonPath, 'utf8'));
+  const entryPath = resolvePackagePath('slang-pbr/enterprise_pbr.slang', localPackageRoot);
+  const manifestPath = resolvePackagePath('slang-pbr/manifest', localPackageRoot);
 
-    if (result.status !== 0) {
-      process.stderr.write(result.stderr || result.stdout || '');
-      process.exit(result.status || 1);
-    } else {
-      const raw = await readFile(rawGlslPath, 'utf8');
-      await writeFile(glslPath, stripSmokeWrapper(raw), 'utf8');
-      targets = { glsl: { available: true, path: 'packages/lib/shader/generated/slang_materials/material_kernel.glsl' } };
-    }
-  }
+  runGenerator(generatorPath);
+
+  const generatedGlsl = prepareWebGlInclude(await readFile(generatedGlslPath, 'utf8'));
+  const generatedMetadata = JSON.parse(await readFile(generatedMetadataPath, 'utf8'));
+  const sanitizedGeneratedMetadata = {
+    ...generatedMetadata,
+    targets: {
+      glsl: {
+        ...(generatedMetadata.targets?.glsl ?? {}),
+        path: 'packages/lib/shader/generated/slang_materials/material_kernel.glsl',
+      },
+    },
+  };
+
+  const glsl = `// AUTO-GENERATED by tools/generate_slang_materials.mjs
+// Include-safe GLSL library emitted by slang-pbr.
+// Do not edit by hand.
+
+${generatedGlsl.trim()}
+`;
+  await writeFile(glslPath, glsl, 'utf8');
 
   const metadata = {
-    version: 1,
-    sourceRoot: path.relative(workspaceRoot, sourceRoot).replace(/\\/g, '/'),
-    sourceHash: await hashFiles(sourceFiles),
-    sourceFiles: sourceFiles.map((file) => path.relative(gltfPtRoot, file).replace(/\\/g, '/')),
-    compileSource: path.relative(gltfPtRoot, compileSourcePath).replace(/\\/g, '/'),
-    compileSourceHash: createHash('sha256').update(await readFile(compileSourcePath)).digest('hex'),
-    compiler,
-    targets,
+    version: 2,
+    package: {
+      name: packageJson.name,
+      version: packageJson.version,
+      entry: 'slang-pbr/enterprise_pbr.slang',
+      manifest: 'slang-pbr/manifest',
+    },
+    generator: {
+      command: 'slang-pbr-generate',
+      module: 'slang-pbr/tools/generate',
+      target: 'glsl',
+      kind: 'include',
+      energyCompensation,
+    },
+    slangPbr: sanitizedGeneratedMetadata,
+    targets: {
+      glsl: {
+        available: true,
+        path: 'packages/lib/shader/generated/slang_materials/material_kernel.glsl',
+      },
+    },
   };
   await writeFile(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, 'utf8');
-  await rm(rawGlslPath, { force: true });
+  await rm(tempDir, { recursive: true, force: true });
+
   console.log(`Wrote ${path.relative(workspaceRoot, glslPath)}`);
   console.log(`Wrote ${path.relative(workspaceRoot, metadataPath)}`);
 }

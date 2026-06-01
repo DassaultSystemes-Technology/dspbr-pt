@@ -452,11 +452,16 @@ async function createMaterialData(
   const iridescence = m.getExtension?.('KHR_materials_iridescence');
   if (iridescence) {
     mat.iridescence = iridescence.getIridescenceFactor?.() ?? 0.0;
-    mat.iridescenceIOR = iridescence.getIOR?.() ?? mat.iridescenceIOR;
+    mat.iridescenceIOR = iridescence.getIridescenceIOR?.() ?? mat.iridescenceIOR;
     mat.iridescenceThicknessMinimum = iridescence.getIridescenceThicknessMinimum?.() ?? mat.iridescenceThicknessMinimum;
     mat.iridescenceThicknessMaximum = iridescence.getIridescenceThicknessMaximum?.() ?? mat.iridescenceThicknessMaximum;
     mat.iridescenceTextureId = await ensureTexture(iridescence.getIridescenceTexture?.() ?? null, iridescence.getIridescenceTextureInfo?.() ?? null, 'linear');
     mat.iridescenceThicknessTextureId = await ensureTexture(iridescence.getIridescenceThicknessTexture?.() ?? null, iridescence.getIridescenceThicknessTextureInfo?.() ?? null, 'linear');
+  }
+
+  const dispersion = m.getExtension?.('KHR_materials_dispersion');
+  if (dispersion) {
+    mat.dispersion = dispersion.getDispersion?.() ?? 0.0;
   }
 
   // KHR_materials_diffuse_transmission (replaces legacy KHR_materials_translucency)

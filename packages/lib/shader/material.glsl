@@ -34,11 +34,9 @@ bool is_specular_event(MaterialClosure c) {
 }
 
 void configure_material(const in uint matIdx, in RenderState rs, out MaterialClosure c, vec4 vertexColor) {
-  vec2 uv = rs.uv0;
-
   MaterialData matData = get_material(matIdx);
 
-  vec4 albedo = get_texture_value(matData.albedoTextureId, uv);
+  vec4 albedo = get_texture_value(matData.albedoTextureId, rs.uv0, rs.uv1);
   c.albedo = matData.albedo * to_linear_rgb(albedo.xyz);
   float opacity = albedo.w;
 
@@ -55,10 +53,10 @@ void configure_material(const in uint matIdx, in RenderState rs, out MaterialClo
     c.cutout_opacity = 1.0;
   }
 
-  c.transparency = matData.transparency * get_texture_value(matData.transmissionTextureId, uv).x;
+  c.transparency = matData.transparency * get_texture_value(matData.transmissionTextureId, rs.uv0, rs.uv1).x;
 
-  c.translucency = matData.translucency * get_texture_value(matData.translucencyTextureId, uv).w;
-  c.translucencyColor = matData.translucencyColor * to_linear_rgb(get_texture_value(matData.translucencyColorTextureId, uv).xyz);
+  c.translucency = matData.translucency * get_texture_value(matData.translucencyTextureId, rs.uv0, rs.uv1).w;
+  c.translucencyColor = matData.translucencyColor * to_linear_rgb(get_texture_value(matData.translucencyColorTextureId, rs.uv0, rs.uv1).xyz);
 
   c.thin_walled = matData.thinWalled;
   // c.ior = c.thin_walled ? 1.0 : matData.ior;
@@ -66,22 +64,22 @@ void configure_material(const in uint matIdx, in RenderState rs, out MaterialClo
 
   c.double_sided = matData.doubleSided;
 
-  vec4 occlusionRoughnessMetallic = get_texture_value(matData.metallicRoughnessTextureId, uv);
+  vec4 occlusionRoughnessMetallic = get_texture_value(matData.metallicRoughnessTextureId, rs.uv0, rs.uv1);
   c.metallic = matData.metallic * occlusionRoughnessMetallic.z;
   float roughness = matData.roughness * occlusionRoughnessMetallic.y;
   c.roughness = roughness;
 
-  float anisotropy = get_texture_value(matData.anisotropyTextureId, uv).x * 2.0 - 1.0;
+  float anisotropy = get_texture_value(matData.anisotropyTextureId, rs.uv0, rs.uv1).x * 2.0 - 1.0;
   c.anisotropy = matData.anisotropy * anisotropy;
   c.alpha = roughness_conversion(roughness, c.anisotropy);
 
-  vec4 specularColor = get_texture_value(matData.specularColorTextureId, rs.uv0);
+  vec4 specularColor = get_texture_value(matData.specularColorTextureId, rs.uv0, rs.uv1);
   c.specular_tint = matData.specularTint * pow(specularColor.rgb, vec3(2.2));
-  vec4 specular = get_texture_value(matData.specularTextureId, rs.uv0);
+  vec4 specular = get_texture_value(matData.specularTextureId, rs.uv0, rs.uv1);
   c.specular = matData.specular * specular.a;
 
-  vec4 sheenColor = get_texture_value(matData.sheenColorTextureId, rs.uv0);
-  vec4 sheenRoughness = get_texture_value(matData.sheenRoughnessTextureId, rs.uv0);
+  vec4 sheenColor = get_texture_value(matData.sheenColorTextureId, rs.uv0, rs.uv1);
+  vec4 sheenRoughness = get_texture_value(matData.sheenRoughnessTextureId, rs.uv0, rs.uv1);
   c.sheen_roughness = matData.sheenRoughness * sheenRoughness.x;
   c.sheen_color = matData.sheenColor * sheenColor.xyz;
 
@@ -91,7 +89,7 @@ void configure_material(const in uint matIdx, in RenderState rs, out MaterialClo
 
   if (matData.normalTextureId >= 0.0) {
     mat3 to_world = get_onb(c.n, c.t.xyz);
-    vec3 n = normalize(get_texture_value(matData.normalTextureId, uv).xyz * 2.0 - vec3(1.0));
+    vec3 n = normalize(get_texture_value(matData.normalTextureId, rs.uv0, rs.uv1).xyz * 2.0 - vec3(1.0));
     n = normalize(n * vec3(matData.normalScale, matData.normalScale, 1.0));
     c.n = to_world * n;
 
@@ -107,7 +105,7 @@ void configure_material(const in uint matIdx, in RenderState rs, out MaterialClo
 
   vec3 ansiotropyDirection = matData.anisotropyDirection;
   if (matData.anisotropyDirectionTextureId >= 0.0)
-    ansiotropyDirection = get_texture_value(matData.anisotropyDirectionTextureId, uv).xyz * 2.0 - vec3(1);
+    ansiotropyDirection = get_texture_value(matData.anisotropyDirectionTextureId, rs.uv0, rs.uv1).xyz * 2.0 - vec3(1);
   ansiotropyDirection.z = 0.0;
 
   float anisotropyRotation = atan(ansiotropyDirection.y, ansiotropyDirection.x) + PI;
@@ -122,12 +120,12 @@ void configure_material(const in uint matIdx, in RenderState rs, out MaterialClo
   c.specular_f0 = mix(c.specular * c.f0 * c.specular_tint, c.albedo, c.metallic);
   c.specular_f90 = vec3(mix(c.specular, 1.0, c.metallic));
 
-  vec3 emission = get_texture_value(matData.emissionTextureId, uv).xyz;
+  vec3 emission = get_texture_value(matData.emissionTextureId, rs.uv0, rs.uv1).xyz;
   c.emission = matData.emission.xyz * to_linear_rgb(emission);
 
-  vec4 clearcoat = get_texture_value(matData.clearcoatTextureId, uv);
+  vec4 clearcoat = get_texture_value(matData.clearcoatTextureId, rs.uv0, rs.uv1);
   c.clearcoat = matData.clearcoat * clearcoat.y;
-  vec4 clearcoatRoughness = get_texture_value(matData.clearcoatRoughnessTextureId, uv);
+  vec4 clearcoatRoughness = get_texture_value(matData.clearcoatRoughnessTextureId, rs.uv0, rs.uv1);
   c.clearcoatRoughness = matData.clearcoatRoughness * clearcoatRoughness.x;
   float clearcoat_alpha = c.clearcoatRoughness * c.clearcoatRoughness;
   c.clearcoat_alpha = max(clearcoat_alpha, MINIMUM_ROUGHNESS);
@@ -135,8 +133,9 @@ void configure_material(const in uint matIdx, in RenderState rs, out MaterialClo
   c.attenuationColor = matData.attenuationColor;
   c.attenuationDistance = matData.attenuationDistance;
 
-  c.iridescence = matData.iridescence * get_texture_value(matData.iridescenceTextureId, uv).x;
-  c.iridescence_ior = matData.iridescenceIor;
+  c.iridescence = saturate(matData.iridescence * get_texture_value(matData.iridescenceTextureId, rs.uv0, rs.uv1).x);
+  c.iridescence_ior = clamp(matData.iridescenceIor, 1.0, 2.5);
   c.iridescence_thickness = mix(matData.iridescenceThicknessMinimum, matData.iridescenceThicknessMaximum,
-                                get_texture_value(matData.iridescenceThicknessTextureId, uv).y);
+                                get_texture_value(matData.iridescenceThicknessTextureId, rs.uv0, rs.uv1).y);
+  c.dispersion = max(matData.dispersion, 0.0);
 }

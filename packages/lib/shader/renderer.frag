@@ -30,7 +30,7 @@ in vec2 v_uv;
     vec2  u_ibl_resolution;
     float u_frame_count;
     float u_debug_mode;
-    float u_sheen_G;
+    float u_uniform_pad1;
     float u_use_ibl;
     float u_ibl_rotation;
     float u_background_from_ibl;
@@ -79,7 +79,6 @@ layout(location = 0) out vec4 out_FragColor;
 
 #include <dspbr>
 #include <lighting>
-#include <debug_bsdf_helpers>
 
 ///////////////////////////////////////////////////////////////////////////////
 // Pathtracing Integrator Common
@@ -116,7 +115,7 @@ bool sample_bsdf_bounce(inout RenderState rs, out vec3 sampleWeight, out float p
     rs.wo = -rs.wi;
     rs.closure.bsdf_selection_pdf = 1.0;
   } else {
-    rs.wo = sample_dspbr(rs.closure, rs.wi,
+    rs.wo = dspbr_sample(rs.closure, rs.wi,
                           vec3(rng_float(), rng_float(), rng_float()),
                           sampleWeight, pdf);
 

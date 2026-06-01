@@ -42,7 +42,7 @@ Package layout:
 # yarn is mandatory as this project uses yarn workspaces
 yarn install
 
-# Regenerate the Slang material GLSL artifact
+# Regenerate the slang-pbr material GLSL artifact; set SLANG_PBR_ROOT for a local checkout
 yarn build:slang-materials
 
 # Builds all packages
@@ -96,6 +96,7 @@ This project stands on a lot of excellent open source work. Thanks to the author
 * [glTF Transform](https://github.com/donmccurdy/glTF-Transform), by Don McCurdy and contributors, for the glTF parsing, extension handling, and asset processing foundation.
 * [meshoptimizer](https://github.com/zeux/meshoptimizer), by Arseny Kapoulkine, for mesh compression decoding support used by glTF assets.
 * [Slang](https://github.com/shader-slang/slang), from the shader-slang project and its research contributors, for the shader language/toolchain used to generate the material model code.
+* [slang-pbr](https://github.com/bsdorra/slang-pbr), for the reusable Enterprise PBR Slang material source used by the generated WebGL material model.
 * [Tweakpane](https://github.com/cocopon/tweakpane), by Hiroki Tani and contributors, for the compact viewer control UI.
 * [simple-dropzone](https://www.npmjs.com/package/simple-dropzone), for the browser drag-and-drop file loading used by the viewer.
 * [Vite](https://vite.dev/) and [tsup](https://tsup.egoist.dev/) for the development server and package build workflow.

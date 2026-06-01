@@ -42,6 +42,9 @@ vec4 evaluateMaterialTextureValue(const in TexInfo texInfo, const in vec2 texCoo
 vec4 get_texture_value(float tex_info_id, vec2 uv) {
   return vec4(1.0);
 }
+vec4 get_texture_value(float tex_info_id, vec2 uv0, vec2 uv1) {
+  return vec4(1.0);
+}
 `,
   material_block: `
 uniform sampler2D u_sampler_material_data;
@@ -98,13 +101,13 @@ MaterialData get_material(uint idx) {
   data.iridescenceThicknessTextureId = -1.0;
   data.translucencyColor = vec3(1.0);
   data.translucencyColorTextureId = -1.0;
+  data.dispersion = 0.0;
   return data;
 }
 `,
   dspbr: `${readShader('generated/slang_materials/material_kernel.glsl')}\n${readShader('slang_material_adapter.glsl')}`,
   bvh: readShader('bvh.glsl'),
   lighting: readShader('lighting.glsl'),
-  debug_bsdf_helpers: '',
   mesh_constants: `
 const uint VERTEX_STRIDE = 5u;
 const uint TRIANGLE_INDEX_STRIDE = 3u;
@@ -124,7 +127,6 @@ const variants = [
     name: 'debug',
     chunks: {
       ...commonChunks,
-      debug_bsdf_helpers: `${readShader('bsdfs/fresnel.glsl')}\n${readShader('bsdfs/iridescence.glsl')}`,
       integrator: readShader('integrator/debug.glsl'),
     },
   },

@@ -65,6 +65,8 @@ struct MaterialData {
 
   vec3 translucencyColor; // 60
   float translucencyColorTextureId;
+
+  float dispersion; // 64
 };
 
 struct TexInfo {
@@ -114,6 +116,7 @@ struct MaterialClosure {
   float anisotropy;
   float clearcoatRoughness;
   vec3 anisotropyTangent;
+  float dispersion;
 };
 
 struct RenderState {

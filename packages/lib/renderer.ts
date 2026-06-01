@@ -33,8 +33,6 @@ import slang_material_kernel_shader from './shader/generated/slang_materials/mat
 import slang_material_adapter_shader from './shader/slang_material_adapter.glsl';
 import bvh_shader from './shader/bvh.glsl';
 import lighting_shader from './shader/lighting.glsl';
-import fresnel_shader from './shader/bsdfs/fresnel.glsl';
-import iridescence_shader from './shader/bsdfs/iridescence.glsl';
 
 import render_shader from './shader/renderer.frag';
 import debug_integrator_shader from './shader/integrator/debug.glsl';
@@ -190,7 +188,7 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
-  public debugModes = ["None", "Albedo", "Metalness", "Roughness", "Normals", "Tangents", "Bitangents", "Transparency", "UV0", "Clearcoat", "IBL PDF", "IBL CDF", "Specular", "SpecularTint", "Specular F0", "Fresnel Angle", "Translucency", "Raw Thin-Film Fresnel"];
+  public debugModes = ["None", "Albedo", "Metalness", "Roughness", "Normals", "Tangents", "Bitangents", "Transparency", "UV0", "Clearcoat", "IBL PDF", "IBL CDF", "Specular", "SpecularTint", "Specular F0", "Translucency"];
   private _debugMode: string = "None";
   public get debugMode() {
     return this._debugMode;
@@ -209,16 +207,6 @@ export class PathtracingRenderer {
   public set tonemapping(val) {
     this._tonemapping = val;
     // this.resetAccumulation();
-  }
-
-  public sheenGModes = ["Charlie", "Ashikhmin"];
-  private _sheenG: string = "Charlie";
-  public get sheenG() {
-    return this._sheenG;
-  }
-  public set sheenG(val) {
-    this._sheenG = val;
-    this.resetAccumulation();
   }
 
   private _maxBounces = 8;
@@ -402,7 +390,7 @@ export class PathtracingRenderer {
     "u_ibl_resolution": [0, 0],
     "u_frame_count": 0,
     "u_debug_mode": 0,
-    "u_sheen_G": 0,
+    "u_uniform_pad1": 0,
     "u_use_ibl": 0,
     "u_ibl_rotation": 0,
     "u_background_from_ibl": 0,
@@ -425,7 +413,6 @@ export class PathtracingRenderer {
     this.pathTracingUniforms["u_camera_pos"] = [camera.position.x, camera.position.y, camera.position.z, filmHeight];
     this.pathTracingUniforms["u_frame_count"] = this._frameCount;
     this.pathTracingUniforms["u_debug_mode"] = this.debugModes.indexOf(this._debugMode);
-    this.pathTracingUniforms["u_sheen_G"] = this.sheenGModes.indexOf(this._sheenG);
     this.pathTracingUniforms["u_use_ibl"] = this.useIBL ? 1 : 0;
     this.pathTracingUniforms["u_ibl_rotation"] = this._iblRotation;
     this.pathTracingUniforms["u_background_from_ibl"] = this.showBackground ? 1 : 0;
@@ -740,7 +727,7 @@ export class PathtracingRenderer {
 
     // cleanup renderbuffers and fbos
     for (const rb of this.renderBuffers.values()) {
-      if (rb) gl.deleteTexture(rb);
+      if (rb) gl.deleteTexture(rb as WebGLTexture);
     }
     this.renderBuffers.clear();
 
@@ -1104,13 +1091,11 @@ export class PathtracingRenderer {
       ['dspbr', `${slang_material_kernel_shader}\n${slang_material_adapter_shader}`],
       ['bvh', bvh_shader],
       ['lighting', lighting_shader],
-      ['debug_bsdf_helpers', ''],
       ['mesh_constants', meshConstants]
     ]);
 
     const debugShaderMap = new Map<string, string>(shaderChunks);
     debugShaderMap.set('integrator', debug_integrator_shader);
-    debugShaderMap.set('debug_bsdf_helpers', `${fresnel_shader}\n${iridescence_shader}`);
     const misptdlShaderMap = new Map<string, string>(shaderChunks);
     misptdlShaderMap.set('integrator', misptdl_integrator_shader);
 

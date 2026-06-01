@@ -145,7 +145,7 @@ GPU Memory Consumption (MB):
     if (!this._materialDataTexture) return;
     const materialData = this._sceneData.num_materials > 0
       ? this._sceneData.getFlatMaterialBuffer()
-      : new Float32Array(64);
+      : new Float32Array(68);
     this.uploadFloatDataTexture(this._materialDataTexture, materialData);
   }
 
@@ -164,7 +164,7 @@ GPU Memory Consumption (MB):
     uniform sampler2D u_sampler_material_data;
 
     vec4 fetch_material_data(uint matIdx, uint slot) {
-      uint texel = matIdx * 16u + slot;
+      uint texel = matIdx * 17u + slot;
       return texelFetch(u_sampler_material_data, ivec2(int(texel % MAX_TEXTURE_SIZE), int(texel / MAX_TEXTURE_SIZE)), 0);
     }
 
@@ -186,6 +186,7 @@ GPU Memory Consumption (MB):
       vec4 m13 = fetch_material_data(idx, 13u);
       vec4 m14 = fetch_material_data(idx, 14u);
       vec4 m15 = fetch_material_data(idx, 15u);
+      vec4 m16 = fetch_material_data(idx, 16u);
 
       data.albedo = m0.xyz; data.metallic = m0.w;
       data.roughness = m1.x; data.anisotropy = m1.y; data.anisotropyRotation = m1.z; data.transparency = m1.w;
@@ -203,6 +204,7 @@ GPU Memory Consumption (MB):
       data.clearcoatRoughnessTextureId = m13.x; data.clearcoatNormalTextureId = m13.y; data.sheenColorTextureId = m13.z; data.sheenRoughnessTextureId = m13.w;
       data.anisotropyTextureId = m14.x; data.anisotropyDirectionTextureId = m14.y; data.iridescenceTextureId = m14.z; data.iridescenceThicknessTextureId = m14.w;
       data.translucencyColor = m15.xyz; data.translucencyColorTextureId = m15.w;
+      data.dispersion = m16.x;
       return data;
     }
     `;
@@ -224,8 +226,8 @@ GPU Memory Consumption (MB):
 
   private materialTextureArrayCapacity() {
     const maxTextureUnits = this.gl.getParameter(this.gl.MAX_TEXTURE_IMAGE_UNITS) as number;
-    // Path tracing pass uses 5 static data textures, 5 IBL textures, and 1 previous-frame texture.
-    return Math.max(1, maxTextureUnits - 11);
+    // Path tracing pass uses 6 static data textures, 5 IBL textures, and 1 previous-frame texture.
+    return Math.max(1, maxTextureUnits - 12);
   }
 
   private generateTextureArrays() {
@@ -350,6 +352,13 @@ GPU Memory Consumption (MB):
     this._texAccessorShaderChunk += `
     vec4 get_texture_value(float tex_info_id, vec2 uv) {
       return tex_info_id < 0.0 ? vec4(1,1,1,1) : evaluateMaterialTextureValue(get_texture_info(int(tex_info_id)), uv);
+    }
+
+    vec4 get_texture_value(float tex_info_id, vec2 uv0, vec2 uv1) {
+      if (tex_info_id < 0.0) return vec4(1,1,1,1);
+      TexInfo info = get_texture_info(int(tex_info_id));
+      vec2 uv = info.uv_set > 0.5 ? uv1 : uv0;
+      return evaluateMaterialTextureValue(info, uv);
     }
     `;
   }

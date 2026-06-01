@@ -1,6 +1,6 @@
 
 export class MaterialData {
-  private _data = new Float32Array(64);
+  private _data = new Float32Array(68);
 
   public get data() {
     return this._data;
@@ -404,6 +404,14 @@ export class MaterialData {
     return this._data[63];
   }
 
+  public set dispersion(val: number) {
+    this._data[64] = val;
+    this.dirty = true;
+  }
+  public get dispersion() {
+    return this._data[64];
+  }
+
   constructor() {
     this.albedo = [1, 1, 1];
     this.metallic = 0;
@@ -468,6 +476,7 @@ export class MaterialData {
 
     this.translucencyColor = [1, 1, 1];
     this.translucencyColorTextureId = -1;
+    this.dispersion = 0;
   }
 }
 

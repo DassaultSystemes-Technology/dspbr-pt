@@ -18,6 +18,10 @@ SurfaceMaterial_0 make_slang_surface(const in MaterialClosure c) {
   surface.thinWalled_0 = c.thin_walled ? 1.0 : 0.0;
   surface.translucency_0 = c.translucency;
   surface.translucencyColor_0 = c.translucencyColor;
+  surface.iridescence_0 = c.iridescence;
+  surface.iridescenceIor_0 = c.iridescence_ior;
+  surface.iridescenceThickness_0 = c.iridescence_thickness;
+  surface.dispersion_0 = c.dispersion;
   surface.clearcoat_0 = c.clearcoat;
   surface.clearcoatRoughness_0 = c.clearcoatRoughness;
   surface.sheenColor_0 = c.sheen_color;
@@ -55,8 +59,8 @@ MaterialBsdfState_0 make_slang_bsdf_state(const in MaterialClosure c) {
 
 DirectionContext_0 make_slang_directions(vec3 wi, vec3 wo) {
   DirectionContext_0 directions;
-  directions.viewDir_17 = wi;
-  directions.lightDir_17 = wo;
+  directions.viewDir_18 = wi;
+  directions.lightDir_18 = wo;
   return directions;
 }
 
@@ -69,7 +73,7 @@ NormalContext_0 make_slang_normal_context(const in MaterialClosure c) {
   return normals;
 }
 
-vec3 eval_dspbr(const in MaterialClosure c, vec3 wi, vec3 wo) {
+vec3 dspbr_eval(const in MaterialClosure c, vec3 wi, vec3 wo) {
   vec3 bsdf_with_cos = evalMaterialBsdf_0(
     make_slang_bsdf_state(c),
     make_slang_directions(wi, wo),
@@ -86,7 +90,7 @@ float dspbr_pdf(const in MaterialClosure c, vec3 wi, vec3 wo) {
   );
 }
 
-vec3 sample_dspbr(inout MaterialClosure c, vec3 wi, in vec3 uvw, inout vec3 bsdf_over_pdf, out float pdf) {
+vec3 dspbr_sample(inout MaterialClosure c, vec3 wi, in vec3 uvw, inout vec3 bsdf_over_pdf, out float pdf) {
   SampleRandoms_0 randoms;
   randoms.component_0 = rng_float();
   randoms.lobe_0 = uvw.xy;

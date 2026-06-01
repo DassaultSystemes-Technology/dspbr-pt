@@ -1,36 +1,112 @@
 {
-  "version": 1,
-  "sourceRoot": "../gltf-pt/packages/lib/wavefront/shaders/slang/materials",
-  "sourceHash": "412c27209e2ef8cff60e0aec8c38e44499b129708df9f62d0cbf6afb0ed931e1",
-  "sourceFiles": [
-    "packages/lib/wavefront/shaders/slang/materials/api.slang",
-    "packages/lib/wavefront/shaders/slang/materials/bsdf/eval.slang",
-    "packages/lib/wavefront/shaders/slang/materials/bsdf/sample.slang",
-    "packages/lib/wavefront/shaders/slang/materials/bsdf/state.slang",
-    "packages/lib/wavefront/shaders/slang/materials/components/clearcoat.slang",
-    "packages/lib/wavefront/shaders/slang/materials/components/diffuse.slang",
-    "packages/lib/wavefront/shaders/slang/materials/components/sheen.slang",
-    "packages/lib/wavefront/shaders/slang/materials/components/specular.slang",
-    "packages/lib/wavefront/shaders/slang/materials/components/transmission.slang",
-    "packages/lib/wavefront/shaders/slang/materials/core/energy_compensation.slang",
-    "packages/lib/wavefront/shaders/slang/materials/core/frames.slang",
-    "packages/lib/wavefront/shaders/slang/materials/core/fresnel.slang",
-    "packages/lib/wavefront/shaders/slang/materials/core/math.slang",
-    "packages/lib/wavefront/shaders/slang/materials/core/microfacet_ggx.slang",
-    "packages/lib/wavefront/shaders/slang/materials/enterprise_pbr.slang",
-    "packages/lib/wavefront/shaders/slang/materials/material_kernel.slang",
-    "packages/lib/wavefront/shaders/slang/materials/material_kernel_smoke.slang",
-    "packages/lib/wavefront/shaders/slang/materials/surface.slang",
-    "packages/lib/wavefront/shaders/slang/materials/volume/api.slang",
-    "packages/lib/wavefront/shaders/slang/materials/volume/phase_henyey_greenstein.slang",
-    "packages/lib/wavefront/shaders/slang/materials/volume/state.slang",
-    "packages/lib/wavefront/shaders/slang/materials/volume/transmittance.slang"
-  ],
-  "compileSource": "packages/lib/wavefront/shaders/slang/materials/material_kernel_smoke.slang",
-  "compileSourceHash": "f64eef2c3dc44244bdceccb566d42c51fdf2fe2aacf2bb5d43b9d6057feceb29",
-  "compiler": {
-    "command": "/opt/shader-slang-bin/bin/slangc",
-    "available": true
+  "version": 2,
+  "package": {
+    "name": "slang-pbr",
+    "version": "0.1.0",
+    "entry": "slang-pbr/enterprise_pbr.slang",
+    "manifest": "slang-pbr/manifest"
+  },
+  "generator": {
+    "command": "slang-pbr-generate",
+    "module": "slang-pbr/tools/generate",
+    "target": "glsl",
+    "kind": "include",
+    "energyCompensation": "analytic"
+  },
+  "slangPbr": {
+    "version": 1,
+    "kind": "include",
+    "energyCompensation": "analytic",
+    "defines": {
+      "SLANG_PBR_USE_ENERGY_LUTS": 0
+    },
+    "source": "src/enterprise_pbr.slang",
+    "compileSource": "src/material_kernel_smoke.slang",
+    "manifest": "src/api.manifest.json",
+    "manifestHash": "21ea39238a992b7868714380997d6ef27b271dd409346b6f49efa78538ebabde",
+    "api": {
+      "version": 1,
+      "entry": "src/enterprise_pbr.slang",
+      "defines": [
+        {
+          "name": "SLANG_PBR_USE_ENERGY_LUTS",
+          "default": 1,
+          "description": "Use Enterprise PBR LUT-backed energy compensation when 1; use analytical approximations when 0."
+        }
+      ],
+      "types": [
+        "SurfaceMaterial",
+        "SurfaceLayerNormals",
+        "SurfaceClosure",
+        "TransportContext",
+        "DirectionContext",
+        "NormalContext",
+        "SampleRandoms",
+        "BsdfSample",
+        "MaterialBsdfState",
+        "MaterialVolumeState",
+        "VolumePhaseSample"
+      ],
+      "functions": [
+        "buildSurfaceClosure",
+        "prepareMaterialBsdfState",
+        "evalMaterialBsdf",
+        "pdfMaterialBsdf",
+        "sampleMaterialBsdf",
+        "prepareMaterialVolumeState",
+        "clearMaterialVolumeState",
+        "enterMaterialVolumeState",
+        "evalHomogeneousTransmittance",
+        "homogeneousMediumEventPdf",
+        "homogeneousMediumNoEventPdf",
+        "sampleVolumePhase",
+        "evalVolumePhase",
+        "pdfVolumePhase"
+      ]
+    },
+    "entry": "materialKernelSmokeMain",
+    "stage": "compute",
+    "sourceHash": "18f0ca9606273e2942ac05fcc2f05947561eb366badf515f1c272eda3f3f9c91",
+    "sourceFiles": [
+      "src/api.slang",
+      "src/bsdf/eval.slang",
+      "src/bsdf/sample.slang",
+      "src/bsdf/state.slang",
+      "src/components/clearcoat.slang",
+      "src/components/diffuse.slang",
+      "src/components/sheen.slang",
+      "src/components/specular.slang",
+      "src/components/transmission.slang",
+      "src/core/energy_compensation.slang",
+      "src/core/enterprise_ggx_lut.slang",
+      "src/core/enterprise_layer_lut.slang",
+      "src/core/frames.slang",
+      "src/core/fresnel.slang",
+      "src/core/math.slang",
+      "src/core/microfacet_ggx.slang",
+      "src/core/thin_film.slang",
+      "src/enterprise_pbr.slang",
+      "src/include_harness.slang",
+      "src/material_kernel_smoke.slang",
+      "src/surface.slang",
+      "src/volume/api.slang",
+      "src/volume/phase_henyey_greenstein.slang",
+      "src/volume/state.slang",
+      "src/volume/transmittance.slang"
+    ],
+    "compileSourceHash": "e853959c2d7d2bf17b71c827cafe3ddaf5f30b5881ed5386bfae1015dde70a28",
+    "compiler": {
+      "command": "/opt/shader-slang-bin/bin/slangc",
+      "available": true
+    },
+    "targets": {
+      "glsl": {
+        "available": true,
+        "path": "packages/lib/shader/generated/slang_materials/material_kernel.glsl",
+        "slangTarget": "glsl",
+        "profile": "glsl_450"
+      }
+    }
   },
   "targets": {
     "glsl": {
