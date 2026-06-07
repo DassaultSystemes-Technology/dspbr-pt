@@ -3201,11 +3201,11 @@ float pdfPbrVolumePhase_0(MaterialVolumeState_0 volume_15, vec3 incidentDir_5, v
 
 // Stable adapter-facing facade. Code outside this generated file should use
 
-// SlangPbr* names only; generated Slang backend names stay private here.
+// Pbr* names only; generated Slang backend names stay private here.
 
 
 
-struct SlangPbrGltfPbrMaterial
+struct PbrGltfMaterial
 {
     vec4 baseColorFactor;
     float metallicFactor;
@@ -3238,7 +3238,7 @@ struct SlangPbrGltfPbrMaterial
     uint featureMask;
 };
 
-struct SlangPbrSurfaceMaterial
+struct PbrMaterial
 {
     vec3 albedo;
     float metallic;
@@ -3270,7 +3270,7 @@ struct SlangPbrSurfaceMaterial
     float frontFaceEmissionOnly;
 };
 
-struct SlangPbrSurfaceLayerNormals
+struct PbrLayerNormals
 {
     vec3 rawGeometry;
     vec3 geometry;
@@ -3281,7 +3281,7 @@ struct SlangPbrSurfaceLayerNormals
     vec3 anisotropyTangent;
 };
 
-struct SlangPbrSurfaceClosure
+struct PbrClosure
 {
     vec3 diffuseColor;
     vec3 diffuseReflectionColor;
@@ -3321,7 +3321,7 @@ struct SlangPbrSurfaceClosure
     float diffuseTransmissionWeight;
 };
 
-struct SlangPbrTransportContext
+struct PbrTransport
 {
     float currentMediumIor;
     float interfaceIor;
@@ -3329,13 +3329,13 @@ struct SlangPbrTransportContext
     float _pad0;
 };
 
-struct SlangPbrDirectionContext
+struct PbrDirections
 {
     vec3 viewDir;
     vec3 lightDir;
 };
 
-struct SlangPbrNormalContext
+struct PbrNormals
 {
     vec3 rawGeometryNormal;
     vec3 transmissionNormal;
@@ -3343,14 +3343,14 @@ struct SlangPbrNormalContext
     vec3 clearcoatNormal;
 };
 
-struct SlangPbrSampleRandoms
+struct PbrRandoms
 {
     float component;
     vec2 lobe;
     float boundary;
 };
 
-struct SlangPbrBsdfSample
+struct PbrSample
 {
     vec3 direction;
     float pdf;
@@ -3360,7 +3360,7 @@ struct SlangPbrBsdfSample
     float nextMediumIor;
 };
 
-struct SlangPbrMaterialVolumeState
+struct PbrVolume
 {
     vec3 sigmaT;
     float isActive;
@@ -3370,27 +3370,27 @@ struct SlangPbrMaterialVolumeState
     float _pad0;
 };
 
-struct SlangPbrVolumePhaseSample
+struct PbrPhaseSample
 {
     vec3 direction;
     float pdf;
 };
 
-struct SlangPbrMaterialBsdfState
+struct PbrState
 {
-    SlangPbrSurfaceMaterial surface;
-    SlangPbrSurfaceClosure closure;
+    PbrMaterial surface;
+    PbrClosure closure;
     float currentMediumIor;
 };
 
-struct SlangPbrGltfMaterialBsdfState
+struct PbrGltfState
 {
-    SlangPbrGltfPbrMaterial material;
-    SlangPbrSurfaceClosure closure;
+    PbrGltfMaterial material;
+    PbrClosure closure;
     float currentMediumIor;
 };
 
-GltfPbrMaterial_0 slangPbrToGeneratedGltfPbrMaterial(SlangPbrGltfPbrMaterial stable)
+GltfPbrMaterial_0 pbrToGeneratedGltfPbrMaterial(PbrGltfMaterial stable)
 {
     GltfPbrMaterial_0 generated;
     generated.baseColorFactor_0 = stable.baseColorFactor;
@@ -3425,9 +3425,9 @@ GltfPbrMaterial_0 slangPbrToGeneratedGltfPbrMaterial(SlangPbrGltfPbrMaterial sta
     return generated;
 }
 
-SlangPbrGltfPbrMaterial slangPbrFromGeneratedGltfPbrMaterial(GltfPbrMaterial_0 generated)
+PbrGltfMaterial pbrFromGeneratedGltfPbrMaterial(GltfPbrMaterial_0 generated)
 {
-    SlangPbrGltfPbrMaterial stable;
+    PbrGltfMaterial stable;
     stable.baseColorFactor = generated.baseColorFactor_0;
     stable.metallicFactor = generated.metallicFactor_0;
     stable.roughnessFactor = generated.roughnessFactor_0;
@@ -3460,7 +3460,7 @@ SlangPbrGltfPbrMaterial slangPbrFromGeneratedGltfPbrMaterial(GltfPbrMaterial_0 g
     return stable;
 }
 
-SurfaceMaterial_0 slangPbrToGeneratedSurfaceMaterial(SlangPbrSurfaceMaterial stable)
+SurfaceMaterial_0 pbrToGeneratedSurfaceMaterial(PbrMaterial stable)
 {
     SurfaceMaterial_0 generated;
     generated.albedo_0 = stable.albedo;
@@ -3494,9 +3494,9 @@ SurfaceMaterial_0 slangPbrToGeneratedSurfaceMaterial(SlangPbrSurfaceMaterial sta
     return generated;
 }
 
-SlangPbrSurfaceMaterial slangPbrFromGeneratedSurfaceMaterial(SurfaceMaterial_0 generated)
+PbrMaterial pbrFromGeneratedSurfaceMaterial(SurfaceMaterial_0 generated)
 {
-    SlangPbrSurfaceMaterial stable;
+    PbrMaterial stable;
     stable.albedo = generated.albedo_0;
     stable.metallic = generated.metallic_0;
     stable.roughness = generated.roughness_1;
@@ -3528,7 +3528,7 @@ SlangPbrSurfaceMaterial slangPbrFromGeneratedSurfaceMaterial(SurfaceMaterial_0 g
     return stable;
 }
 
-SurfaceLayerNormals_0 slangPbrToGeneratedSurfaceLayerNormals(SlangPbrSurfaceLayerNormals stable)
+SurfaceLayerNormals_0 pbrToGeneratedSurfaceLayerNormals(PbrLayerNormals stable)
 {
     SurfaceLayerNormals_0 generated;
     generated.rawGeometry_0 = stable.rawGeometry;
@@ -3541,9 +3541,9 @@ SurfaceLayerNormals_0 slangPbrToGeneratedSurfaceLayerNormals(SlangPbrSurfaceLaye
     return generated;
 }
 
-SlangPbrSurfaceLayerNormals slangPbrFromGeneratedSurfaceLayerNormals(SurfaceLayerNormals_0 generated)
+PbrLayerNormals pbrFromGeneratedSurfaceLayerNormals(SurfaceLayerNormals_0 generated)
 {
-    SlangPbrSurfaceLayerNormals stable;
+    PbrLayerNormals stable;
     stable.rawGeometry = generated.rawGeometry_0;
     stable.geometry = generated.geometry_0;
     stable.shadingGeometry = generated.shadingGeometry_0;
@@ -3554,7 +3554,7 @@ SlangPbrSurfaceLayerNormals slangPbrFromGeneratedSurfaceLayerNormals(SurfaceLaye
     return stable;
 }
 
-SurfaceClosure_0 slangPbrToGeneratedSurfaceClosure(SlangPbrSurfaceClosure stable)
+SurfaceClosure_0 pbrToGeneratedSurfaceClosure(PbrClosure stable)
 {
     SurfaceClosure_0 generated;
     generated.diffuseColor_0 = stable.diffuseColor;
@@ -3596,9 +3596,9 @@ SurfaceClosure_0 slangPbrToGeneratedSurfaceClosure(SlangPbrSurfaceClosure stable
     return generated;
 }
 
-SlangPbrSurfaceClosure slangPbrFromGeneratedSurfaceClosure(SurfaceClosure_0 generated)
+PbrClosure pbrFromGeneratedSurfaceClosure(SurfaceClosure_0 generated)
 {
-    SlangPbrSurfaceClosure stable;
+    PbrClosure stable;
     stable.diffuseColor = generated.diffuseColor_0;
     stable.diffuseReflectionColor = generated.diffuseReflectionColor_0;
     stable.transmissionColor = generated.transmissionColor_0;
@@ -3638,7 +3638,7 @@ SlangPbrSurfaceClosure slangPbrFromGeneratedSurfaceClosure(SurfaceClosure_0 gene
     return stable;
 }
 
-TransportContext_0 slangPbrToGeneratedTransportContext(SlangPbrTransportContext stable)
+TransportContext_0 pbrToGeneratedTransportContext(PbrTransport stable)
 {
     TransportContext_0 generated;
     generated.currentMediumIor_1 = stable.currentMediumIor;
@@ -3648,9 +3648,9 @@ TransportContext_0 slangPbrToGeneratedTransportContext(SlangPbrTransportContext 
     return generated;
 }
 
-SlangPbrTransportContext slangPbrFromGeneratedTransportContext(TransportContext_0 generated)
+PbrTransport pbrFromGeneratedTransportContext(TransportContext_0 generated)
 {
-    SlangPbrTransportContext stable;
+    PbrTransport stable;
     stable.currentMediumIor = generated.currentMediumIor_1;
     stable.interfaceIor = generated.interfaceIor_0;
     stable.thinWalled = generated.thinWalled_2;
@@ -3658,7 +3658,7 @@ SlangPbrTransportContext slangPbrFromGeneratedTransportContext(TransportContext_
     return stable;
 }
 
-DirectionContext_0 slangPbrToGeneratedDirectionContext(SlangPbrDirectionContext stable)
+DirectionContext_0 pbrToGeneratedDirectionContext(PbrDirections stable)
 {
     DirectionContext_0 generated;
     generated.viewDir_18 = stable.viewDir;
@@ -3666,15 +3666,15 @@ DirectionContext_0 slangPbrToGeneratedDirectionContext(SlangPbrDirectionContext 
     return generated;
 }
 
-SlangPbrDirectionContext slangPbrFromGeneratedDirectionContext(DirectionContext_0 generated)
+PbrDirections pbrFromGeneratedDirectionContext(DirectionContext_0 generated)
 {
-    SlangPbrDirectionContext stable;
+    PbrDirections stable;
     stable.viewDir = generated.viewDir_18;
     stable.lightDir = generated.lightDir_18;
     return stable;
 }
 
-NormalContext_0 slangPbrToGeneratedNormalContext(SlangPbrNormalContext stable)
+NormalContext_0 pbrToGeneratedNormalContext(PbrNormals stable)
 {
     NormalContext_0 generated;
     generated.rawGeometryNormal_0 = stable.rawGeometryNormal;
@@ -3684,9 +3684,9 @@ NormalContext_0 slangPbrToGeneratedNormalContext(SlangPbrNormalContext stable)
     return generated;
 }
 
-SlangPbrNormalContext slangPbrFromGeneratedNormalContext(NormalContext_0 generated)
+PbrNormals pbrFromGeneratedNormalContext(NormalContext_0 generated)
 {
-    SlangPbrNormalContext stable;
+    PbrNormals stable;
     stable.rawGeometryNormal = generated.rawGeometryNormal_0;
     stable.transmissionNormal = generated.transmissionNormal_0;
     stable.baseNormal = generated.baseNormal_3;
@@ -3694,7 +3694,7 @@ SlangPbrNormalContext slangPbrFromGeneratedNormalContext(NormalContext_0 generat
     return stable;
 }
 
-SampleRandoms_0 slangPbrToGeneratedSampleRandoms(SlangPbrSampleRandoms stable)
+SampleRandoms_0 pbrToGeneratedSampleRandoms(PbrRandoms stable)
 {
     SampleRandoms_0 generated;
     generated.component_0 = stable.component;
@@ -3703,16 +3703,16 @@ SampleRandoms_0 slangPbrToGeneratedSampleRandoms(SlangPbrSampleRandoms stable)
     return generated;
 }
 
-SlangPbrSampleRandoms slangPbrFromGeneratedSampleRandoms(SampleRandoms_0 generated)
+PbrRandoms pbrFromGeneratedSampleRandoms(SampleRandoms_0 generated)
 {
-    SlangPbrSampleRandoms stable;
+    PbrRandoms stable;
     stable.component = generated.component_0;
     stable.lobe = generated.lobe_0;
     stable.boundary = generated.boundary_0;
     return stable;
 }
 
-BsdfSample_0 slangPbrToGeneratedBsdfSample(SlangPbrBsdfSample stable)
+BsdfSample_0 pbrToGeneratedBsdfSample(PbrSample stable)
 {
     BsdfSample_0 generated;
     generated.direction_0 = stable.direction;
@@ -3724,9 +3724,9 @@ BsdfSample_0 slangPbrToGeneratedBsdfSample(SlangPbrBsdfSample stable)
     return generated;
 }
 
-SlangPbrBsdfSample slangPbrFromGeneratedBsdfSample(BsdfSample_0 generated)
+PbrSample pbrFromGeneratedBsdfSample(BsdfSample_0 generated)
 {
-    SlangPbrBsdfSample stable;
+    PbrSample stable;
     stable.direction = generated.direction_0;
     stable.pdf = generated.pdf_1;
     stable.bsdfOverPdf = generated.bsdfOverPdf_0;
@@ -3736,7 +3736,7 @@ SlangPbrBsdfSample slangPbrFromGeneratedBsdfSample(BsdfSample_0 generated)
     return stable;
 }
 
-MaterialVolumeState_0 slangPbrToGeneratedMaterialVolumeState(SlangPbrMaterialVolumeState stable)
+MaterialVolumeState_0 pbrToGeneratedMaterialVolumeState(PbrVolume stable)
 {
     MaterialVolumeState_0 generated;
     generated.sigmaT_0 = stable.sigmaT;
@@ -3748,9 +3748,9 @@ MaterialVolumeState_0 slangPbrToGeneratedMaterialVolumeState(SlangPbrMaterialVol
     return generated;
 }
 
-SlangPbrMaterialVolumeState slangPbrFromGeneratedMaterialVolumeState(MaterialVolumeState_0 generated)
+PbrVolume pbrFromGeneratedMaterialVolumeState(MaterialVolumeState_0 generated)
 {
-    SlangPbrMaterialVolumeState stable;
+    PbrVolume stable;
     stable.sigmaT = generated.sigmaT_0;
     stable.isActive = generated.isActive_0;
     stable.rhoSs = generated.rhoSs_0;
@@ -3760,7 +3760,7 @@ SlangPbrMaterialVolumeState slangPbrFromGeneratedMaterialVolumeState(MaterialVol
     return stable;
 }
 
-VolumePhaseSample_0 slangPbrToGeneratedVolumePhaseSample(SlangPbrVolumePhaseSample stable)
+VolumePhaseSample_0 pbrToGeneratedVolumePhaseSample(PbrPhaseSample stable)
 {
     VolumePhaseSample_0 generated;
     generated.direction_1 = stable.direction;
@@ -3768,134 +3768,134 @@ VolumePhaseSample_0 slangPbrToGeneratedVolumePhaseSample(SlangPbrVolumePhaseSamp
     return generated;
 }
 
-SlangPbrVolumePhaseSample slangPbrFromGeneratedVolumePhaseSample(VolumePhaseSample_0 generated)
+PbrPhaseSample pbrFromGeneratedVolumePhaseSample(VolumePhaseSample_0 generated)
 {
-    SlangPbrVolumePhaseSample stable;
+    PbrPhaseSample stable;
     stable.direction = generated.direction_1;
     stable.pdf = generated.pdf_2;
     return stable;
 }
 
-MaterialBsdfState_0 slangPbrToGeneratedMaterialBsdfState(SlangPbrMaterialBsdfState stable)
+MaterialBsdfState_0 pbrToGeneratedMaterialBsdfState(PbrState stable)
 {
     MaterialBsdfState_0 generated;
-    generated.closure_1 = slangPbrToGeneratedSurfaceClosure(stable.closure);
+    generated.closure_1 = pbrToGeneratedSurfaceClosure(stable.closure);
     generated.currentMediumIor_0 = stable.currentMediumIor;
     return generated;
 }
 
-SlangPbrSurfaceClosure slangPbrBuildSurfaceClosureFromGltf(SlangPbrGltfPbrMaterial material, SlangPbrSurfaceLayerNormals layerNormals, vec3 anisotropyTangent)
+PbrClosure pbrBuildClosureFromGltf(PbrGltfMaterial material, PbrLayerNormals layerNormals, vec3 anisotropyTangent)
 {
-    return slangPbrFromGeneratedSurfaceClosure(buildPbrSurfaceClosure_0(buildPbrSurfaceFromGltf_0(slangPbrToGeneratedGltfPbrMaterial(material)), slangPbrToGeneratedSurfaceLayerNormals(layerNormals), anisotropyTangent));
+    return pbrFromGeneratedSurfaceClosure(buildPbrSurfaceClosure_0(buildPbrSurfaceFromGltf_0(pbrToGeneratedGltfPbrMaterial(material)), pbrToGeneratedSurfaceLayerNormals(layerNormals), anisotropyTangent));
 }
 
-MaterialBsdfState_0 slangPbrToGeneratedGltfMaterialBsdfState(SlangPbrGltfMaterialBsdfState stable)
+MaterialBsdfState_0 pbrToGeneratedGltfMaterialBsdfState(PbrGltfState stable)
 {
     MaterialBsdfState_0 generated;
-    generated.closure_1 = slangPbrToGeneratedSurfaceClosure(stable.closure);
+    generated.closure_1 = pbrToGeneratedSurfaceClosure(stable.closure);
     generated.currentMediumIor_0 = stable.currentMediumIor;
     return generated;
 }
 
-SlangPbrGltfMaterialBsdfState slangPbrPrepareMaterialBsdfStateFromGltf(SlangPbrGltfPbrMaterial material, SlangPbrSurfaceClosure closure, SlangPbrTransportContext transport)
+PbrGltfState pbrPrepareStateFromGltf(PbrGltfMaterial material, PbrClosure closure, PbrTransport transport)
 {
-    SlangPbrGltfMaterialBsdfState stable;
+    PbrGltfState stable;
     stable.material = material;
     stable.closure = closure;
     stable.currentMediumIor = max(transport.currentMediumIor, 1.0);
     return stable;
 }
 
-vec3 slangPbrEvalMaterialBsdfFromGltfState(SlangPbrGltfMaterialBsdfState state, SlangPbrDirectionContext directions, SlangPbrNormalContext normals)
+vec3 pbrEvalGltfState(PbrGltfState state, PbrDirections directions, PbrNormals normals)
 {
-    return evalPbrBsdf_0(slangPbrToGeneratedGltfMaterialBsdfState(state), slangPbrToGeneratedDirectionContext(directions), slangPbrToGeneratedNormalContext(normals));
+    return evalPbrBsdf_0(pbrToGeneratedGltfMaterialBsdfState(state), pbrToGeneratedDirectionContext(directions), pbrToGeneratedNormalContext(normals));
 }
 
-float slangPbrPdfMaterialBsdfFromGltfState(SlangPbrGltfMaterialBsdfState state, SlangPbrDirectionContext directions, SlangPbrNormalContext normals)
+float pbrPdfGltfState(PbrGltfState state, PbrDirections directions, PbrNormals normals)
 {
-    return pdfPbrBsdf_0(slangPbrToGeneratedGltfMaterialBsdfState(state), slangPbrToGeneratedDirectionContext(directions), slangPbrToGeneratedNormalContext(normals));
+    return pdfPbrBsdf_0(pbrToGeneratedGltfMaterialBsdfState(state), pbrToGeneratedDirectionContext(directions), pbrToGeneratedNormalContext(normals));
 }
 
-SlangPbrBsdfSample slangPbrSampleMaterialBsdfFromGltfState(SlangPbrGltfMaterialBsdfState state, SlangPbrDirectionContext directions, SlangPbrNormalContext normals, SlangPbrSampleRandoms randoms)
+PbrSample pbrSampleGltfState(PbrGltfState state, PbrDirections directions, PbrNormals normals, PbrRandoms randoms)
 {
-    return slangPbrFromGeneratedBsdfSample(samplePbrBsdf_0(slangPbrToGeneratedGltfMaterialBsdfState(state), slangPbrToGeneratedDirectionContext(directions), slangPbrToGeneratedNormalContext(normals), slangPbrToGeneratedSampleRandoms(randoms)));
+    return pbrFromGeneratedBsdfSample(samplePbrBsdf_0(pbrToGeneratedGltfMaterialBsdfState(state), pbrToGeneratedDirectionContext(directions), pbrToGeneratedNormalContext(normals), pbrToGeneratedSampleRandoms(randoms)));
 }
 
-SlangPbrMaterialVolumeState slangPbrPrepareMaterialVolumeStateFromGltfState(SlangPbrGltfMaterialBsdfState state)
+PbrVolume pbrPrepareVolumeFromGltfState(PbrGltfState state)
 {
-    return slangPbrFromGeneratedMaterialVolumeState(preparePbrVolumeState_0(slangPbrToGeneratedGltfMaterialBsdfState(state)));
+    return pbrFromGeneratedMaterialVolumeState(preparePbrVolumeState_0(pbrToGeneratedGltfMaterialBsdfState(state)));
 }
 
-SlangPbrSurfaceClosure slangPbrBuildSurfaceClosure(SlangPbrSurfaceMaterial surface, SlangPbrSurfaceLayerNormals layerNormals, vec3 anisotropyTangent)
+PbrClosure pbrBuildClosure(PbrMaterial surface, PbrLayerNormals layerNormals, vec3 anisotropyTangent)
 {
-    return slangPbrFromGeneratedSurfaceClosure(buildPbrSurfaceClosure_0(slangPbrToGeneratedSurfaceMaterial(surface), slangPbrToGeneratedSurfaceLayerNormals(layerNormals), anisotropyTangent));
+    return pbrFromGeneratedSurfaceClosure(buildPbrSurfaceClosure_0(pbrToGeneratedSurfaceMaterial(surface), pbrToGeneratedSurfaceLayerNormals(layerNormals), anisotropyTangent));
 }
 
-SlangPbrMaterialBsdfState slangPbrPrepareMaterialBsdfState(SlangPbrSurfaceMaterial surface, SlangPbrSurfaceClosure closure, SlangPbrTransportContext transport)
+PbrState pbrPrepareState(PbrMaterial surface, PbrClosure closure, PbrTransport transport)
 {
-    SlangPbrMaterialBsdfState stable;
+    PbrState stable;
     stable.surface = surface;
     stable.closure = closure;
     stable.currentMediumIor = max(transport.currentMediumIor, 1.0);
     return stable;
 }
 
-vec3 slangPbrEvalMaterialBsdf(SlangPbrMaterialBsdfState state, SlangPbrDirectionContext directions, SlangPbrNormalContext normals)
+vec3 pbrEval(PbrState state, PbrDirections directions, PbrNormals normals)
 {
-    return evalPbrBsdf_0(slangPbrToGeneratedMaterialBsdfState(state), slangPbrToGeneratedDirectionContext(directions), slangPbrToGeneratedNormalContext(normals));
+    return evalPbrBsdf_0(pbrToGeneratedMaterialBsdfState(state), pbrToGeneratedDirectionContext(directions), pbrToGeneratedNormalContext(normals));
 }
 
-float slangPbrPdfMaterialBsdf(SlangPbrMaterialBsdfState state, SlangPbrDirectionContext directions, SlangPbrNormalContext normals)
+float pbrPdf(PbrState state, PbrDirections directions, PbrNormals normals)
 {
-    return pdfPbrBsdf_0(slangPbrToGeneratedMaterialBsdfState(state), slangPbrToGeneratedDirectionContext(directions), slangPbrToGeneratedNormalContext(normals));
+    return pdfPbrBsdf_0(pbrToGeneratedMaterialBsdfState(state), pbrToGeneratedDirectionContext(directions), pbrToGeneratedNormalContext(normals));
 }
 
-SlangPbrBsdfSample slangPbrSampleMaterialBsdf(SlangPbrMaterialBsdfState state, SlangPbrDirectionContext directions, SlangPbrNormalContext normals, SlangPbrSampleRandoms randoms)
+PbrSample pbrSample(PbrState state, PbrDirections directions, PbrNormals normals, PbrRandoms randoms)
 {
-    return slangPbrFromGeneratedBsdfSample(samplePbrBsdf_0(slangPbrToGeneratedMaterialBsdfState(state), slangPbrToGeneratedDirectionContext(directions), slangPbrToGeneratedNormalContext(normals), slangPbrToGeneratedSampleRandoms(randoms)));
+    return pbrFromGeneratedBsdfSample(samplePbrBsdf_0(pbrToGeneratedMaterialBsdfState(state), pbrToGeneratedDirectionContext(directions), pbrToGeneratedNormalContext(normals), pbrToGeneratedSampleRandoms(randoms)));
 }
 
-SlangPbrMaterialVolumeState slangPbrClearMaterialVolumeState()
+PbrVolume pbrClearVolume()
 {
-    return slangPbrFromGeneratedMaterialVolumeState(clearPbrVolumeState_0());
+    return pbrFromGeneratedMaterialVolumeState(clearPbrVolumeState_0());
 }
 
-SlangPbrMaterialVolumeState slangPbrEnterMaterialVolumeState(SlangPbrMaterialVolumeState volume)
+PbrVolume pbrEnterVolume(PbrVolume volume)
 {
-    return slangPbrFromGeneratedMaterialVolumeState(enterPbrVolumeState_0(slangPbrToGeneratedMaterialVolumeState(volume)));
+    return pbrFromGeneratedMaterialVolumeState(enterPbrVolumeState_0(pbrToGeneratedMaterialVolumeState(volume)));
 }
 
-SlangPbrMaterialVolumeState slangPbrPrepareMaterialVolumeState(SlangPbrMaterialBsdfState state)
+PbrVolume pbrPrepareVolume(PbrState state)
 {
-    return slangPbrFromGeneratedMaterialVolumeState(preparePbrVolumeState_0(slangPbrToGeneratedMaterialBsdfState(state)));
+    return pbrFromGeneratedMaterialVolumeState(preparePbrVolumeState_0(pbrToGeneratedMaterialBsdfState(state)));
 }
 
-vec3 slangPbrEvalHomogeneousTransmittance(SlangPbrMaterialVolumeState volume, float distance)
+vec3 pbrEvalTransmittance(PbrVolume volume, float distance)
 {
-    return evalPbrHomogeneousTransmittance_0(slangPbrToGeneratedMaterialVolumeState(volume), distance);
+    return evalPbrHomogeneousTransmittance_0(pbrToGeneratedMaterialVolumeState(volume), distance);
 }
 
-float slangPbrHomogeneousMediumEventPdf(SlangPbrMaterialVolumeState volume, float distance)
+float pbrMediumEventPdf(PbrVolume volume, float distance)
 {
-    return pbrHomogeneousMediumEventPdf_0(slangPbrToGeneratedMaterialVolumeState(volume), distance);
+    return pbrHomogeneousMediumEventPdf_0(pbrToGeneratedMaterialVolumeState(volume), distance);
 }
 
-float slangPbrHomogeneousMediumNoEventPdf(SlangPbrMaterialVolumeState volume, float distance)
+float pbrMediumNoEventPdf(PbrVolume volume, float distance)
 {
-    return pbrHomogeneousMediumNoEventPdf_0(slangPbrToGeneratedMaterialVolumeState(volume), distance);
+    return pbrHomogeneousMediumNoEventPdf_0(pbrToGeneratedMaterialVolumeState(volume), distance);
 }
 
-float slangPbrEvalVolumePhase(SlangPbrMaterialVolumeState volume, vec3 incidentDir, vec3 outgoingDir)
+float pbrEvalPhase(PbrVolume volume, vec3 incidentDir, vec3 outgoingDir)
 {
-    return evalPbrVolumePhase_0(slangPbrToGeneratedMaterialVolumeState(volume), incidentDir, outgoingDir);
+    return evalPbrVolumePhase_0(pbrToGeneratedMaterialVolumeState(volume), incidentDir, outgoingDir);
 }
 
-float slangPbrPdfVolumePhase(SlangPbrMaterialVolumeState volume, vec3 incidentDir, vec3 outgoingDir)
+float pbrPdfPhase(PbrVolume volume, vec3 incidentDir, vec3 outgoingDir)
 {
-    return pdfPbrVolumePhase_0(slangPbrToGeneratedMaterialVolumeState(volume), incidentDir, outgoingDir);
+    return pdfPbrVolumePhase_0(pbrToGeneratedMaterialVolumeState(volume), incidentDir, outgoingDir);
 }
 
-SlangPbrVolumePhaseSample slangPbrSampleVolumePhase(SlangPbrMaterialVolumeState volume, vec3 incidentDir, vec2 randoms)
+PbrPhaseSample pbrSamplePhase(PbrVolume volume, vec3 incidentDir, vec2 randoms)
 {
-    return slangPbrFromGeneratedVolumePhaseSample(samplePbrVolumePhase_0(slangPbrToGeneratedMaterialVolumeState(volume), incidentDir, randoms));
+    return pbrFromGeneratedVolumePhaseSample(samplePbrVolumePhase_0(pbrToGeneratedMaterialVolumeState(volume), incidentDir, randoms));
 }

@@ -54,40 +54,40 @@ vec4 fetch_material_data(uint matIdx, uint slot) {
 }
 MaterialData get_material(uint idx) {
   MaterialData data;
-  data.albedo = vec3(1.0);
-  data.metallic = 0.0;
-  data.roughness = 0.5;
+  data.baseColorFactor = vec3(1.0);
+  data.metallicFactor = 0.0;
+  data.roughnessFactor = 0.5;
   data.anisotropy = 0.0;
   data.anisotropyRotation = 0.0;
-  data.transparency = 0.0;
+  data.transmissionFactor = 0.0;
   data.cutoutOpacity = 1.0;
   data.doubleSided = true;
   data.normalScale = 1.0;
   data.ior = 1.5;
-  data.specularTint = vec3(1.0);
-  data.specular = 1.0;
-  data.sheenColor = vec3(0.0);
-  data.sheenRoughness = 0.0;
-  data.emission = vec3(0.0);
-  data.normalScaleClearcoat = 1.0;
-  data.clearcoat = 0.0;
-  data.clearcoatRoughness = 0.0;
-  data.translucency = 0.0;
+  data.specularColorFactor = vec3(1.0);
+  data.specularFactor = 1.0;
+  data.sheenColorFactor = vec3(0.0);
+  data.sheenRoughnessFactor = 0.0;
+  data.emissiveFactor = vec3(0.0);
+  data.clearcoatNormalTextureScale = 1.0;
+  data.clearcoatFactor = 0.0;
+  data.clearcoatRoughnessFactor = 0.0;
+  data.diffuseTransmissionFactor = 0.0;
   data.alphaCutoff = 1.0;
   data.attenuationColor = vec3(1.0);
   data.attenuationDistance = 0.0;
-  data.subsurfaceColor = vec3(1.0);
+  data.multiscatterColorFactor = vec3(1.0);
   data.thinWalled = false;
   data.anisotropyDirection = vec3(1.0, 0.0, 0.0);
-  data.translucencyTextureId = -1.0;
-  data.iridescence = 0.0;
+  data.diffuseTransmissionTextureId = -1.0;
+  data.iridescenceFactor = 0.0;
   data.iridescenceIor = 1.3;
   data.iridescenceThicknessMinimum = 100.0;
   data.iridescenceThicknessMaximum = 400.0;
-  data.albedoTextureId = -1.0;
+  data.baseColorTextureId = -1.0;
   data.metallicRoughnessTextureId = -1.0;
   data.normalTextureId = -1.0;
-  data.emissionTextureId = -1.0;
+  data.emissiveTextureId = -1.0;
   data.specularTextureId = -1.0;
   data.specularColorTextureId = -1.0;
   data.transmissionTextureId = -1.0;
@@ -100,13 +100,14 @@ MaterialData get_material(uint idx) {
   data.anisotropyDirectionTextureId = -1.0;
   data.iridescenceTextureId = -1.0;
   data.iridescenceThicknessTextureId = -1.0;
-  data.translucencyColor = vec3(1.0);
-  data.translucencyColorTextureId = -1.0;
+  data.diffuseTransmissionColorFactor = vec3(1.0);
+  data.diffuseTransmissionColorTextureId = -1.0;
   data.dispersion = 0.0;
   return data;
 }
 `,
-  dspbr: `${readShader(`generated/slang_materials/${materialProfile}/material_kernel.glsl`)}\n${readShader('slang_material_adapter.glsl')}`,
+  pbr_kernel: readShader(`generated/slang_materials/${materialProfile}/material_kernel.glsl`),
+  pbr_material_adapter: readShader('pbr_material_adapter.glsl'),
   bvh: readShader('bvh.glsl'),
   lighting: readShader('lighting.glsl'),
   mesh_constants: `

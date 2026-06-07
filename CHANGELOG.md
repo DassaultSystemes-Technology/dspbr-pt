@@ -2,25 +2,22 @@
 ## [Ongoing]
 
 ### Added
+- slang-pbr is now responsible for the material shaders
 - Slang PBR material profile selection with lean and full Enterprise PBR profiles
-- Public renderer material profile option
+- Viewer splash/profile selection, diagnostics/help actions, and mobile menu layout
+
+### Changed
+- Rework material integration around the upstream PBR glTF adapter/facade
+
+### Historical
 - KHR_materials_anisotropy
 - KHR_materials_iridescence
 - KHR_materials_emissive_strength
 - IBL importance sampling
 - Multiple importance sampling IBL/BSDF
-- Meshopt decoding
-- glTF-Transform as scene pre-process
-  - unweld, dequantize
-
-### Changes
-- Merge viewer helpers into the demo app workspace
-- Update slang-pbr integration to use the stable Enterprise PBR facade
-- Add viewer splash/profile selection, diagnostics/help actions, and mobile menu layout
+- Meshopt decoding and glTF-Transform scene preprocessing
 - Add tiled rendering to improve responsiveness
-- Move materials from textures to uniform buffers
-- Refactor scene data pipeline
-  - Move scene translation out of the renderer core to adapter classes
+- Refactor renderer scene data pipeline
 
 ## [0.3.4] - 2021-09-25
 ### Fixes

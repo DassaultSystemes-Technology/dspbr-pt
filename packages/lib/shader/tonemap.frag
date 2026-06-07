@@ -42,11 +42,6 @@ vec3 OptimizedCineonToneMapping(vec3 color) {
   return pow((color * (6.2 * color + 0.5)) / (color * (6.2 * color + 1.7) + 0.06), vec3(2.2));
 }
 
-// vec3 ACESFilmicToneMapping(vec3 color) {
-//   color *= exposure;
-//   return saturate((color * (2.51 * color + 0.03)) / (color * (2.43 * color + 0.59) + 0.14));
-// }
-
 vec3 RRTAndODTFit(vec3 v) {
 
   vec3 a = v * (v + 0.0245786) - 0.000090537;

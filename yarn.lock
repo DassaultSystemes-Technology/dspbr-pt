@@ -1153,7 +1153,7 @@ __metadata:
   resolution: "dspbr-pt-dev@workspace:."
   dependencies:
     rimraf: ^3.0.2
-    slang-pbr: "https://github.com/bsdorra/slang-pbr.git#commit=8c3642836acb29e7ce4623ff6416a87dd2c7b213"
+    slang-pbr: "https://github.com/bsdorra/slang-pbr.git#commit=c12046ec3b9628bcfc384ed2c275c92d007e5d7e"
     typescript: ^5.5.0
   languageName: unknown
   linkType: soft
@@ -2373,12 +2373,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"slang-pbr@https://github.com/bsdorra/slang-pbr.git#commit=8c3642836acb29e7ce4623ff6416a87dd2c7b213":
+"slang-pbr@https://github.com/bsdorra/slang-pbr.git#commit=c12046ec3b9628bcfc384ed2c275c92d007e5d7e":
   version: 0.1.0
-  resolution: "slang-pbr@https://github.com/bsdorra/slang-pbr.git#commit=8c3642836acb29e7ce4623ff6416a87dd2c7b213"
+  resolution: "slang-pbr@https://github.com/bsdorra/slang-pbr.git#commit=c12046ec3b9628bcfc384ed2c275c92d007e5d7e"
   bin:
     slang-pbr-generate: ./tools/generate.mjs
-  checksum: 581ec8a8f7bdf8dd270b27d2f0ba6f3f06776d1beff1ec606cd5c42135952353fd2710e7f51a6c4b8756862140bae9099173f45617334d74d3f1f7479f234732
+  checksum: 8b525648dc46e875399ef6fcdfdcfa6151a5b60d4afbc8f6aa86cff62163301db333a1a395524e954c8085135a52c16bf8f341584388a8ea68418d482c32d96a
   languageName: node
   linkType: hard
 

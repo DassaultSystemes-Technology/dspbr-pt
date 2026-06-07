@@ -188,22 +188,22 @@ GPU Memory Consumption (MB):
       vec4 m15 = fetch_material_data(idx, 15u);
       vec4 m16 = fetch_material_data(idx, 16u);
 
-      data.albedo = m0.xyz; data.metallic = m0.w;
-      data.roughness = m1.x; data.anisotropy = m1.y; data.anisotropyRotation = m1.z; data.transparency = m1.w;
+      data.baseColorFactor = m0.xyz; data.metallicFactor = m0.w;
+      data.roughnessFactor = m1.x; data.anisotropy = m1.y; data.anisotropyRotation = m1.z; data.transmissionFactor = m1.w;
       data.cutoutOpacity = m2.x; data.doubleSided = m2.y > 0.5; data.normalScale = m2.z; data.ior = m2.w;
-      data.specularTint = m3.xyz; data.specular = m3.w;
-      data.sheenColor = m4.xyz; data.sheenRoughness = m4.w;
-      data.emission = m5.xyz; data.normalScaleClearcoat = m5.w;
-      data.clearcoat = m6.x; data.clearcoatRoughness = m6.y; data.translucency = m6.z; data.alphaCutoff = m6.w;
+      data.specularColorFactor = m3.xyz; data.specularFactor = m3.w;
+      data.sheenColorFactor = m4.xyz; data.sheenRoughnessFactor = m4.w;
+      data.emissiveFactor = m5.xyz; data.clearcoatNormalTextureScale = m5.w;
+      data.clearcoatFactor = m6.x; data.clearcoatRoughnessFactor = m6.y; data.diffuseTransmissionFactor = m6.z; data.alphaCutoff = m6.w;
       data.attenuationColor = m7.xyz; data.attenuationDistance = m7.w;
-      data.subsurfaceColor = m8.xyz; data.thinWalled = m8.w > 0.5;
-      data.anisotropyDirection = m9.xyz; data.translucencyTextureId = m9.w;
-      data.iridescence = m10.x; data.iridescenceIor = m10.y; data.iridescenceThicknessMinimum = m10.z; data.iridescenceThicknessMaximum = m10.w;
-      data.albedoTextureId = m11.x; data.metallicRoughnessTextureId = m11.y; data.normalTextureId = m11.z; data.emissionTextureId = m11.w;
+      data.multiscatterColorFactor = m8.xyz; data.thinWalled = m8.w > 0.5;
+      data.anisotropyDirection = m9.xyz; data.diffuseTransmissionTextureId = m9.w;
+      data.iridescenceFactor = m10.x; data.iridescenceIor = m10.y; data.iridescenceThicknessMinimum = m10.z; data.iridescenceThicknessMaximum = m10.w;
+      data.baseColorTextureId = m11.x; data.metallicRoughnessTextureId = m11.y; data.normalTextureId = m11.z; data.emissiveTextureId = m11.w;
       data.specularTextureId = m12.x; data.specularColorTextureId = m12.y; data.transmissionTextureId = m12.z; data.clearcoatTextureId = m12.w;
       data.clearcoatRoughnessTextureId = m13.x; data.clearcoatNormalTextureId = m13.y; data.sheenColorTextureId = m13.z; data.sheenRoughnessTextureId = m13.w;
       data.anisotropyTextureId = m14.x; data.anisotropyDirectionTextureId = m14.y; data.iridescenceTextureId = m14.z; data.iridescenceThicknessTextureId = m14.w;
-      data.translucencyColor = m15.xyz; data.translucencyColorTextureId = m15.w;
+      data.diffuseTransmissionColorFactor = m15.xyz; data.diffuseTransmissionColorTextureId = m15.w;
       data.dispersion = m16.x;
       return data;
     }

@@ -22,29 +22,29 @@ export class MaterialData {
     this._dirty = flag;
   }
 
-  public set albedo(val: number[]) {
+  public set baseColorFactor(val: number[]) {
     this._data[0] = val[0];
     this._data[1] = val[1];
     this._data[2] = val[2];
     this.dirty = true;
   }
-  public get albedo() {
+  public get baseColorFactor() {
     return [...this._data.slice(0, 3)];
   }
 
-  public set metallic(val: number) {
+  public set metallicFactor(val: number) {
     this._data[3] = val;
     this.dirty = true;
   }
-  public get metallic() : number{
+  public get metallicFactor(): number {
     return this.data[3];
   }
 
-  public set roughness(val: number) {
+  public set roughnessFactor(val: number) {
     this._data[4] = val;
     this.dirty = true;
   }
-  public get roughness() : number {
+  public get roughnessFactor(): number {
     return this.data[4];
   }
 
@@ -64,11 +64,11 @@ export class MaterialData {
     return this.data[6];
   }
 
-  public set transparency(val: number) {
+  public set transmissionFactor(val: number) {
     this._data[7] = val;
     this.dirty = true;
   }
-  public get transparency() {
+  public get transmissionFactor() {
     return this.data[7];
   }
 
@@ -104,81 +104,81 @@ export class MaterialData {
     return this.data[11];
   }
 
-  public set specularTint(val: number[]) {
+  public set specularColorFactor(val: number[]) {
     this._data[12] = val[0];
     this._data[13] = val[1];
     this._data[14] = val[2];
     this.dirty = true;
   }
-  public get specularTint() {
+  public get specularColorFactor() {
     return [...this._data.slice(12, 15)];
   }
 
-  public set specular(val: number) {
+  public set specularFactor(val: number) {
     this._data[15] = val;
     this.dirty = true;
   }
-  public get specular() {
+  public get specularFactor() {
     return this.data[15];
   }
 
-  public set sheenColor(val: number[]) {
+  public set sheenColorFactor(val: number[]) {
     this._data[16] = val[0];
     this._data[17] = val[1];
     this._data[18] = val[2];
     this.dirty = true;
   }
-  public get sheenColor() {
+  public get sheenColorFactor() {
     return [...this._data.slice(16, 19)];
   }
 
-  public set sheenRoughness(val: number) {
+  public set sheenRoughnessFactor(val: number) {
     this._data[19] = val;
     this.dirty = true;
   }
-  public get sheenRoughness() {
+  public get sheenRoughnessFactor() {
     return this.data[19];
   }
 
-  public set emission(val: number[]) {
+  public set emissiveFactor(val: number[]) {
     this._data[20] = val[0];
     this._data[21] = val[1];
     this._data[22] = val[2];
     this.dirty = true;
   }
-  public get emission() {
+  public get emissiveFactor() {
     return [...this._data.slice(20, 23)];
   }
 
-  public set normalScaleClearcoat(val: number) {
+  public set clearcoatNormalTextureScale(val: number) {
     this._data[23] = val;
     this.dirty = true;
   }
-  public get normalScaleClearcoat() {
+  public get clearcoatNormalTextureScale() {
     return this.data[23];
   }
 
-  public set clearcoat(val: number) {
+  public set clearcoatFactor(val: number) {
     this._data[24] = val;
     this.dirty = true;
   }
-  public get clearcoat() {
+  public get clearcoatFactor() {
     return this.data[24];
   }
 
-  public set clearcoatRoughness(val: number) {
+  public set clearcoatRoughnessFactor(val: number) {
     this._data[25] = val;
     this.dirty = true;
   }
-  public get clearcoatRoughness() {
+  public get clearcoatRoughnessFactor() {
     return this.data[25];
   }
 
-  public set translucency(val: number) {
+  public set diffuseTransmissionFactor(val: number) {
     this._data[26] = val;
     this.dirty = true;
   }
-  public get translucency() {
+  public get diffuseTransmissionFactor() {
     return this.data[26];
   }
 
@@ -207,13 +207,13 @@ export class MaterialData {
     return this.data[31];
   }
 
-  public set subsurfaceColor(val: number[]) {
+  public set multiscatterColorFactor(val: number[]) {
     this._data[32] = val[0];
     this._data[33] = val[1];
     this._data[34] = val[2];
     this.dirty = true;
   }
-  public get subsurfaceColor() {
+  public get multiscatterColorFactor() {
     return [...this._data.slice(32, 35)];
   }
 
@@ -235,26 +235,26 @@ export class MaterialData {
     return [...this._data.slice(36, 39)];
   }
 
-  public set translucencyTextureId(val: number) {
+  public set diffuseTransmissionTextureId(val: number) {
     this._data[39] = val;
   }
-  public get translucencyTextureId() {
+  public get diffuseTransmissionTextureId() {
     return this._data[39];
   }
 
-  public set iridescence(val: number) {
+  public set iridescenceFactor(val: number) {
     this._data[40] = val;
     this.dirty = true;
   }
-  public get iridescence() {
+  public get iridescenceFactor() {
     return this._data[40];
   }
 
-  public set iridescenceIOR(val: number) {
+  public set iridescenceIor(val: number) {
     this._data[41] = val;
     this.dirty = true;
   }
-  public get iridescenceIOR() {
+  public get iridescenceIor() {
     return this._data[41];
   }
 
@@ -274,10 +274,10 @@ export class MaterialData {
     return this._data[43];
   }
 
-  public set albedoTextureId(val: number) {
+  public set baseColorTextureId(val: number) {
     this._data[44] = val;
   }
-  public get albedoTextureId() {
+  public get baseColorTextureId() {
     return this._data[44];
   }
 
@@ -295,10 +295,10 @@ export class MaterialData {
     return this._data[46];
   }
 
-  public set emissionTextureId(val: number) {
+  public set emissiveTextureId(val: number) {
     this._data[47] = val;
   }
-  public get emissionTextureId() {
+  public get emissiveTextureId() {
     return this._data[47];
   }
 
@@ -362,7 +362,7 @@ export class MaterialData {
   public set anisotropyTextureId(val: number) {
     this._data[56] = val;
   }
-  public get snisotropyTextureId() {
+  public get anisotropyTextureId() {
     return this._data[56];
   }
 
@@ -387,20 +387,20 @@ export class MaterialData {
     return this._data[59];
   }
 
-  public set translucencyColor(val: number[]) {
+  public set diffuseTransmissionColorFactor(val: number[]) {
     this._data[60] = val[0];
     this._data[61] = val[1];
     this._data[62] = val[2];
     this.dirty = true;
   }
-  public get translucencyColor() {
+  public get diffuseTransmissionColorFactor() {
     return [...this._data.slice(60, 63)];
   }
 
-  public set translucencyColorTextureId(val: number) {
+  public set diffuseTransmissionColorTextureId(val: number) {
     this._data[63] = val;
   }
-  public get translucencyColorTextureId() {
+  public get diffuseTransmissionColorTextureId() {
     return this._data[63];
   }
 
@@ -413,51 +413,51 @@ export class MaterialData {
   }
 
   constructor() {
-    this.albedo = [1, 1, 1];
-    this.metallic = 0;
+    this.baseColorFactor = [1, 1, 1];
+    this.metallicFactor = 0;
 
-    this.roughness = 0;
+    this.roughnessFactor = 0;
     this.anisotropy = 0.0;
     this.anisotropyRotation = 0; // not used
-    this.transparency = 0;
+    this.transmissionFactor = 0;
 
     this.cutoutOpacity = 1;
     this.doubleSided = 1;
     this.normalScale = 1;
     this.ior = 1.49;
 
-    this.specularTint = [1, 1, 1];
-    this.specular = 1;
+    this.specularColorFactor = [1, 1, 1];
+    this.specularFactor = 1;
 
-    this.sheenRoughness = 0;
-    this.sheenColor = [0, 0, 0];
+    this.sheenRoughnessFactor = 0;
+    this.sheenColorFactor = [0, 0, 0];
 
-    this.normalScaleClearcoat = 1;
-    this.emission = [0, 0, 0];
+    this.clearcoatNormalTextureScale = 1;
+    this.emissiveFactor = [0, 0, 0];
 
-    this.clearcoat = 0;
-    this.clearcoatRoughness = 0;
-    this.translucency = 0;
+    this.clearcoatFactor = 0;
+    this.clearcoatRoughnessFactor = 0;
+    this.diffuseTransmissionFactor = 0;
     this.alphaCutoff = 0;
 
     this.attenuationDistance = Number.MAX_VALUE;
     this.attenuationColor = [1, 1, 1];
 
-    this.subsurfaceColor = [1, 1, 1];
+    this.multiscatterColorFactor = [1, 1, 1];
     this.thinWalled = 1;
 
     this.anisotropyDirection = [1, 0, 0];
-    this.translucencyTextureId = -1;
+    this.diffuseTransmissionTextureId = -1;
 
-    this.iridescence = 0.0;
-    this.iridescenceIOR = 1.3;
+    this.iridescenceFactor = 0.0;
+    this.iridescenceIor = 1.3;
     this.iridescenceThicknessMinimum = 100.0;
     this.iridescenceThicknessMaximum = 400.0;
 
-    this.albedoTextureId = -1;
+    this.baseColorTextureId = -1;
     this.metallicRoughnessTextureId = -1;
     this.normalTextureId = -1;
-    this.emissionTextureId = -1;
+    this.emissiveTextureId = -1;
 
     this.specularTextureId = -1;
     this.specularColorTextureId = -1;
@@ -474,8 +474,8 @@ export class MaterialData {
     this.iridescenceTextureId = -1;
     this.iridescenceThicknessTextureId = -1;
 
-    this.translucencyColor = [1, 1, 1];
-    this.translucencyColorTextureId = -1;
+    this.diffuseTransmissionColorFactor = [1, 1, 1];
+    this.diffuseTransmissionColorTextureId = -1;
     this.dispersion = 0;
   }
 }

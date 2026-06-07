@@ -1,52 +1,52 @@
 
 
 struct MaterialData {
-  vec3 albedo; // 0
-  float metallic; // 3
+  vec3 baseColorFactor; // 0
+  float metallicFactor; // 3
 
-  float roughness; //4
+  float roughnessFactor; //4
   float anisotropy;
   float anisotropyRotation;
-  float transparency;
+  float transmissionFactor;
 
   float cutoutOpacity; // 8
   bool doubleSided;
   float normalScale;
   float ior;
 
-  vec3 specularTint; // 12
-  float specular; // 15
+  vec3 specularColorFactor; // 12
+  float specularFactor; // 15
 
-  vec3 sheenColor; // 16
-  float sheenRoughness; // 19
+  vec3 sheenColorFactor; // 16
+  float sheenRoughnessFactor; // 19
 
-  vec3 emission; // 20
-  float normalScaleClearcoat; // 23
+  vec3 emissiveFactor; // 20
+  float clearcoatNormalTextureScale; // 23
 
-  float clearcoat; // 24
-  float clearcoatRoughness;
-  float translucency;
+  float clearcoatFactor; // 24
+  float clearcoatRoughnessFactor;
+  float diffuseTransmissionFactor;
   float alphaCutoff;
 
   vec3 attenuationColor; // 28
   float attenuationDistance; // 31
 
-  vec3 subsurfaceColor; // 32
+  vec3 multiscatterColorFactor; // 32
   bool thinWalled; // 35
 
   vec3 anisotropyDirection; // 36
-  float translucencyTextureId; // 39
+  float diffuseTransmissionTextureId; // 39
 
   // 11
-  float iridescence; // 40
+  float iridescenceFactor; // 40
   float iridescenceIor;
   float iridescenceThicknessMinimum;
   float iridescenceThicknessMaximum;
 
-  float albedoTextureId; //44
+  float baseColorTextureId; //44
   float metallicRoughnessTextureId;
   float normalTextureId;
-  float emissionTextureId;
+  float emissiveTextureId;
 
   float specularTextureId; //48
   float specularColorTextureId;
@@ -63,8 +63,8 @@ struct MaterialData {
   float iridescenceTextureId;
   float iridescenceThicknessTextureId;
 
-  vec3 translucencyColor; // 60
-  float translucencyColorTextureId;
+  vec3 diffuseTransmissionColorFactor; // 60
+  float diffuseTransmissionColorTextureId;
 
   float dispersion; // 64
 };
@@ -80,43 +80,16 @@ struct TexInfo {
 
 
 struct MaterialClosure {
-  vec3 albedo;
-  float transparency;
-  float translucency;
+  PbrGltfMaterial material;
   float cutout_opacity;
-  float metallic;
-  float specular;
-  float f0;
-  vec3 specular_f0;
-  vec3 specular_f90;
-  vec3 specular_tint;
-  vec3 emission;
-  vec3 normal;
-  float sheen_roughness;
-  vec3 sheen_color;
-  vec2 alpha;
-  float clearcoat;
-  float clearcoat_alpha;
   bool thin_walled;
   bool double_sided;
-  float attenuationDistance;
-  vec3 attenuationColor;
-  float ior;
   bool backside;
   vec3 n;
   vec3 ng;
   vec4 t;
   int event_type;
-  float bsdf_selection_pdf;
-  float iridescence;
-  float iridescence_ior;
-  float iridescence_thickness;
-  vec3 translucencyColor;
-  float roughness;
-  float anisotropy;
-  float clearcoatRoughness;
   vec3 anisotropyTangent;
-  float dispersion;
 };
 
 struct RenderState {

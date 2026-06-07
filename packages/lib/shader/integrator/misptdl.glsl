@@ -12,11 +12,11 @@ vec3 eval_direct_light_contribution(in RenderState rs, float r0, float r1) {
     float cosNL = saturate(dot(ibl_sample_dir, n));
     if (cosNL > EPS_COS && ibl_sample_pdf > EPS_PDF) {
       if (!isOccluded(rs.hitPos, ibl_sample_dir)) {
-        SlangPbrMaterialBsdfState bsdf_state = make_slang_bsdf_state(rs.closure);
-        SlangPbrDirectionContext directions = make_slang_directions(rs.wi, ibl_sample_dir);
-        SlangPbrNormalContext normals = make_slang_normal_context(rs.closure);
-        vec3 bsdf = slangPbrEvalMaterialBsdf(bsdf_state, directions, normals) / max(abs(dot(rs.closure.n, ibl_sample_dir)), EPS);
-        float brdf_sample_pdf = slangPbrPdfMaterialBsdf(bsdf_state, directions, normals);
+        PbrGltfState bsdf_state = make_pbr_gltf_state(rs.closure);
+        PbrDirections directions = make_pbr_directions(rs.wi, ibl_sample_dir);
+        PbrNormals normals = make_pbr_normals(rs.closure);
+        vec3 bsdf = pbrEvalGltfState(bsdf_state, directions, normals) / max(abs(dot(rs.closure.n, ibl_sample_dir)), EPS);
+        float brdf_sample_pdf = pbrPdfGltfState(bsdf_state, directions, normals);
         L = ibl_eval(ibl_sample_dir) * bsdf * cosNL / ibl_sample_pdf;
 
         if (brdf_sample_pdf > EPS_PDF) {
@@ -58,11 +58,11 @@ vec4 trace(bvh_ray ray) {
 
     // Absorption
     if (rs.closure.backside && !rs.closure.thin_walled) {
-      vec3 absorption_sigma = -log(rs.closure.attenuationColor) / rs.closure.attenuationDistance;
+      vec3 absorption_sigma = -log(rs.closure.material.attenuationColor) / rs.closure.material.attenuationDistance;
       path_weight *= exp(-absorption_sigma * hit.tfar);
     }
 
-    L += rs.closure.emission * path_weight;
+    L += rs.closure.material.emissiveFactor * rs.closure.material.emissiveStrength * path_weight;
     last_bounce_specular = bool(rs.closure.event_type & E_DELTA);
 
     vec3 bounce_weight;

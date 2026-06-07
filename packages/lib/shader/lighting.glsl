@@ -1,18 +1,3 @@
-/* @license
- * Copyright 2022  Dassault Systemes - All Rights Reserved.
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 // For now, we only have 1 point light
 vec3 sampleAndEvaluatePointLight(const in RenderState rs) {
   if (u_point_light_position.w <= 0.5) return vec3(0.0);
@@ -30,7 +15,7 @@ vec3 sampleAndEvaluatePointLight(const in RenderState rs) {
 
   vec3 L = vec3(0.0);
   if (cosNL > EPS_COS && isVisible) {
-    L = dspbr_eval(rs.closure, rs.wi, light_dir) * (pointLightEmission / dist2) * cosNL;
+    L = pbr_material_eval(rs.closure, rs.wi, light_dir) * (pointLightEmission / dist2) * cosNL;
   }
 
   return L;
@@ -111,4 +96,3 @@ float ibl_pdf(vec3 dir) {
   return w * h * texelFetch(u_sampler_env_map_yPdf, ivec2(y, 0), 0).x *
          texelFetch(u_sampler_env_map_pdf, ivec2(x, y), 0).x * pdf_w;
 }
-

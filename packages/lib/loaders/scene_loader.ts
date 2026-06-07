@@ -363,7 +363,7 @@ async function createMaterialData(
   mat.name = m.getName?.() ?? 'material';
 
   const baseColor = m.getBaseColorFactor?.() ?? [1, 1, 1, 1];
-  mat.albedo = [baseColor[0], baseColor[1], baseColor[2]];
+  mat.baseColorFactor = [baseColor[0], baseColor[1], baseColor[2]];
 
   const alphaMode = m.getAlphaMode?.() ?? 'OPAQUE';
   const baseAlpha = baseColor[3] ?? 1.0;
@@ -371,22 +371,22 @@ async function createMaterialData(
   mat.alphaCutoff   = alphaMode === 'MASK'   ? (m.getAlphaCutoff?.() ?? 0.5)
                     : alphaMode === 'OPAQUE'  ? 1.0 : 0.0;
 
-  mat.metallic    = m.getMetallicFactor?.() ?? 0.0;
-  mat.roughness   = m.getRoughnessFactor?.() ?? 1.0;
+  mat.metallicFactor = m.getMetallicFactor?.() ?? 0.0;
+  mat.roughnessFactor = m.getRoughnessFactor?.() ?? 1.0;
   mat.normalScale = m.getNormalScale?.() ?? 1.0;
-  mat.emission    = m.getEmissiveFactor?.() ?? [0, 0, 0];
+  mat.emissiveFactor = m.getEmissiveFactor?.() ?? [0, 0, 0];
   mat.doubleSided = m.getDoubleSided?.() ? 1 : 0;
 
-  mat.albedoTextureId = await ensureTexture(m.getBaseColorTexture?.() ?? null, m.getBaseColorTextureInfo?.() ?? null, 'srgb');
+  mat.baseColorTextureId = await ensureTexture(m.getBaseColorTexture?.() ?? null, m.getBaseColorTextureInfo?.() ?? null, 'srgb');
   mat.metallicRoughnessTextureId = await ensureTexture(m.getMetallicRoughnessTexture?.() ?? null, m.getMetallicRoughnessTextureInfo?.() ?? null, 'linear');
   mat.normalTextureId = await ensureTexture(m.getNormalTexture?.() ?? null, m.getNormalTextureInfo?.() ?? null, 'linear');
-  mat.emissionTextureId = await ensureTexture(m.getEmissiveTexture?.() ?? null, m.getEmissiveTextureInfo?.() ?? null, 'srgb');
+  mat.emissiveTextureId = await ensureTexture(m.getEmissiveTexture?.() ?? null, m.getEmissiveTextureInfo?.() ?? null, 'srgb');
 
   // KHR_materials_emissive_strength
   const emissiveStrength = m.getExtension?.('KHR_materials_emissive_strength');
   if (emissiveStrength) {
     const s = emissiveStrength.getEmissiveStrength?.() ?? 1.0;
-    mat.emission = mat.emission.map((c: number) => c * s);
+    mat.emissiveFactor = mat.emissiveFactor.map((c: number) => c * s);
   }
 
   // KHR_materials_ior
@@ -396,8 +396,8 @@ async function createMaterialData(
   // KHR_materials_specular
   const specular = m.getExtension?.('KHR_materials_specular');
   if (specular) {
-    mat.specular = specular.getSpecularFactor?.() ?? 1.0;
-    mat.specularTint = specular.getSpecularColorFactor?.() ?? [1, 1, 1];
+    mat.specularFactor = specular.getSpecularFactor?.() ?? 1.0;
+    mat.specularColorFactor = specular.getSpecularColorFactor?.() ?? [1, 1, 1];
     mat.specularTextureId = await ensureTexture(specular.getSpecularTexture?.() ?? null, specular.getSpecularTextureInfo?.() ?? null, 'linear');
     mat.specularColorTextureId = await ensureTexture(specular.getSpecularColorTexture?.() ?? null, specular.getSpecularColorTextureInfo?.() ?? null, 'srgb');
   }
@@ -405,7 +405,7 @@ async function createMaterialData(
   // KHR_materials_transmission
   const transmission = m.getExtension?.('KHR_materials_transmission');
   if (transmission) {
-    mat.transparency = transmission.getTransmissionFactor?.() ?? 0.0;
+    mat.transmissionFactor = transmission.getTransmissionFactor?.() ?? 0.0;
     mat.transmissionTextureId = await ensureTexture(transmission.getTransmissionTexture?.() ?? null, transmission.getTransmissionTextureInfo?.() ?? null, 'linear');
   }
 
@@ -422,9 +422,9 @@ async function createMaterialData(
   // KHR_materials_clearcoat
   const clearcoat = m.getExtension?.('KHR_materials_clearcoat');
   if (clearcoat) {
-    mat.clearcoat = clearcoat.getClearcoatFactor?.() ?? 0.0;
-    mat.clearcoatRoughness = clearcoat.getClearcoatRoughnessFactor?.() ?? 0.0;
-    mat.normalScaleClearcoat = clearcoat.getClearcoatNormalScale?.() ?? 1.0;
+    mat.clearcoatFactor = clearcoat.getClearcoatFactor?.() ?? 0.0;
+    mat.clearcoatRoughnessFactor = clearcoat.getClearcoatRoughnessFactor?.() ?? 0.0;
+    mat.clearcoatNormalTextureScale = clearcoat.getClearcoatNormalScale?.() ?? 1.0;
     mat.clearcoatTextureId = await ensureTexture(clearcoat.getClearcoatTexture?.() ?? null, clearcoat.getClearcoatTextureInfo?.() ?? null, 'linear');
     mat.clearcoatRoughnessTextureId = await ensureTexture(clearcoat.getClearcoatRoughnessTexture?.() ?? null, clearcoat.getClearcoatRoughnessTextureInfo?.() ?? null, 'linear');
     mat.clearcoatNormalTextureId = await ensureTexture(clearcoat.getClearcoatNormalTexture?.() ?? null, clearcoat.getClearcoatNormalTextureInfo?.() ?? null, 'linear');
@@ -433,8 +433,8 @@ async function createMaterialData(
   // KHR_materials_sheen
   const sheen = m.getExtension?.('KHR_materials_sheen');
   if (sheen) {
-    mat.sheenColor = sheen.getSheenColorFactor?.() ?? [0, 0, 0];
-    mat.sheenRoughness = sheen.getSheenRoughnessFactor?.() ?? 0.0;
+    mat.sheenColorFactor = sheen.getSheenColorFactor?.() ?? [0, 0, 0];
+    mat.sheenRoughnessFactor = sheen.getSheenRoughnessFactor?.() ?? 0.0;
     mat.sheenColorTextureId = await ensureTexture(sheen.getSheenColorTexture?.() ?? null, sheen.getSheenColorTextureInfo?.() ?? null, 'srgb');
     mat.sheenRoughnessTextureId = await ensureTexture(sheen.getSheenRoughnessTexture?.() ?? null, sheen.getSheenRoughnessTextureInfo?.() ?? null, 'linear');
   }
@@ -451,8 +451,8 @@ async function createMaterialData(
   // KHR_materials_iridescence
   const iridescence = m.getExtension?.('KHR_materials_iridescence');
   if (iridescence) {
-    mat.iridescence = iridescence.getIridescenceFactor?.() ?? 0.0;
-    mat.iridescenceIOR = iridescence.getIridescenceIOR?.() ?? mat.iridescenceIOR;
+    mat.iridescenceFactor = iridescence.getIridescenceFactor?.() ?? 0.0;
+    mat.iridescenceIor = iridescence.getIridescenceIOR?.() ?? mat.iridescenceIor;
     mat.iridescenceThicknessMinimum = iridescence.getIridescenceThicknessMinimum?.() ?? mat.iridescenceThicknessMinimum;
     mat.iridescenceThicknessMaximum = iridescence.getIridescenceThicknessMaximum?.() ?? mat.iridescenceThicknessMaximum;
     mat.iridescenceTextureId = await ensureTexture(iridescence.getIridescenceTexture?.() ?? null, iridescence.getIridescenceTextureInfo?.() ?? null, 'linear');
@@ -464,13 +464,13 @@ async function createMaterialData(
     mat.dispersion = dispersion.getDispersion?.() ?? 0.0;
   }
 
-  // KHR_materials_diffuse_transmission (replaces legacy KHR_materials_translucency)
+  // KHR_materials_diffuse_transmission
   const diffTrans = m.getExtension?.('KHR_materials_diffuse_transmission');
   if (diffTrans) {
-    mat.translucency = diffTrans.getDiffuseTransmissionFactor?.() ?? 0.0;
-    mat.translucencyColor = diffTrans.getDiffuseTransmissionColorFactor?.() ?? [1, 1, 1];
-    mat.translucencyTextureId = await ensureTexture(diffTrans.getDiffuseTransmissionTexture?.() ?? null, diffTrans.getDiffuseTransmissionTextureInfo?.() ?? null, 'linear');
-    mat.translucencyColorTextureId = await ensureTexture(diffTrans.getDiffuseTransmissionColorTexture?.() ?? null, diffTrans.getDiffuseTransmissionColorTextureInfo?.() ?? null, 'srgb');
+    mat.diffuseTransmissionFactor = diffTrans.getDiffuseTransmissionFactor?.() ?? 0.0;
+    mat.diffuseTransmissionColorFactor = diffTrans.getDiffuseTransmissionColorFactor?.() ?? [1, 1, 1];
+    mat.diffuseTransmissionTextureId = await ensureTexture(diffTrans.getDiffuseTransmissionTexture?.() ?? null, diffTrans.getDiffuseTransmissionTextureInfo?.() ?? null, 'linear');
+    mat.diffuseTransmissionColorTextureId = await ensureTexture(diffTrans.getDiffuseTransmissionColorTexture?.() ?? null, diffTrans.getDiffuseTransmissionColorTextureInfo?.() ?? null, 'srgb');
   }
 
   mat.dirty = false;

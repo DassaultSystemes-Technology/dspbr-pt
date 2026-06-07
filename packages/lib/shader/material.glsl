@@ -1,49 +1,20 @@
-/* @license
- * Copyright 2020  Dassault Systemes - All Rights Reserved.
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-const int E_DIFFUSE = 0x00001;
 const int E_DELTA = 0x00002;
 const int E_REFLECTION = 0x00004;
 const int E_TRANSMISSION = 0x00008;
-const int E_COATING = 0x00010;
-const int E_STRAIGHT = 0x00020;
-const int E_OPAQUE_DIELECTRIC = 0x00040;
-const int E_TRANSPARENT_DIELECTRIC = 0x00080;
-const int E_METAL = 0x00100;
 
-// Convert from roughness and anisotropy to 2d anisotropy.
-vec2 roughness_conversion(float roughness, float anisotropy) {
-  vec2 a = vec2(roughness * (1.0 + anisotropy), roughness * (1.0 - anisotropy));
-  return max(a * a, vec2(MINIMUM_ROUGHNESS));
-}
-
-bool is_specular_event(MaterialClosure c) {
-  return bool(c.event_type & E_DELTA);
-}
-
-void configure_material(const in uint matIdx, in RenderState rs, out MaterialClosure c, vec4 vertexColor) {
+void configure_gltf_material(const in uint matIdx, in RenderState rs, out MaterialClosure c, vec4 vertexColor) {
   MaterialData matData = get_material(matIdx);
+  PbrGltfMaterial material;
 
-  vec4 albedo = get_texture_value(matData.albedoTextureId, rs.uv0, rs.uv1);
-  c.albedo = matData.albedo * to_linear_rgb(albedo.xyz);
-  float opacity = albedo.w;
+  vec4 baseColorFactor = get_texture_value(matData.baseColorTextureId, rs.uv0, rs.uv1);
+  material.baseColorFactor = vec4(matData.baseColorFactor * to_linear_rgb(baseColorFactor.xyz), baseColorFactor.w);
+  float opacity = baseColorFactor.w;
 
   if (length(vertexColor) > 0.0) {
-    c.albedo *= vertexColor.xyz;
+    material.baseColorFactor.rgb *= vertexColor.xyz;
     opacity *= vertexColor.w;
   }
+  material.baseColorFactor.a = opacity;
 
   c.cutout_opacity = matData.cutoutOpacity * opacity;
   if (matData.alphaCutoff > 0.0) { // MASK
@@ -53,35 +24,32 @@ void configure_material(const in uint matIdx, in RenderState rs, out MaterialClo
     c.cutout_opacity = 1.0;
   }
 
-  c.transparency = matData.transparency * get_texture_value(matData.transmissionTextureId, rs.uv0, rs.uv1).x;
+  material.transmissionFactor = matData.transmissionFactor * get_texture_value(matData.transmissionTextureId, rs.uv0, rs.uv1).x;
 
-  c.translucency = matData.translucency * get_texture_value(matData.translucencyTextureId, rs.uv0, rs.uv1).w;
-  c.translucencyColor = matData.translucencyColor * to_linear_rgb(get_texture_value(matData.translucencyColorTextureId, rs.uv0, rs.uv1).xyz);
+  material.diffuseTransmissionFactor = matData.diffuseTransmissionFactor * get_texture_value(matData.diffuseTransmissionTextureId, rs.uv0, rs.uv1).x;
+  material.diffuseTransmissionColorFactor = matData.diffuseTransmissionColorFactor * to_linear_rgb(get_texture_value(matData.diffuseTransmissionColorTextureId, rs.uv0, rs.uv1).xyz);
 
   c.thin_walled = matData.thinWalled;
-  // c.ior = c.thin_walled ? 1.0 : matData.ior;
-  c.ior = matData.ior;
+  material.ior = matData.ior;
 
   c.double_sided = matData.doubleSided;
 
   vec4 occlusionRoughnessMetallic = get_texture_value(matData.metallicRoughnessTextureId, rs.uv0, rs.uv1);
-  c.metallic = matData.metallic * occlusionRoughnessMetallic.z;
-  float roughness = matData.roughness * occlusionRoughnessMetallic.y;
-  c.roughness = roughness;
+  material.metallicFactor = matData.metallicFactor * occlusionRoughnessMetallic.z;
+  material.roughnessFactor = matData.roughnessFactor * occlusionRoughnessMetallic.y;
 
-  float anisotropy = get_texture_value(matData.anisotropyTextureId, rs.uv0, rs.uv1).x * 2.0 - 1.0;
-  c.anisotropy = matData.anisotropy * anisotropy;
-  c.alpha = roughness_conversion(roughness, c.anisotropy);
+  vec4 anisotropy = get_texture_value(matData.anisotropyTextureId, rs.uv0, rs.uv1);
+  material.anisotropyStrength = matData.anisotropy * anisotropy.b;
 
   vec4 specularColor = get_texture_value(matData.specularColorTextureId, rs.uv0, rs.uv1);
-  c.specular_tint = matData.specularTint * pow(specularColor.rgb, vec3(2.2));
-  vec4 specular = get_texture_value(matData.specularTextureId, rs.uv0, rs.uv1);
-  c.specular = matData.specular * specular.a;
+  material.specularColorFactor = matData.specularColorFactor * pow(specularColor.rgb, vec3(2.2));
+  vec4 specularFactor = get_texture_value(matData.specularTextureId, rs.uv0, rs.uv1);
+  material.specularFactor = matData.specularFactor * specularFactor.a;
 
-  vec4 sheenColor = get_texture_value(matData.sheenColorTextureId, rs.uv0, rs.uv1);
-  vec4 sheenRoughness = get_texture_value(matData.sheenRoughnessTextureId, rs.uv0, rs.uv1);
-  c.sheen_roughness = matData.sheenRoughness * sheenRoughness.x;
-  c.sheen_color = matData.sheenColor * sheenColor.xyz;
+  vec4 sheenColorFactor = get_texture_value(matData.sheenColorTextureId, rs.uv0, rs.uv1);
+  vec4 sheenRoughnessFactor = get_texture_value(matData.sheenRoughnessTextureId, rs.uv0, rs.uv1);
+  material.sheenRoughnessFactor = matData.sheenRoughnessFactor * sheenRoughnessFactor.x;
+  material.sheenColorFactor = matData.sheenColorFactor * to_linear_rgb(sheenColorFactor.xyz);
 
   c.n = rs.n;
   c.ng = rs.ng;
@@ -103,39 +71,40 @@ void configure_material(const in uint matIdx, in RenderState rs, out MaterialClo
   vec3 wi = rs.wi;
   c.backside = fix_normals(c.n, c.ng, wi);
 
-  vec3 ansiotropyDirection = matData.anisotropyDirection;
+  vec3 anisotropyDirection = matData.anisotropyDirection;
   if (matData.anisotropyDirectionTextureId >= 0.0)
-    ansiotropyDirection = get_texture_value(matData.anisotropyDirectionTextureId, rs.uv0, rs.uv1).xyz * 2.0 - vec3(1);
-  ansiotropyDirection.z = 0.0;
+    anisotropyDirection = get_texture_value(matData.anisotropyDirectionTextureId, rs.uv0, rs.uv1).xyz * 2.0 - vec3(1);
+  else if (matData.anisotropyTextureId >= 0.0)
+    anisotropyDirection = vec3(anisotropy.rg * 2.0 - vec2(1.0), 0.0);
+  anisotropyDirection.z = 0.0;
 
-  float anisotropyRotation = atan(ansiotropyDirection.y, ansiotropyDirection.x) + PI;
-  c.t = rotation_to_tangent(anisotropyRotation, c.n, c.t);
+  material.anisotropyRotation = atan(anisotropyDirection.y, anisotropyDirection.x);
+  c.t = rotation_to_tangent(material.anisotropyRotation + PI, c.n, c.t);
   c.anisotropyTangent = c.t.xyz;
 
-  if (c.backside && !c.thin_walled) {
-    c.f0 = ((1.0 - c.ior) / (1.0 + c.ior)) * ((1.0 - c.ior) / (1.0 + c.ior));
-  } else {
-    c.f0 = ((c.ior - 1.0) / (c.ior + 1.0)) * ((c.ior - 1.0) / (c.ior + 1.0));
-  }
-  c.specular_f0 = mix(c.specular * c.f0 * c.specular_tint, c.albedo, c.metallic);
-  c.specular_f90 = vec3(mix(c.specular, 1.0, c.metallic));
+  vec3 emissiveFactor = get_texture_value(matData.emissiveTextureId, rs.uv0, rs.uv1).xyz;
+  material.emissiveFactor = matData.emissiveFactor.xyz * to_linear_rgb(emissiveFactor);
+  material.emissiveStrength = 1.0;
 
-  vec3 emission = get_texture_value(matData.emissionTextureId, rs.uv0, rs.uv1).xyz;
-  c.emission = matData.emission.xyz * to_linear_rgb(emission);
+  vec4 clearcoatFactor = get_texture_value(matData.clearcoatTextureId, rs.uv0, rs.uv1);
+  material.clearcoatFactor = matData.clearcoatFactor * clearcoatFactor.x;
+  vec4 clearcoatRoughnessFactor = get_texture_value(matData.clearcoatRoughnessTextureId, rs.uv0, rs.uv1);
+  material.clearcoatRoughnessFactor = matData.clearcoatRoughnessFactor * clearcoatRoughnessFactor.x;
+  material.clearcoatNormalTextureScale = matData.clearcoatNormalTextureScale;
 
-  vec4 clearcoat = get_texture_value(matData.clearcoatTextureId, rs.uv0, rs.uv1);
-  c.clearcoat = matData.clearcoat * clearcoat.y;
-  vec4 clearcoatRoughness = get_texture_value(matData.clearcoatRoughnessTextureId, rs.uv0, rs.uv1);
-  c.clearcoatRoughness = matData.clearcoatRoughness * clearcoatRoughness.x;
-  float clearcoat_alpha = c.clearcoatRoughness * c.clearcoatRoughness;
-  c.clearcoat_alpha = max(clearcoat_alpha, MINIMUM_ROUGHNESS);
+  material.attenuationColor = matData.attenuationColor;
+  material.attenuationDistance = matData.attenuationDistance;
+  material.thicknessFactor = c.thin_walled ? 0.0 : 1.0;
+  material.multiscatterColorFactor = vec3(0.0);
+  material.scatterAnisotropy = 0.0;
 
-  c.attenuationColor = matData.attenuationColor;
-  c.attenuationDistance = matData.attenuationDistance;
+  material.iridescenceFactor = matData.iridescenceFactor * get_texture_value(matData.iridescenceTextureId, rs.uv0, rs.uv1).x;
+  material.iridescenceIor = matData.iridescenceIor;
+  material.iridescenceThickness = mix(matData.iridescenceThicknessMinimum, matData.iridescenceThicknessMaximum,
+                                      get_texture_value(matData.iridescenceThicknessTextureId, rs.uv0, rs.uv1).y);
+  material.dispersion = matData.dispersion;
+  material.normalTextureScale = matData.normalScale;
+  material.featureMask = 0U;
 
-  c.iridescence = saturate(matData.iridescence * get_texture_value(matData.iridescenceTextureId, rs.uv0, rs.uv1).x);
-  c.iridescence_ior = clamp(matData.iridescenceIor, 1.0, 2.5);
-  c.iridescence_thickness = mix(matData.iridescenceThicknessMinimum, matData.iridescenceThicknessMaximum,
-                                get_texture_value(matData.iridescenceThicknessTextureId, rs.uv0, rs.uv1).y);
-  c.dispersion = max(matData.dispersion, 0.0);
+  c.material = material;
 }

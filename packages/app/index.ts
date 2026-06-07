@@ -1,18 +1,3 @@
-/* @license
- * Copyright 2020  Dassault Systemes - All Rights Reserved.
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 import { Pane } from 'tweakpane';
 import type { PathtracingRenderer, PathtracingSceneData } from 'dspbr-pt';
 import * as Assets from './asset_index';
@@ -432,14 +417,14 @@ class Demo {
 
     const f01: Parameters<Pane['addBinding']>[2] = { step: 0.01, min: 0, max: 1 };
     const colors = {
-      albedo:           { r: mat.albedo[0]! * 255,           g: mat.albedo[1]! * 255,           b: mat.albedo[2]! * 255 },
-      specularTint:     { r: mat.specularTint[0]! * 255,     g: mat.specularTint[1]! * 255,     b: mat.specularTint[2]! * 255 },
-      translucencyColor:{ r: mat.translucencyColor[0]! * 255,g: mat.translucencyColor[1]! * 255,b: mat.translucencyColor[2]! * 255 },
-      sheenColor:       { r: mat.sheenColor[0]! * 255,       g: mat.sheenColor[1]! * 255,       b: mat.sheenColor[2]! * 255 },
+      baseColor: { r: mat.baseColorFactor[0]! * 255, g: mat.baseColorFactor[1]! * 255, b: mat.baseColorFactor[2]! * 255 },
+      specularColor: { r: mat.specularColorFactor[0]! * 255, g: mat.specularColorFactor[1]! * 255, b: mat.specularColorFactor[2]! * 255 },
+      diffuseTransmissionColor: { r: mat.diffuseTransmissionColorFactor[0]! * 255, g: mat.diffuseTransmissionColorFactor[1]! * 255, b: mat.diffuseTransmissionColorFactor[2]! * 255 },
+      sheenColor: { r: mat.sheenColorFactor[0]! * 255, g: mat.sheenColorFactor[1]! * 255, b: mat.sheenColorFactor[2]! * 255 },
       attenuationColor: { r: mat.attenuationColor[0]! * 255, g: mat.attenuationColor[1]! * 255, b: mat.attenuationColor[2]! * 255 },
     };
     const colorOpts = { color: { type: 'int' as const } };
-    const emission = { x: mat.emission[0]!, y: mat.emission[1]!, z: mat.emission[2]! };
+    const emission = { x: mat.emissiveFactor[0]!, y: mat.emissiveFactor[1]!, z: mat.emissiveFactor[2]! };
 
     const add = (title: string) => {
       const folder = matTab.addFolder({ title });
@@ -448,39 +433,39 @@ class Demo {
     };
 
     const base = add('Base');
-    base.addBinding(colors, 'albedo', { ...colorOpts }).on('change', ev => {
-      mat.albedo = [ev.value.r / 255, ev.value.g / 255, ev.value.b / 255];
+    base.addBinding(colors, 'baseColor', { ...colorOpts, label: 'base color' }).on('change', ev => {
+      mat.baseColorFactor = [ev.value.r / 255, ev.value.g / 255, ev.value.b / 255];
     });
-    base.addBinding(mat, 'roughness', f01);
-    base.addBinding(mat, 'metallic',  f01);
-    base.addBinding(mat, 'specular',  f01);
-    base.addBinding(emission, 'x', { label: 'emission R', min: 0, max: 1e6, step: 0.1 }).on('change', ev => { mat.emission = [ev.value, emission.y, emission.z]; });
-    base.addBinding(emission, 'y', { label: 'emission G', min: 0, max: 1e6, step: 0.1 }).on('change', ev => { mat.emission = [emission.x, ev.value, emission.z]; });
-    base.addBinding(emission, 'z', { label: 'emission B', min: 0, max: 1e6, step: 0.1 }).on('change', ev => { mat.emission = [emission.x, emission.y, ev.value]; });
+    base.addBinding(mat, 'roughnessFactor', { ...f01, label: 'roughness' });
+    base.addBinding(mat, 'metallicFactor',  { ...f01, label: 'metallic' });
+    base.addBinding(mat, 'specularFactor',  { ...f01, label: 'specular' });
+    base.addBinding(emission, 'x', { label: 'emission R', min: 0, max: 1e6, step: 0.1 }).on('change', ev => { mat.emissiveFactor = [ev.value, emission.y, emission.z]; });
+    base.addBinding(emission, 'y', { label: 'emission G', min: 0, max: 1e6, step: 0.1 }).on('change', ev => { mat.emissiveFactor = [emission.x, ev.value, emission.z]; });
+    base.addBinding(emission, 'z', { label: 'emission B', min: 0, max: 1e6, step: 0.1 }).on('change', ev => { mat.emissiveFactor = [emission.x, emission.y, ev.value]; });
 
     const anisotropy = add('Anisotropy');
     const anisoDir = { x: mat.anisotropyDirection[0]!, y: mat.anisotropyDirection[1]! };
-    anisotropy.addBinding(mat, 'anisotropy', { step: 0.01, min: -1, max: 1 });
+    anisotropy.addBinding(mat, 'anisotropy', { step: 0.01, min: 0, max: 1 });
     anisotropy.addBinding(anisoDir, 'x', { label: 'direction X', step: 0.01, min: -1, max: 1 }).on('change', ev => { mat.anisotropyDirection = [ev.value, anisoDir.y, 0]; });
     anisotropy.addBinding(anisoDir, 'y', { label: 'direction Y', step: 0.01, min: -1, max: 1 }).on('change', ev => { mat.anisotropyDirection = [anisoDir.x, ev.value, 0]; });
 
     const transmission = add('Transmission');
-    transmission.addBinding(mat, 'transparency',  f01);
+    transmission.addBinding(mat, 'transmissionFactor',  { ...f01, label: 'transmission' });
     transmission.addBinding(mat, 'cutoutOpacity', f01);
-    transmission.addBinding(mat, 'translucency',  { ...f01, label: 'diffuse transmission' });
-    transmission.addBinding(colors, 'translucencyColor', { ...colorOpts, label: 'diffuse transmission color' }).on('change', ev => {
-      mat.translucencyColor = [ev.value.r / 255, ev.value.g / 255, ev.value.b / 255];
+    transmission.addBinding(mat, 'diffuseTransmissionFactor',  { ...f01, label: 'diffuse transmission' });
+    transmission.addBinding(colors, 'diffuseTransmissionColor', { ...colorOpts, label: 'diffuse transmission color' }).on('change', ev => {
+      mat.diffuseTransmissionColorFactor = [ev.value.r / 255, ev.value.g / 255, ev.value.b / 255];
     });
 
     const sheen = add('Sheen');
-    sheen.addBinding(mat,    'sheenRoughness', f01);
-    sheen.addBinding(colors, 'sheenColor', colorOpts).on('change', ev => {
-      mat.sheenColor = [ev.value.r / 255, ev.value.g / 255, ev.value.b / 255];
+    sheen.addBinding(mat, 'sheenRoughnessFactor', { ...f01, label: 'roughness' });
+    sheen.addBinding(colors, 'sheenColor', { ...colorOpts, label: 'color' }).on('change', ev => {
+      mat.sheenColorFactor = [ev.value.r / 255, ev.value.g / 255, ev.value.b / 255];
     });
 
     const clearcoat = add('Clearcoat');
-    clearcoat.addBinding(mat, 'clearcoat',          f01);
-    clearcoat.addBinding(mat, 'clearcoatRoughness', f01);
+    clearcoat.addBinding(mat, 'clearcoatFactor', { ...f01, label: 'factor' });
+    clearcoat.addBinding(mat, 'clearcoatRoughnessFactor', { ...f01, label: 'roughness' });
 
     const thinWalledState = { thinWalled: mat.thinWalled > 0 };
     const volume = add('Volume');
@@ -493,10 +478,10 @@ class Demo {
     });
 
     const iridescence = add('Iridescence');
-    iridescence.addBinding(mat, 'iridescence',                f01);
-    iridescence.addBinding(mat, 'iridescenceIOR',             { min: 0, max: 3, step: 0.01 });
-    iridescence.addBinding(mat, 'iridescenceThicknessMinimum',{ min: 10, max: 1200, step: 1 });
-    iridescence.addBinding(mat, 'iridescenceThicknessMaximum',{ min: 10, max: 1200, step: 1 });
+    iridescence.addBinding(mat, 'iridescenceFactor', { ...f01, label: 'factor' });
+    iridescence.addBinding(mat, 'iridescenceIor', { min: 0, max: 3, step: 0.01 });
+    iridescence.addBinding(mat, 'iridescenceThicknessMinimum', { min: 10, max: 1200, step: 1 });
+    iridescence.addBinding(mat, 'iridescenceThicknessMaximum', { min: 10, max: 1200, step: 1 });
 
     const unfold = this._params['unfold'];
     if (unfold) {

@@ -125,7 +125,7 @@
     },
     "entry": "materialKernelSmokeMain",
     "stage": "compute",
-    "sourceHash": "691ff52a16799c3b1cc4e8595adb2430fb10742fe82e159eba514c04d4ceac82",
+    "sourceHash": "fa3fefd380f8391e18578836d20f8f7df39455adbf99a619d3e06ebc79d9afec",
     "sourceFiles": [
       "src/adapters/gltf/gltf_pbr.slang",
       "src/adapters/gltf/parameters.slang",
@@ -209,39 +209,39 @@
         "profile": "glsl_450",
         "facade": {
           "stableStructs": {
-            "GltfPbrMaterial": "SlangPbrGltfPbrMaterial",
-            "SurfaceMaterial": "SlangPbrSurfaceMaterial",
-            "SurfaceLayerNormals": "SlangPbrSurfaceLayerNormals",
-            "SurfaceClosure": "SlangPbrSurfaceClosure",
-            "TransportContext": "SlangPbrTransportContext",
-            "DirectionContext": "SlangPbrDirectionContext",
-            "NormalContext": "SlangPbrNormalContext",
-            "SampleRandoms": "SlangPbrSampleRandoms",
-            "BsdfSample": "SlangPbrBsdfSample",
-            "MaterialVolumeState": "SlangPbrMaterialVolumeState",
-            "VolumePhaseSample": "SlangPbrVolumePhaseSample"
+            "GltfPbrMaterial": "PbrGltfMaterial",
+            "SurfaceMaterial": "PbrMaterial",
+            "SurfaceLayerNormals": "PbrLayerNormals",
+            "SurfaceClosure": "PbrClosure",
+            "TransportContext": "PbrTransport",
+            "DirectionContext": "PbrDirections",
+            "NormalContext": "PbrNormals",
+            "SampleRandoms": "PbrRandoms",
+            "BsdfSample": "PbrSample",
+            "MaterialVolumeState": "PbrVolume",
+            "VolumePhaseSample": "PbrPhaseSample"
           },
           "stableFunctions": [
-            "slangPbrBuildSurfaceClosureFromGltf",
-            "slangPbrPrepareMaterialBsdfStateFromGltf",
-            "slangPbrEvalMaterialBsdfFromGltfState",
-            "slangPbrPdfMaterialBsdfFromGltfState",
-            "slangPbrSampleMaterialBsdfFromGltfState",
-            "slangPbrPrepareMaterialVolumeStateFromGltfState",
-            "slangPbrBuildSurfaceClosure",
-            "slangPbrPrepareMaterialBsdfState",
-            "slangPbrEvalMaterialBsdf",
-            "slangPbrPdfMaterialBsdf",
-            "slangPbrSampleMaterialBsdf",
-            "slangPbrClearMaterialVolumeState",
-            "slangPbrEnterMaterialVolumeState",
-            "slangPbrPrepareMaterialVolumeState",
-            "slangPbrEvalHomogeneousTransmittance",
-            "slangPbrHomogeneousMediumEventPdf",
-            "slangPbrHomogeneousMediumNoEventPdf",
-            "slangPbrEvalVolumePhase",
-            "slangPbrPdfVolumePhase",
-            "slangPbrSampleVolumePhase"
+            "pbrBuildClosureFromGltf",
+            "pbrPrepareStateFromGltf",
+            "pbrEvalGltfState",
+            "pbrPdfGltfState",
+            "pbrSampleGltfState",
+            "pbrPrepareVolumeFromGltfState",
+            "pbrBuildClosure",
+            "pbrPrepareState",
+            "pbrEval",
+            "pbrPdf",
+            "pbrSample",
+            "pbrClearVolume",
+            "pbrEnterVolume",
+            "pbrPrepareVolume",
+            "pbrEvalTransmittance",
+            "pbrMediumEventPdf",
+            "pbrMediumNoEventPdf",
+            "pbrEvalPhase",
+            "pbrPdfPhase",
+            "pbrSamplePhase"
           ]
         }
       }
@@ -266,12 +266,12 @@
       }
     },
     "webgl-full": {
-      "description": "dspbr-pt WebGL full Enterprise PBR profile: all current slang-pbr optional Enterprise features enabled.",
+      "description": "dspbr-pt WebGL full Enterprise PBR profile: dispersion and iridescence enabled, absorption-only media.",
       "glsl": "packages/lib/shader/generated/slang_materials/webgl-full/material_kernel.glsl",
       "metadata": "packages/lib/shader/generated/slang_materials/webgl-full/material_kernel.codegen.json",
       "defines": {
         "SLANG_PBR_ENABLE_VOLUME_ABSORPTION": 1,
-        "SLANG_PBR_ENABLE_VOLUME_SCATTERING": 1,
+        "SLANG_PBR_ENABLE_VOLUME_SCATTERING": 0,
         "SLANG_PBR_ENABLE_DISPERSION": 1,
         "SLANG_PBR_ENABLE_IRIDESCENCE": 1
       }

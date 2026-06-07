@@ -1,18 +1,3 @@
-/* @license
- * Copyright 2020  Dassault Systemes - All Rights Reserved.
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 import { buildBvh, buildIndexedBvh } from './bvh/tinybvh_builder';
 import { PathtracingSceneData } from './scene_data'
 import { PathtracingSceneDataWebGL2 } from './scene_data_webgl2'
@@ -29,10 +14,9 @@ import structs_shader from './shader/structs.glsl';
 import rng_shader from './shader/rng.glsl';
 import utils_shader from './shader/utils.glsl';
 import material_shader from './shader/material.glsl';
-import slang_material_kernel_shader from './shader/generated/slang_materials/material_kernel.glsl';
-import slang_material_kernel_lean_shader from './shader/generated/slang_materials/webgl-lean/material_kernel.glsl';
-import slang_material_kernel_full_shader from './shader/generated/slang_materials/webgl-full/material_kernel.glsl';
-import slang_material_adapter_shader from './shader/slang_material_adapter.glsl';
+import pbr_material_kernel_lean_shader from './shader/generated/slang_materials/webgl-lean/material_kernel.glsl';
+import pbr_material_kernel_full_shader from './shader/generated/slang_materials/webgl-full/material_kernel.glsl';
+import pbr_material_adapter_shader from './shader/pbr_material_adapter.glsl';
 import bvh_shader from './shader/bvh.glsl';
 import lighting_shader from './shader/lighting.glsl';
 
@@ -194,7 +178,7 @@ export class PathtracingRenderer {
     this.resetAccumulation();
   }
 
-  public debugModes = ["None", "Albedo", "Metalness", "Roughness", "Normals", "Tangents", "Bitangents", "Transparency", "UV0", "Clearcoat", "IBL PDF", "IBL CDF", "Specular", "SpecularTint", "Specular F0", "Translucency"];
+  public debugModes = ["None", "Albedo", "Metalness", "Roughness", "Normals", "Tangents", "Bitangents", "Transparency", "UV0", "Clearcoat", "IBL PDF", "IBL CDF", "Specular", "SpecularTint", "Translucency"];
   private _debugMode: string = "None";
   public get debugMode() {
     return this._debugMode;
@@ -1085,9 +1069,9 @@ export class PathtracingRenderer {
     `;
 
     // console.log(this.scene.materialBufferShaderChunk);
-    const slangMaterialKernelShader = this.materialProfile === 'webgl-full'
-      ? slang_material_kernel_full_shader
-      : slang_material_kernel_lean_shader || slang_material_kernel_shader;
+    const pbrMaterialKernelShader = this.materialProfile === 'webgl-full'
+      ? pbr_material_kernel_full_shader
+      : pbr_material_kernel_lean_shader;
 
     const shaderChunks = new Map<string, string>([
       ['structs', structs_shader],
@@ -1099,7 +1083,8 @@ export class PathtracingRenderer {
       ['buffer_accessor', bufferAccessSnippet],
       ['texture_accessor', this.gpu_scene.texAccessorShaderChunk],
       ['material_block', this.gpu_scene.materialBufferShaderChunk],
-      ['dspbr', `${slangMaterialKernelShader}\n${slang_material_adapter_shader}`],
+      ['pbr_kernel', pbrMaterialKernelShader],
+      ['pbr_material_adapter', pbr_material_adapter_shader],
       ['bvh', bvh_shader],
       ['lighting', lighting_shader],
       ['mesh_constants', meshConstants]

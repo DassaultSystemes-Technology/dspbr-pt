@@ -11,8 +11,7 @@ const int D_IBL_PDF = 10;
 const int D_IBL_CDF = 11;
 const int D_SPECULAR = 12;
 const int D_SPECULAR_TINT = 13;
-const int D_SPECULAR_F0 = 14;
-const int D_TRANSLUCENCY = 15;
+const int D_TRANSLUCENCY = 14;
 
 vec4 trace(const bvh_ray ray) {
   bvh_hit hit;
@@ -26,12 +25,12 @@ vec4 trace(const bvh_ray ray) {
     MaterialClosure c = rs.closure;
 
     if (int(u_debug_mode) == D_ALBEDO) {
-      contrib = vec3(c.albedo);
+      contrib = c.material.baseColorFactor.rgb;
     }
     if (int(u_debug_mode) == D_METAL)
-      contrib = vec3(c.metallic);
+      contrib = vec3(c.material.metallicFactor);
     if (int(u_debug_mode) == D_ROUGHNESS)
-      contrib = vec3(c.alpha, 0.0);
+      contrib = vec3(c.material.roughnessFactor);
     if (int(u_debug_mode) == D_NORMAL)
       contrib = c.n;
     if (int(u_debug_mode) == D_TANGENT) {
@@ -42,25 +41,22 @@ vec4 trace(const bvh_ray ray) {
       contrib = g.b;
     }
     if (int(u_debug_mode) == D_TRANSPARENCY) {
-      contrib = vec3(c.transparency);
+      contrib = vec3(c.material.transmissionFactor);
     }
      if (int(u_debug_mode) == D_TRANSLUCENCY) {
-      contrib = c.translucency * c.translucencyColor;
+      contrib = c.material.diffuseTransmissionFactor * c.material.diffuseTransmissionColorFactor;
     }
     if (int(u_debug_mode) == D_UV0) {
       contrib = vec3(rs.uv0, 0.0);
     }
     if (int(u_debug_mode) == D_CLEARCOAT) {
-      contrib = vec3(c.clearcoat);
+      contrib = vec3(c.material.clearcoatFactor);
     }
     if (int(u_debug_mode) == D_SPECULAR) {
-      contrib = vec3(c.specular);
+      contrib = vec3(c.material.specularFactor);
     }
     if (int(u_debug_mode) == D_SPECULAR_TINT) {
-      contrib = c.specular_tint;
-    }
-    if (int(u_debug_mode) == D_SPECULAR_F0) {
-      contrib = c.specular_f0;
+      contrib = c.material.specularColorFactor;
     }
     color = vec4(contrib, 1.0);
   } else { // direct background hit

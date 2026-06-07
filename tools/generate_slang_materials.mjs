@@ -25,10 +25,10 @@ const materialProfiles = {
     },
   },
   'webgl-full': {
-    description: 'dspbr-pt WebGL full Enterprise PBR profile: all current slang-pbr optional Enterprise features enabled.',
+    description: 'dspbr-pt WebGL full Enterprise PBR profile: dispersion and iridescence enabled, absorption-only media.',
     defines: {
       SLANG_PBR_ENABLE_VOLUME_ABSORPTION: 1,
-      SLANG_PBR_ENABLE_VOLUME_SCATTERING: 1,
+      SLANG_PBR_ENABLE_VOLUME_SCATTERING: 0,
       SLANG_PBR_ENABLE_DISPERSION: 1,
       SLANG_PBR_ENABLE_IRIDESCENCE: 1,
     },
