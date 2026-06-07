@@ -1,7 +1,7 @@
 {
   "version": 3,
-  "materialProfile": "webgl-lean",
-  "description": "dspbr-pt WebGL lean Enterprise PBR profile: absorption-only media, no dispersion, no iridescence.",
+  "materialProfile": "webgl-full",
+  "description": "dspbr-pt WebGL full Enterprise PBR profile: all current slang-pbr optional Enterprise features enabled.",
   "package": {
     "name": "slang-pbr",
     "version": "0.1.0",
@@ -16,9 +16,9 @@
     "energyCompensation": "analytic",
     "defines": {
       "SLANG_PBR_ENABLE_VOLUME_ABSORPTION": 1,
-      "SLANG_PBR_ENABLE_VOLUME_SCATTERING": 0,
-      "SLANG_PBR_ENABLE_DISPERSION": 0,
-      "SLANG_PBR_ENABLE_IRIDESCENCE": 0
+      "SLANG_PBR_ENABLE_VOLUME_SCATTERING": 1,
+      "SLANG_PBR_ENABLE_DISPERSION": 1,
+      "SLANG_PBR_ENABLE_IRIDESCENCE": 1
     }
   },
   "slangPbr": {
@@ -28,9 +28,9 @@
     "defines": {
       "SLANG_PBR_ENTERPRISE_LUT_MODE": "0",
       "SLANG_PBR_ENABLE_VOLUME_ABSORPTION": "1",
-      "SLANG_PBR_ENABLE_VOLUME_SCATTERING": "0",
-      "SLANG_PBR_ENABLE_DISPERSION": "0",
-      "SLANG_PBR_ENABLE_IRIDESCENCE": "0"
+      "SLANG_PBR_ENABLE_VOLUME_SCATTERING": "1",
+      "SLANG_PBR_ENABLE_DISPERSION": "1",
+      "SLANG_PBR_ENABLE_IRIDESCENCE": "1"
     },
     "source": "src/models/enterprise/enterprise_pbr.slang",
     "compileSource": "src/pbr_material_kernel_smoke.slang",
@@ -204,7 +204,7 @@
     "targets": {
       "glsl": {
         "available": true,
-        "path": "packages/lib/shader/generated/slang_materials/webgl-lean/material_kernel.glsl",
+        "path": "packages/lib/shader/generated/slang_materials/webgl-full/material_kernel.glsl",
         "slangTarget": "glsl",
         "profile": "glsl_450",
         "facade": {
@@ -250,31 +250,7 @@
   "targets": {
     "glsl": {
       "available": true,
-      "path": "packages/lib/shader/generated/slang_materials/webgl-lean/material_kernel.glsl"
-    }
-  },
-  "profiles": {
-    "webgl-lean": {
-      "description": "dspbr-pt WebGL lean Enterprise PBR profile: absorption-only media, no dispersion, no iridescence.",
-      "glsl": "packages/lib/shader/generated/slang_materials/webgl-lean/material_kernel.glsl",
-      "metadata": "packages/lib/shader/generated/slang_materials/webgl-lean/material_kernel.codegen.json",
-      "defines": {
-        "SLANG_PBR_ENABLE_VOLUME_ABSORPTION": 1,
-        "SLANG_PBR_ENABLE_VOLUME_SCATTERING": 0,
-        "SLANG_PBR_ENABLE_DISPERSION": 0,
-        "SLANG_PBR_ENABLE_IRIDESCENCE": 0
-      }
-    },
-    "webgl-full": {
-      "description": "dspbr-pt WebGL full Enterprise PBR profile: all current slang-pbr optional Enterprise features enabled.",
-      "glsl": "packages/lib/shader/generated/slang_materials/webgl-full/material_kernel.glsl",
-      "metadata": "packages/lib/shader/generated/slang_materials/webgl-full/material_kernel.codegen.json",
-      "defines": {
-        "SLANG_PBR_ENABLE_VOLUME_ABSORPTION": 1,
-        "SLANG_PBR_ENABLE_VOLUME_SCATTERING": 1,
-        "SLANG_PBR_ENABLE_DISPERSION": 1,
-        "SLANG_PBR_ENABLE_IRIDESCENCE": 1
-      }
+      "path": "packages/lib/shader/generated/slang_materials/webgl-full/material_kernel.glsl"
     }
   }
 }

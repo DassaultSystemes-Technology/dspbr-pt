@@ -1,5 +1,5 @@
 export { PathtracingRenderer } from './renderer';
-export type { PathtracingCamera, PathtracingRendererDiagnostics, PathtracingRendererParameters, PathtracingRendererProgress, PathtracingRendererProgressCallback, RenderSchedulerMode } from './renderer';
+export type { PathtracingCamera, PathtracingRendererDiagnostics, PathtracingRendererMaterialProfile, PathtracingRendererParameters, PathtracingRendererProgress, PathtracingRendererProgressCallback, RenderSchedulerMode } from './renderer';
 export { PathtracingViewport, createPathtracingViewport } from './pathtracing_viewport';
 export type { LookAtCameraOptions, PathtracingViewportEventMap, PathtracingViewportOptions, PathtracingViewportProgressCallback, PathtracingViewportSettings, Vec3Like } from './pathtracing_viewport';
 export { PathtracingSceneData } from './scene_data';

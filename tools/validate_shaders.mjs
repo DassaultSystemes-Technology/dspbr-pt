@@ -10,7 +10,8 @@ const outDir = mkdtempSync(path.join(tmpdir(), 'dspbr-pt-shader-validation-'));
 
 const readShader = relativePath => readFileSync(path.join(shaderRoot, relativePath), 'utf8');
 
-const commonChunks = {
+function buildCommonChunks(materialProfile) {
+  return {
   structs: readShader('structs.glsl'),
   rng: readShader('rng.glsl'),
   constants: readShader('constants.glsl'),
@@ -105,7 +106,7 @@ MaterialData get_material(uint idx) {
   return data;
 }
 `,
-  dspbr: `${readShader('generated/slang_materials/material_kernel.glsl')}\n${readShader('slang_material_adapter.glsl')}`,
+  dspbr: `${readShader(`generated/slang_materials/${materialProfile}/material_kernel.glsl`)}\n${readShader('slang_material_adapter.glsl')}`,
   bvh: readShader('bvh.glsl'),
   lighting: readShader('lighting.glsl'),
   mesh_constants: `
@@ -120,20 +121,39 @@ const uint COLOR_OFFSET = 4u;
 #define NUM_BVH_NODES int(u_scene_counts.y)
 #define NUM_BVH_INDICES int(u_scene_counts.z)
 `,
-};
+  };
+}
 
 const variants = [
   {
     name: 'debug',
+    profile: 'webgl-lean',
     chunks: {
-      ...commonChunks,
+      ...buildCommonChunks('webgl-lean'),
       integrator: readShader('integrator/debug.glsl'),
     },
   },
   {
     name: 'misptdl',
+    profile: 'webgl-lean',
     chunks: {
-      ...commonChunks,
+      ...buildCommonChunks('webgl-lean'),
+      integrator: readShader('integrator/misptdl.glsl'),
+    },
+  },
+  {
+    name: 'debug-full',
+    profile: 'webgl-full',
+    chunks: {
+      ...buildCommonChunks('webgl-full'),
+      integrator: readShader('integrator/debug.glsl'),
+    },
+  },
+  {
+    name: 'misptdl-full',
+    profile: 'webgl-full',
+    chunks: {
+      ...buildCommonChunks('webgl-full'),
       integrator: readShader('integrator/misptdl.glsl'),
     },
   },

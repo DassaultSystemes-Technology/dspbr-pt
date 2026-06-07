@@ -30,6 +30,8 @@ import rng_shader from './shader/rng.glsl';
 import utils_shader from './shader/utils.glsl';
 import material_shader from './shader/material.glsl';
 import slang_material_kernel_shader from './shader/generated/slang_materials/material_kernel.glsl';
+import slang_material_kernel_lean_shader from './shader/generated/slang_materials/webgl-lean/material_kernel.glsl';
+import slang_material_kernel_full_shader from './shader/generated/slang_materials/webgl-full/material_kernel.glsl';
 import slang_material_adapter_shader from './shader/slang_material_adapter.glsl';
 import bvh_shader from './shader/bvh.glsl';
 import lighting_shader from './shader/lighting.glsl';
@@ -77,7 +79,10 @@ export interface PathtracingCamera {
 export interface PathtracingRendererParameters {
   canvas?: HTMLCanvasElement;
   context?: WebGL2RenderingContext;
+  materialProfile?: PathtracingRendererMaterialProfile;
 }
+
+export type PathtracingRendererMaterialProfile = 'webgl-lean' | 'webgl-full';
 
 export interface PathtracingRendererProgress {
   phase: string;
@@ -162,6 +167,7 @@ export class PathtracingRenderer {
   private frameHandleKind: RenderFrameHandleKind | null = null;
   private tileIndex = 0;
   private tileOrders = new Map<number, number[]>();
+  private materialProfile: PathtracingRendererMaterialProfile = 'webgl-lean';
   private currentCamera: PathtracingCamera | null = null;
   private currentNumSamples = -1;
   private tileFinishedCB: () => void = () => {};
@@ -318,6 +324,7 @@ export class PathtracingRenderer {
 
   constructor(parameters: PathtracingRendererParameters = {}) {
     this.canvas = parameters.canvas ? parameters.canvas : document.createElementNS('http://www.w3.org/1999/xhtml', 'canvas');
+    this.materialProfile = parameters.materialProfile ?? 'webgl-lean';
 
     const gl = parameters.context ? parameters.context : this.canvas.getContext('webgl2', { alpha: true, powerPreference: "high-performance" });
     this.gl = gl;
@@ -1078,6 +1085,10 @@ export class PathtracingRenderer {
     `;
 
     // console.log(this.scene.materialBufferShaderChunk);
+    const slangMaterialKernelShader = this.materialProfile === 'webgl-full'
+      ? slang_material_kernel_full_shader
+      : slang_material_kernel_lean_shader || slang_material_kernel_shader;
+
     const shaderChunks = new Map<string, string>([
       ['structs', structs_shader],
       ['rng', rng_shader],
@@ -1088,7 +1099,7 @@ export class PathtracingRenderer {
       ['buffer_accessor', bufferAccessSnippet],
       ['texture_accessor', this.gpu_scene.texAccessorShaderChunk],
       ['material_block', this.gpu_scene.materialBufferShaderChunk],
-      ['dspbr', `${slang_material_kernel_shader}\n${slang_material_adapter_shader}`],
+      ['dspbr', `${slangMaterialKernelShader}\n${slang_material_adapter_shader}`],
       ['bvh', bvh_shader],
       ['lighting', lighting_shader],
       ['mesh_constants', meshConstants]

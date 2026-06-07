@@ -114,6 +114,7 @@ export class PathtracingViewport {
     this.renderer = new PathtracingRenderer({
       canvas: options.canvas,
       context: options.context,
+      materialProfile: options.materialProfile,
     });
     this.camera = new ViewportCamera();
     if (options.settings) this.setSettings(options.settings);
