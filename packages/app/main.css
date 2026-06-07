@@ -102,12 +102,19 @@ canvas {
 
 @media (max-width: 640px) {
   .diagnostics-panel {
-    width: calc(100vw - 24px);
-    font-size: 10px;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    width: auto;
+    max-height: min(54vh, calc(100dvh - 78px));
+    overflow: auto;
+    font-size: 9px;
   }
 
   .diagnostics-card {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding: 7px;
   }
 
   .diagnostics-row {
@@ -117,6 +124,67 @@ canvas {
 
   .overlay-guidance-grid {
     grid-template-columns: 1fr;
+  }
+
+  .overlay {
+    align-items: flex-start;
+    padding: 10px;
+    overflow: auto;
+  }
+
+  body.viewer-overlay-active .overlay {
+    padding-top: 64px;
+  }
+
+  .overlay-card,
+  .start-card {
+    width: 100%;
+    max-height: calc(100dvh - 20px);
+    padding: 14px;
+  }
+
+  .overlay-card h1,
+  .overlay-card h2 {
+    font-size: 22px;
+    line-height: 1.08;
+  }
+
+  .overlay-kicker {
+    margin-bottom: 6px;
+    font-size: 10px;
+  }
+
+  .overlay-chip-row,
+  .overlay-menu-hint,
+  .material-profile-picker,
+  .shader-warmup-note {
+    margin-top: 10px;
+  }
+
+  .material-profile-picker,
+  .shader-warmup-note {
+    padding: 10px;
+  }
+
+  .material-profile-picker-actions {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .material-profile-choice {
+    min-height: 0;
+    padding: 9px 10px;
+  }
+
+  .overlay-copy,
+  .shader-warmup-note p {
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .shader-warmup-note strong,
+  .material-profile-picker-header strong {
+    font-size: 10px;
   }
 }
 
@@ -157,6 +225,151 @@ select {
   pointer-events: auto;
 }
 
+.viewer-action-bar {
+  position: fixed;
+  left: 12px;
+  top: 12px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+#menu-button {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+}
+
+.viewer-guidance-toggle,
+.viewer-controls-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(10, 10, 12, 0.82);
+  color: rgba(255, 255, 255, 0.92);
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.35);
+}
+
+.viewer-controls-toggle {
+  width: 42px;
+  height: 42px;
+}
+
+.viewer-controls {
+  max-width: calc(100vw - 10px);
+  max-height: calc(100dvh - 10px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+body.viewer-compact-controls .viewer-controls {
+  top: 60px !important;
+  right: 10px !important;
+  max-height: calc(100dvh - 70px);
+}
+
+.viewer-guidance-toggle-icon,
+.viewer-controls-toggle-icon {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.viewer-controls-toggle-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.viewer-guidance-toggle-icon circle,
+.viewer-controls-toggle-icon circle {
+  fill: currentColor;
+  stroke: none;
+}
+
+.viewer-guidance-toggle:hover,
+.viewer-guidance-toggle[aria-pressed="true"],
+.viewer-controls-toggle:hover,
+.viewer-controls-toggle[aria-expanded="true"] {
+  background: rgba(18, 18, 21, 0.92);
+}
+
+.viewer-guidance-toggle:focus-visible,
+.viewer-controls-toggle:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline-offset: 2px;
+}
+
+.viewer-guidance-card {
+  position: fixed;
+  left: 12px;
+  top: 96px;
+  z-index: 4;
+  display: grid;
+  gap: 10px;
+  width: min(480px, calc(100vw - 24px));
+  max-height: calc(100dvh - 108px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(10, 10, 12, 0.76);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+}
+
+.viewer-guidance-card[hidden] {
+  display: none !important;
+}
+
+.viewer-guidance-section {
+  display: grid;
+  gap: 4px;
+}
+
+.viewer-guidance-section + .viewer-guidance-section {
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.viewer-guidance-section strong {
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.viewer-guidance-text {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.viewer-guidance-text code {
+  color: rgba(255, 255, 255, 0.96);
+}
+
 .dg.ac {
   -moz-user-select: none;
   -webkit-user-select: none;
@@ -189,6 +402,10 @@ select {
   box-sizing: border-box;
 }
 
+.start-card {
+  width: min(680px, calc(100vw - 48px));
+}
+
 .overlay-kicker {
   margin-bottom: 10px;
   color: rgba(255, 255, 255, 0.48);
@@ -205,11 +422,17 @@ select {
 }
 
 .overlay-copy,
-.overlay-meta {
+.overlay-meta,
+.overlay-menu-hint {
   margin: 14px 0 0;
   color: rgba(255, 255, 255, 0.62);
   font-size: 14px;
   line-height: 1.55;
+}
+
+.overlay-menu-hint {
+  margin-top: 10px;
+  color: rgba(255, 255, 255, 0.52);
 }
 
 .overlay-copy code {
@@ -239,6 +462,104 @@ select {
   color: rgba(255, 255, 255, 0.72);
   font-size: 11px;
   text-transform: uppercase;
+}
+
+.material-profile-picker {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.material-profile-picker-header {
+  display: grid;
+  gap: 3px;
+}
+
+.material-profile-picker-header strong {
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+.material-profile-picker-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.material-profile-choice {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(255, 255, 255, 0.84);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.material-profile-choice:hover,
+.material-profile-choice:focus-visible {
+  border-color: rgba(255, 255, 255, 0.32);
+  background: rgba(255, 255, 255, 0.07);
+  outline: none;
+}
+
+.material-profile-choice[aria-pressed="true"] {
+  border-color: rgba(139, 202, 255, 0.72);
+  background: rgba(22, 64, 100, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(139, 202, 255, 0.18);
+}
+
+.material-profile-choice-green {
+  border-color: rgba(93, 220, 158, 0.22);
+}
+
+.material-profile-choice-green:hover,
+.material-profile-choice-green:focus-visible,
+.material-profile-choice-green[aria-pressed="true"] {
+  border-color: rgba(93, 220, 158, 0.72);
+  background: rgba(18, 88, 59, 0.46);
+}
+
+.material-profile-choice-orange {
+  border-color: rgba(255, 162, 74, 0.24);
+}
+
+.material-profile-choice-orange:hover,
+.material-profile-choice-orange:focus-visible,
+.material-profile-choice-orange[aria-pressed="true"] {
+  border-color: rgba(255, 162, 74, 0.76);
+  background: rgba(110, 61, 15, 0.48);
+}
+
+.material-profile-choice-green[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 1px rgba(93, 220, 158, 0.22), 0 0 24px rgba(36, 180, 111, 0.16);
+}
+
+.material-profile-choice-orange[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 1px rgba(255, 162, 74, 0.24), 0 0 24px rgba(255, 128, 37, 0.16);
+}
+
+.material-profile-choice span {
+  font-size: 13px;
+  line-height: 1.2;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.material-profile-choice small {
+  margin-top: 5px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .overlay-guidance-grid {
@@ -274,6 +595,31 @@ select {
 
 .load-card {
   display: grid;
+}
+
+.shader-warmup-note {
+  display: grid;
+  gap: 6px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 207, 135, 0.62);
+  background: rgba(95, 72, 36, 0.62);
+  color: rgba(224, 238, 255, 0.96);
+}
+
+.shader-warmup-note strong {
+  display: block;
+  color: #cfe4ff;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.shader-warmup-note p {
+  margin: 0;
+  color: rgba(224, 238, 255, 0.82);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .spinner {

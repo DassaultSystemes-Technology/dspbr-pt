@@ -21,6 +21,8 @@ import * as Assets from './asset_index';
 const VERTEX_STRIDE = 20;
 const MATERIAL_OFFSET = 3;
 const PICK_EPSILON = 1e-7;
+const MATERIAL_PROFILES = ['webgl-lean', 'webgl-full'] as const;
+type MaterialProfile = typeof MATERIAL_PROFILES[number];
 
 if (!window.File || !window.FileReader || !window.FileList || !window.Blob) {
   alert('The File APIs are not fully supported in this browser.');
@@ -47,6 +49,11 @@ class Demo {
   private _diagnosticsPanel: HTMLDivElement;
   private _diagnosticsVisible = false;
   private _diagnosticsTimer = 0;
+  private _helpPanel: HTMLElement | null = null;
+  private _helpVisible = false;
+  private _materialProfile: MaterialProfile = 'webgl-lean';
+  private _materialProfileChoiceButtons: HTMLButtonElement[] = [];
+  private _menuOpen = false;
   private _materialSelection = { index: 0 };
   private _materialSelector?: { refresh: () => void };
 
@@ -59,17 +66,17 @@ class Demo {
 
   constructor() {
     this._container = document.createElement('div');
-    this._viewer    = new DemoViewer({ container: this._container });
+    this._params = new Proxy(new URLSearchParams(window.location.search), {
+      get: (sp, prop: string) => sp.get(prop),
+    }) as unknown as Record<string, string | null>;
+    this._materialProfile = parseMaterialProfile(new URLSearchParams(window.location.search).get('materialProfile'));
+    this._viewer    = new DemoViewer({ container: this._container, materialProfile: this._materialProfile });
     this._renderer  = this._viewer.renderer;
     this._ui        = new Pane({ title: 'dspbr-pt' });
     this._diagnosticsPanel = document.createElement('div');
     this._diagnosticsPanel.className = 'diagnostics-panel';
     this._diagnosticsPanel.hidden = true;
     document.body.appendChild(this._diagnosticsPanel);
-
-    this._params = new Proxy(new URLSearchParams(window.location.search), {
-      get: (sp, prop: string) => sp.get(prop),
-    }) as unknown as Record<string, string | null>;
 
     this._viewer.addEventListener('sceneLoaded', (ev: Event) => {
       const { scene } = (ev as CustomEvent<{ scene: PathtracingSceneData }>).detail;
@@ -78,14 +85,20 @@ class Demo {
       this.renderDiagnosticsPanel();
     });
     window.addEventListener('keydown', ev => {
-      if (ev.key === 'd' || ev.key === 'D' || ev.key === '`') {
+      if (ev.key === '`') {
         if (isEditingElement(ev.target)) return;
+        ev.preventDefault();
         this.toggleDiagnostics();
       }
+      if (ev.key === 'Escape' && this._helpVisible) {
+        this.toggleHelp(false);
+      }
     });
+    window.addEventListener('resize', () => this.syncMenuState());
     this._viewer.viewCanvas.addEventListener('pointerdown', ev => this.captureMaterialPickPointer(ev), true);
     this._viewer.viewCanvas.addEventListener('pointerup', ev => this.captureMaterialPickPointer(ev), true);
     this._viewer.viewCanvas.addEventListener('click', ev => this.handleCanvasClick(ev), true);
+    this.initOverlayActions();
 
     if (this._params['src']) {
       this._viewer.loadSceneFromUrl(this.resolveUrlFromIndex(this._params['src']!));
@@ -103,12 +116,15 @@ class Demo {
     }
 
     this.initUI();
+    this.updateMaterialProfilePicker();
+    this.syncMenuState();
   }
 
   private initUI() {
     Object.assign(this._ui.element.style, {
       width: '350px', top: '5px', right: '5px', position: 'absolute', zIndex: '2',
     });
+    this._ui.element.classList.add('viewer-controls');
 
     this._uiTabs = this._ui.addTab({
       pages: [{ title: 'Parameters' }, { title: 'Materials' }],
@@ -192,7 +208,64 @@ class Demo {
   private toggleDiagnostics() {
     this._diagnosticsVisible = !this._diagnosticsVisible;
     this._diagnosticsPanel.hidden = !this._diagnosticsVisible;
+    const button = document.getElementById('diagnostics-button');
+    button?.setAttribute('aria-pressed', this._diagnosticsVisible ? 'true' : 'false');
+    button?.setAttribute('aria-label', this._diagnosticsVisible ? 'Hide diagnostics' : 'Show diagnostics');
     if (this._diagnosticsVisible) this.renderDiagnosticsPanel();
+  }
+
+  private initOverlayActions() {
+    this._helpPanel = document.getElementById('viewer-help-panel');
+    this._materialProfileChoiceButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('.material-profile-choice[data-material-profile]'));
+    document.getElementById('help-button')?.addEventListener('click', () => this.toggleHelp());
+    document.getElementById('diagnostics-button')?.addEventListener('click', () => this.toggleDiagnostics());
+    document.getElementById('menu-button')?.addEventListener('click', () => this.toggleMenu());
+    for (const button of this._materialProfileChoiceButtons) {
+      button.addEventListener('click', () => {
+        const profile = parseMaterialProfile(button.dataset.materialProfile ?? '');
+        this.selectMaterialProfile(profile);
+      });
+    }
+  }
+
+  private toggleHelp(force?: boolean) {
+    this._helpVisible = force ?? !this._helpVisible;
+    if (this._helpPanel) this._helpPanel.hidden = !this._helpVisible;
+    const button = document.getElementById('help-button');
+    button?.setAttribute('aria-expanded', this._helpVisible ? 'true' : 'false');
+    button?.setAttribute('aria-label', this._helpVisible ? 'Hide viewer help' : 'Show viewer help');
+  }
+
+  private toggleMenu() {
+    this._menuOpen = !this._menuOpen;
+    this.syncMenuState();
+  }
+
+  private syncMenuState() {
+    const compact = window.innerWidth < 900 || window.innerHeight < 640 || window.matchMedia?.('(pointer: coarse)').matches === true;
+    const visible = this._menuOpen;
+    document.body.classList.toggle('viewer-compact-controls', compact);
+    document.body.classList.toggle('viewer-controls-toggle-visible', true);
+    this._ui.element.hidden = !visible;
+    this._ui.element.classList.toggle('viewer-controls-mobile-open', compact && visible);
+    const button = document.getElementById('menu-button');
+    button?.setAttribute('aria-expanded', visible ? 'true' : 'false');
+    button?.setAttribute('aria-label', visible ? 'Hide controls' : 'Show controls');
+  }
+
+  private selectMaterialProfile(profile: MaterialProfile) {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('materialProfile') === profile) return;
+    params.set('materialProfile', profile);
+    const nextSearch = params.toString();
+    window.location.search = nextSearch ? `?${nextSearch}` : '';
+  }
+
+  private updateMaterialProfilePicker() {
+    for (const button of this._materialProfileChoiceButtons) {
+      const active = button.dataset.materialProfile === this._materialProfile;
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    }
   }
 
   private renderDiagnosticsPanel() {
@@ -213,6 +286,7 @@ class Demo {
       ]),
       this.renderDiagnosticsSection('Renderer', [
         ['Backend', d.backend],
+        ['Material', this._materialProfile],
         ['Mode', d.mode],
         ['Samples', formatNumber(d.sampleCount)],
         ['FPS', Number.isFinite(this._viewer.fps) ? this._viewer.fps.toFixed(1) : 'n/a'],
@@ -538,6 +612,10 @@ function intersectRayTriangle(
 
 function buildOptions(labels: string[]): Record<string, string> {
   return Object.fromEntries([['', ''], ...labels.map(l => [l, l])]);
+}
+
+function parseMaterialProfile(value: string | null): MaterialProfile {
+  return MATERIAL_PROFILES.includes(value as MaterialProfile) ? value as MaterialProfile : 'webgl-lean';
 }
 
 function formatNumber(value: number | undefined) {

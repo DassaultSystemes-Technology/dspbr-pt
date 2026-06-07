@@ -15,7 +15,7 @@
 
 import { SimpleDropzone } from 'simple-dropzone';
 import { PathtracingRenderer, loadSceneFromBlobs, loadSceneFromUrl, loadIblFromUrl, loadIblFromBlob } from 'dspbr-pt';
-import type { PathtracingSceneData, IblTextureLike, LoadProgressEvent, PathtracingRendererProgress } from 'dspbr-pt';
+import type { PathtracingRendererMaterialProfile, PathtracingSceneData, IblTextureLike, LoadProgressEvent, PathtracingRendererProgress } from 'dspbr-pt';
 import { PerspectiveCamera } from './perspective_camera';
 import { WasdCameraController } from './wasd_camera_controller';
 import { Vec3, Box3 } from './math';
@@ -86,7 +86,7 @@ export class DemoViewer extends EventTarget {
   private sceneLoading = false;
   private sceneReady = false;
 
-  constructor(params: { container: HTMLElement }) {
+  constructor(params: { container: HTMLElement; materialProfile?: PathtracingRendererMaterialProfile }) {
     super();
     this.container = params.container;
     document.body.appendChild(this.container);
@@ -102,6 +102,7 @@ export class DemoViewer extends EventTarget {
     this.statusDetail = document.getElementById('status-detail')!;
     this.statusMeta = document.getElementById('status-meta')!;
     this.spinner    = document.getElementsByClassName('spinner')[0] as HTMLElement;
+    document.body.classList.add('viewer-overlay-active');
 
     const aspect = window.innerWidth / window.innerHeight;
     this.camera = new PerspectiveCamera(45, aspect, 0.01, 1000);
@@ -120,7 +121,7 @@ export class DemoViewer extends EventTarget {
       this.toggleInteractionMode(false);
     });
 
-    this._renderer = new PathtracingRenderer({ canvas: this.canvas });
+    this._renderer = new PathtracingRenderer({ canvas: this.canvas, materialProfile: params.materialProfile });
     this._renderer.maxBounces = 5;
     this._renderer.pixelRatio = this._pixelRatio;
     this.updateAutoTileRes();
@@ -323,8 +324,14 @@ export class DemoViewer extends EventTarget {
     this.camera.aspect = window.innerWidth / window.innerHeight;
   }
 
-  showStartpage() { this.startpage!.style.visibility = 'visible'; }
-  hideStartpage() { this.startpage!.style.visibility = 'hidden'; }
+  showStartpage() {
+    this.startpage!.style.visibility = 'visible';
+    document.body.classList.add('viewer-overlay-active');
+  }
+  hideStartpage() {
+    this.startpage!.style.visibility = 'hidden';
+    document.body.classList.remove('viewer-overlay-active');
+  }
 
   showStatusScreen(event: LoadProgressEvent | PathtracingRendererProgress) {
     this.loadscreen!.classList.remove('error-mode');
@@ -333,6 +340,7 @@ export class DemoViewer extends EventTarget {
     this.statusMeta!.innerText = event.meta ?? 'Large assets and fresh shaders can take a moment.';
     this.loadscreen!.style.visibility = 'visible';
     this.spinner.style.visibility = 'visible';
+    document.body.classList.add('viewer-overlay-active');
   }
 
   showLoadError(title: string, err: unknown) {
@@ -342,11 +350,15 @@ export class DemoViewer extends EventTarget {
     this.loadscreen!.classList.add('error-mode');
     this.loadscreen!.style.visibility = 'visible';
     this.spinner.style.visibility = 'hidden';
+    document.body.classList.add('viewer-overlay-active');
   }
 
   hideLoadscreen() {
     this.loadscreen!.style.visibility = 'hidden';
     this.spinner.style.visibility = 'hidden';
+    if (this.startpage?.style.visibility === 'hidden') {
+      document.body.classList.remove('viewer-overlay-active');
+    }
   }
 }
 
