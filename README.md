@@ -1,12 +1,12 @@
 # Enterprise PBR WebGL Path Tracer
 
-[Viewer App](https://dassaultsystemes-technology.github.io/dspbr-pt/index.html)
+[Demo Viewer](https://dassaultsystemes-technology.github.io/dspbr-pt/index.html)
 
 [Minimal Demo](https://dassaultsystemes-technology.github.io/dspbr-pt/simple.html) [[ Code ](packages/app/simple.ts)]
 
 ## Features
 * Browser-based WebGL2 GPU path tracing
-* MIS path tracing with IBL importance sampling
+* MIS with IBL importance sampling
 * glTF/glb loading via glTF-Transform, including GitHub/raw URL normalization and local asset caching
 * TinyBVH WASM acceleration structure builds with indexed geometry upload
 * [Enterprise PBR Shading Model (DSPBR)](https://github.com/DassaultSystemes-Technology/EnterprisePBRShadingModel) via [slang-pbr](https://github.com/bsdorra/slang-pbr)
@@ -30,8 +30,7 @@
 Package layout:
 
 * `packages/lib`: renderer, loaders, shaders, public viewport API
-* `packages/viewer`: reusable camera/controller/viewer helpers
-* `packages/app`: full viewer UI and minimal integration example
+* `packages/app`: viewer UI, camera/controller helpers, and minimal integration example
 
 ```bash
 # yarn is mandatory as this project uses yarn workspaces
@@ -101,6 +100,7 @@ This project stands on a lot of excellent open source work. Thanks to the author
 
 ## License
 * Source code license info in [LICENSE](LICENSE)
+* Third-party notices in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
 [1]: https://www.khronos.org/news/press/khronos-releases-wave-of-new-gltf-pbr-3d-material-capabilities
 [2]: https://www.khronos.org/news/press/new-gltf-extensions-raise-the-bar-on-3d-asset-visual-realism

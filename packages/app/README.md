@@ -27,6 +27,6 @@ Both pages are served by this same Vite app, so `/index.html` and `/simple.html`
 
 * `asset_index.ts`: curated scene/IBL entries for the full viewer.
 * `main.css`: shared viewer UI, loading screen, diagnostics, and Tweakpane styling.
-* `vite.config.ts`: app build config and local aliases to `packages/lib` and `packages/viewer`.
+* `vite.config.ts`: app build config and local alias to `packages/lib`.
 
 For renderer/library API details, see [`../lib/README.md`](../lib/README.md). For project-wide development notes, see [`../../README.md`](../../README.md).

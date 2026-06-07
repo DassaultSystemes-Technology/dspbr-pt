@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "scripts": {
-    "clean": "rimraf dist/ packages/lib/dist packages/viewer/dist",
+    "clean": "rimraf dist/ packages/lib/dist",
     "build:slang-materials": "node tools/generate_slang_materials.mjs",
     "validate:shaders": "node tools/validate_shaders.mjs",
     "build": "yarn workspaces foreach --topological run build",

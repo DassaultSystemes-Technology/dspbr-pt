@@ -14,9 +14,9 @@
  */
 
 import { Pane } from 'tweakpane';
-import { DemoViewer } from 'dspbr-pt-viewer';
 import type { PathtracingRenderer, PathtracingSceneData } from 'dspbr-pt';
 import * as Assets from './asset_index';
+import { DemoViewer } from './demo_viewer';
 
 const VERTEX_STRIDE = 20;
 const MATERIAL_OFFSET = 3;

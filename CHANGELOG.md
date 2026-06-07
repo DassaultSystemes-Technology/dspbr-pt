@@ -14,6 +14,7 @@
   - unweld, dequantize
 
 ### Changes
+- Merge viewer helpers into the demo app workspace
 - Update slang-pbr integration to use the stable Enterprise PBR facade
 - Add viewer splash/profile selection, diagnostics/help actions, and mobile menu layout
 - Add tiled rendering to improve responsiveness

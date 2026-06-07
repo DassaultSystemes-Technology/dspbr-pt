@@ -1,6 +1,8 @@
 import { Pane } from 'tweakpane';
 import { createPathtracingViewport } from 'dspbr-pt';
-import { PerspectiveCamera, Vec3, WasdCameraController } from 'dspbr-pt-viewer';
+import { PerspectiveCamera } from './perspective_camera';
+import { Vec3 } from './math';
+import { WasdCameraController } from './wasd_camera_controller';
 
 const settings = {
   exposure: 1.5,

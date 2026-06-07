@@ -15,8 +15,7 @@ export default defineConfig(({ command }) => ({
 
   resolve: {
     alias: {
-      'dspbr-pt':        resolve(__dirname, '../lib/index.ts'),
-      'dspbr-pt-viewer': resolve(__dirname, '../viewer/main.ts'),
+      'dspbr-pt': resolve(__dirname, '../lib/index.ts'),
     },
   },
 
