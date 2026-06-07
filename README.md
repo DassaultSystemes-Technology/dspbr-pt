@@ -9,16 +9,9 @@
 * MIS path tracing with IBL importance sampling
 * glTF/glb loading via glTF-Transform, including GitHub/raw URL normalization and local asset caching
 * TinyBVH WASM acceleration structure builds with indexed geometry upload
-* Slang-generated material evaluation for [Enterprise PBR Shading Model (DSPBR)](https://github.com/DassaultSystemes-Technology/EnterprisePBRShadingModel)
+* [Enterprise PBR Shading Model (DSPBR)](https://github.com/DassaultSystemes-Technology/EnterprisePBRShadingModel) via [slang-pbr](https://github.com/bsdorra/slang-pbr)
 * Public `PathtracingViewport` API for simple embedding
-* Supported material features include:
-  * [x] Rough Metal & Dielectrics (opaque/transparent)<br>
-  Using energy preserving, multi-scattering GGX BRDF and directional albedo scaling for diffuse/sheen components
-  * [x] Sheen
-  * [x] Clearcoat
-  * [x] Emission
-  * [x] Iridescence
-* Implements most of the glTF PBR material extensions [1,2].
+* Implements most of the glTF PBR material extensions.
   * [KHR_materials_anisotropy](https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_anisotropy/README.md)
   * [KHR_materials_clearcoat](https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_materials_clearcoat/README.md)
   * [KHR_materials_emission_strength](https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_emissive_strength/README.md)
@@ -27,8 +20,10 @@
   * [KHR_materials_sheen](https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_materials_sheen/README.md)
   * [KHR_materials_specular](https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_specular)
   * [KHR_materials_transmission](https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_materials_transmission/README.md)
+  * [KHR_materials_dispersion](https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_dispersion/README.md)
   * [KHR_materials_volume](https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_volume)
   * [KHR_materials_diffuse_transmission (Release Candidate)](https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_diffuse_transmission/README.md)
+  * [KHR_materials_volume_scatter (PR)](https://github.com/KhronosGroup/glTF/blob/134d07661f461ee26d02e0e11b7ebe3e26f28330/extensions/2.0/Khronos/KHR_materials_volume_scatter/README.md)
 
 ## Development
 
@@ -93,6 +88,7 @@ npm run render -- -- "https://example.com/scene.gltf" --ibl "https://dl.polyhave
 This project stands on a lot of excellent open source work. Thanks to the authors and maintainers of:
 
 * [TinyBVH](https://github.com/jbikker/tinybvh), by Jacco Bikker, for the compact high-performance BVH builder and traversal code that backs the WASM acceleration structure path.
+* [tinybvh-wasm](https://github.com/bsdorra/tinybvh-wasm), for the reusable TinyBVH WebAssembly bridge and browser-facing BVH builder ABI.
 * [glTF Transform](https://github.com/donmccurdy/glTF-Transform), by Don McCurdy and contributors, for the glTF parsing, extension handling, and asset processing foundation.
 * [meshoptimizer](https://github.com/zeux/meshoptimizer), by Arseny Kapoulkine, for mesh compression decoding support used by glTF assets.
 * [Slang](https://github.com/shader-slang/slang), from the shader-slang project and its research contributors, for the shader language/toolchain used to generate the material model code.
