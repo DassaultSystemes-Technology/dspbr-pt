@@ -1,36 +1,67 @@
-# Install, build and publish the viewer and examples to github pages root (demo)
-name: Publish Demo
+name: Build and Publish Demo
 
-# Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the main branch
-  # push:
-  #   branches: [ main ]
-
-  # Allows you to run this workflow manually from the Actions tab
+  pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  # This workflow contains a single job called "build"
   build:
     runs-on: ubuntu-latest
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Install Dependencies
-        run: yarn install
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+
+      - name: Install shader validator
+        run: sudo apt-get update && sudo apt-get install -y glslang-tools
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Validate shaders
+        run: yarn validate:shaders
 
       - name: Build
         run: yarn build
 
+      - name: Upload demo artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo
+          path: dist
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download demo artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: demo
+          path: dist
+
       - name: Deploy
-        uses: peaceiris/actions-gh-pages@v3
-        if: ${{ github.ref == 'refs/heads/main' }}
+        uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_branch: demo  # default: gh-pages
+          publish_branch: demo
           publish_dir: ./dist
-          # destination_dir: demo
