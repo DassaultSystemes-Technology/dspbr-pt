@@ -21,7 +21,7 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "rimraf": "^3.0.2",
-    "slang-pbr": "https://github.com/bsdorra/slang-pbr.git#commit=c12046ec3b9628bcfc384ed2c275c92d007e5d7e",
+    "slang-pbr": "https://github.com/bsdorra/slang-pbr/archive/c12046ec3b9628bcfc384ed2c275c92d007e5d7e.tar.gz",
     "typescript": "^5.5.0"
   },
   "packageManager": "yarn@3.2.0"
