@@ -11,6 +11,7 @@ const shaderPlugin = {
 };
 
 export default defineConfig(({ command }) => ({
+  base: command === 'serve' ? '/' : './',
   publicDir: command === 'serve' ? resolve(__dirname, '../../assets') : false,
 
   resolve: {
