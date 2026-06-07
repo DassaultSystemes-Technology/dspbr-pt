@@ -1,1 +1,127 @@
-<!DOCTYPE html><html lang="en"><head><script type="module" src="index.1c278865.js"></script><title>Enterprise PBR Sample Renderer</title><meta charset="utf-8"><meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"><link type="text/css" rel="stylesheet" href="index.643b61d6.css"></head><body> <div id="info"> <a href="https://github.com/DassaultSystemes-Technology/EnterprisePBRShadingModel">Enterprise PBR</a> Sample Renderer <div id="version">dev</div> </div> <div id="startpage" class="overlay"> <div> <p>Drag&Drop</p> <p>[.glb|.gltf+assets|.hdr]</p> </div> </div> <div id="loadscreen" class="overlay" style="visibility:hidden"> <div> <p id="status"></p> </div> <div class="spinner" style="visibility:hidden"></div> </div> <div id="bottom-info"> <div id="ibl-info"></div> <div id="scene-info"></div> </div> <script src="index.85729736.js" type="module"></script> </body></html>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <title>Enterprise PBR Sample Renderer</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+  <script type="module" crossorigin src="/assets/index-DdfbdYWN.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/wasd_camera_controller-DDfQmZbS.js">
+  <link rel="stylesheet" crossorigin href="/assets/index-WklDtUCg.css">
+</head>
+
+<body>
+  <div id="info">
+    <a href="https://github.com/DassaultSystemes-Technology/EnterprisePBRShadingModel">Enterprise PBR</a> Sample
+    Renderer
+    <div id="version">dev</div>
+  </div>
+
+  <div class="viewer-action-bar" aria-label="Viewer actions">
+    <button type="button" id="help-button" class="viewer-guidance-toggle viewer-guidance-toggle-help" title="Help" aria-expanded="false" aria-label="Show viewer help">?</button>
+    <button type="button" id="diagnostics-button" class="viewer-guidance-toggle viewer-guidance-toggle-diagnostics" title="Diagnostics" aria-pressed="false" aria-label="Show diagnostics">
+      <svg class="viewer-guidance-toggle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M4 18.5h16" />
+        <path d="M6 15.5l3.25-3.25 3 2.25 5-6" />
+        <circle cx="6" cy="15.5" r="1.25" />
+        <circle cx="9.25" cy="12.25" r="1.25" />
+        <circle cx="12.25" cy="14.5" r="1.25" />
+        <circle cx="17.25" cy="8.5" r="1.25" />
+      </svg>
+    </button>
+    <button type="button" id="menu-button" class="viewer-controls-toggle" title="Scene menu" aria-expanded="false" aria-label="Show controls">
+      <svg class="viewer-controls-toggle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M4 7h16" />
+        <path d="M4 12h16" />
+        <path d="M4 17h16" />
+        <circle cx="8" cy="7" r="1.7" />
+        <circle cx="15" cy="12" r="1.7" />
+        <circle cx="10" cy="17" r="1.7" />
+      </svg>
+    </button>
+  </div>
+
+  <div id="viewer-help-panel" class="viewer-guidance-card" hidden>
+    <div class="viewer-guidance-section">
+      <strong>Camera</strong>
+      <p class="viewer-guidance-text">Left drag orbit, right drag pan, wheel zoom.</p>
+      <p class="viewer-guidance-text">Use middle drag to steer. <code>W A S D</code> move, <code>Q / E</code> move vertically, <code>Shift</code> moves faster.</p>
+    </div>
+    <div class="viewer-guidance-section">
+      <strong>Load</strong>
+      <p class="viewer-guidance-text">Drop a <code>.glb</code>, a <code>.gltf</code> with its assets, or an <code>.hdr</code> environment.</p>
+      <p class="viewer-guidance-text">Use <code>?src=...</code> for scenes and <code>&amp;ibl=...</code> for environments.</p>
+    </div>
+    <div class="viewer-guidance-section">
+      <strong>Materials</strong>
+      <p class="viewer-guidance-text"><code>Alt</code>-click a surface to select its material in the editor.</p>
+    </div>
+    <div class="viewer-guidance-section">
+      <strong>Diagnostics</strong>
+      <p class="viewer-guidance-text">Use the graph button or press <code>`</code> to toggle diagnostics.</p>
+    </div>
+  </div>
+
+  <div id="startpage" class="overlay">
+    <div class="overlay-card start-card">
+      <div class="overlay-kicker">dspbr-pt Viewer</div>
+      <h1>Drop a Scene and Start Tracing</h1>
+      <p class="overlay-menu-hint">Or use the scene menu in the upper right to select bundled assets.</p>
+      <div class="overlay-chip-row">
+        <span class="overlay-chip">.glb</span>
+        <span class="overlay-chip">.gltf + assets</span>
+        <span class="overlay-chip">.hdr</span>
+      </div>
+      <div class="material-profile-picker" role="group" aria-label="Material profile">
+        <div class="material-profile-picker-header">
+          <strong>Choose your material profile</strong>
+        </div>
+        <div class="material-profile-picker-actions">
+          <button type="button" class="material-profile-choice material-profile-choice-green" data-material-profile="webgl-lean">
+            <span>Lean Enterprise PBR</span>
+            <small>Faster startup; no iridescence, dispersion, or volume scattering.</small>
+          </button>
+          <button type="button" class="material-profile-choice material-profile-choice-orange" data-material-profile="webgl-full">
+            <span>Full Enterprise PBR</span>
+            <small>Complete material model; higher shader compile cost.</small>
+          </button>
+        </div>
+      </div>
+      <div class="shader-warmup-note">
+        <strong>Please be patient on first load</strong>
+        <p>Sorry for the wait: the browser has to compile and link WebGL shader programs the first time you load a scene. This can take a while for the full material profile.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="loadscreen" class="overlay" style="visibility: hidden">
+    <div class="overlay-card load-card">
+      <div class="overlay-kicker">Preparing Renderer</div>
+      <h2 id="status">Loading Scene...</h2>
+      <p id="status-detail" class="overlay-copy">Parsing assets, uploading resources, and compiling shaders.</p>
+      <div class="shader-warmup-note">
+        <strong>Please be patient on first load</strong>
+        <p>Sorry for the wait: the browser has to compile and link WebGL shader programs the first time the renderer starts. This can take a while before the scene appears.</p>
+      </div>
+      <div class="spinner" style="visibility: hidden;">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+      <div class="loading-bar">
+        <div class="loading-bar-fill"></div>
+      </div>
+      <p id="status-meta" class="overlay-meta">Large assets, fresh shaders, and mobile GPUs can take a moment.</p>
+    </div>
+  </div>
+
+
+  <div id="bottom-info">
+  <div id="ibl-info"></div>
+  <div id="scene-info"></div>
+  </div>
+
+
+</body>
+
+</html>
